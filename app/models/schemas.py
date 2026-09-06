@@ -1,0 +1,157 @@
+"""
+schemas.py
+-----------
+Pydantic request/response models for the SIH26137 FastAPI backend.
+"""
+
+from __future__ import annotations
+from pydantic import BaseModel, Field
+from typing import List, Optional, Literal
+
+
+# ---------------------------------------------------------------------------
+# Network generation
+# ---------------------------------------------------------------------------
+
+class NetworkGenerateRequest(BaseModel):
+    n_nodes: int = Field(30, ge=5, le=500, description="Number of intersections/nodes")
+    connectivity: float = Field(0.15, ge=0.05, le=0.5, description="k-nearest-neighbor connectivity fraction")
+    seed: int = Field(42, description="Random seed for reproducibility")
+    grid_size: float = Field(100.0, description="Size of the 2D plane nodes are scattered in")
+
+
+class NodeOut(BaseModel):
+    id: int
+    x: float
+    y: float
+
+
+class EdgeOut(BaseModel):
+    u: int
+    v: int
+    distance: float
+    base_time: float
+    congestion_factor: float
+
+
+class NetworkResponse(BaseModel):
+    network_id: str
+    num_nodes: int
+    num_edges: int
+    is_geo: bool = Field(False, description="True if node x/y are real longitude/latitude (OSM); False for synthetic planar coords")
+    nodes: List[NodeOut]
+    edges: List[EdgeOut]
+
+
+class OSMNetworkRequest(BaseModel):
+    place: Optional[str] = Field(None, description="Geocodable place name, e.g. 'Connaught Place, New Delhi, India'")
+    north: Optional[float] = Field(None, description="Bounding box north latitude (alternative to `place`)")
+    south: Optional[float] = None
+    east: Optional[float] = None
+    west: Optional[float] = None
+    network_type: str = Field("drive", description="osmnx network type: drive, walk, bike, etc.")
+    max_nodes: int = Field(2000, ge=10, le=20000)
+    seed: int = Field(1, description="Seed for simulated congestion randomization")
+
+
+# ---------------------------------------------------------------------------
+# VRP instance generation
+# ---------------------------------------------------------------------------
+
+class VRPGenerateRequest(BaseModel):
+    network_id: str
+    n_customers: int = Field(15, ge=1, le=300)
+    depot: int = Field(0, description="Node id to use as the depot")
+    vehicle_capacity: float = Field(100.0, gt=0)
+    n_vehicles: Optional[int] = Field(None, description="If omitted, auto-computed from total demand")
+    demand_min: float = Field(5.0)
+    demand_max: float = Field(20.0)
+    horizon: float = Field(480.0, description="Operating time horizon in minutes")
+    window_length_min: float = Field(60.0)
+    window_length_max: float = Field(180.0)
+    service_time: float = Field(10.0)
+    seed: int = Field(1)
+
+
+class CustomerOut(BaseModel):
+    node_id: int
+    demand: float
+    ready_time: float
+    due_time: float
+    service_time: float
+
+
+class VRPInstanceResponse(BaseModel):
+    vrp_id: str
+    network_id: str
+    depot: int
+    n_vehicles: int
+    vehicle_capacity: float
+    total_demand: float
+    customers: List[CustomerOut]
+
+
+# ---------------------------------------------------------------------------
+# Solve
+# ---------------------------------------------------------------------------
+
+AlgorithmName = Literal["qpso", "ga", "sa", "standard_pso", "greedy"]
+
+
+class VRPSolveRequest(BaseModel):
+    vrp_id: str
+    algorithm: AlgorithmName = "qpso"
+    n_particles: int = Field(50, ge=5, le=500, description="Swarm/population size (QPSO, GA, standard_pso)")
+    max_iter: int = Field(150, ge=1, le=5000)
+    seed: int = Field(1)
+    use_local_search: bool = Field(True, description="QPSO only: hybridize with 2-opt/or-opt local search")
+
+
+class RouteOut(BaseModel):
+    vehicle_id: int
+    customer_sequence: List[int]
+    load: float
+    full_path: List[int] = Field(default_factory=list, description="Full road-network node sequence (depot -> ... -> depot) including intermediate intersections, for accurate map rendering")
+
+
+class VRPSolveResponse(BaseModel):
+    algorithm: str
+    routes: List[RouteOut]
+    total_distance: float
+    total_time: float
+    capacity_violation: float
+    time_window_violation: float
+    feasible: bool
+    fitness: float
+    runtime_ms: float
+    n_evaluations: int
+    convergence_curve: List[float]
+
+
+# ---------------------------------------------------------------------------
+# Benchmark
+# ---------------------------------------------------------------------------
+
+class BenchmarkRequest(BaseModel):
+    vrp_id: str
+    max_iter: int = Field(150, ge=1, le=5000)
+    seed: int = Field(1)
+    algorithms: Optional[List[AlgorithmName]] = Field(
+        None, description="Subset of algorithms to run; defaults to all"
+    )
+
+
+class BenchmarkAlgoResult(BaseModel):
+    algorithm: str
+    fitness: float
+    distance: float
+    time: float
+    feasible: bool
+    runtime_ms: float
+    n_evaluations: int
+    convergence_curve: List[float]
+
+
+class BenchmarkResponse(BaseModel):
+    vrp_id: str
+    results: List[BenchmarkAlgoResult]
