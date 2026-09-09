@@ -66,6 +66,12 @@ separately, but test the actual UI end-to-end first thing on your machine and
 expect to fix small integration issues (e.g. CORS, port mismatches, edge
 cases in map rendering for very large OSM networks).
 
+## Deploying
+
+Backend and frontend deploy to **different platforms** (Render for the backend,
+Vercel/Netlify for the frontend) — see [DEPLOYMENT.md](DEPLOYMENT.md) for why and how.
+Do not attempt to deploy the whole app to Vercel.
+
 ## Running the standalone benchmark scripts (no API needed)
 
 These generate the convergence and scalability plots directly to `data/`:
