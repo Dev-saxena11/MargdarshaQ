@@ -1,0 +1,100 @@
+# Deployment Architecture
+
+> Resolves [#43](https://github.com/Dev-saxena11/SIH26137/issues/43). Read this before
+> attempting to deploy the app — **do not deploy the whole thing to Vercel.**
+
+## Decision
+
+This app deploys as **two separate services on two different platforms**, not as one
+unified deployment:
+
+| Component | Platform | Type |
+|---|---|---|
+| Backend (`app/`, FastAPI) | **Render** | Persistent web service |
+| Frontend (`frontend/dashboard.html`) | **Vercel** (or Netlify) | Static site |
+
+## Why not "just deploy it all to Vercel"
+
+Vercel's hosting model for a Python backend is serverless functions, and this backend
+doesn't fit that model:
+
+- **Cold starts.** Vercel serverless functions spin down when idle and cold-start on the
+  next request. The VRP solver (QPSO + local search, benchmark runs across multiple
+  algorithms) is CPU-bound and can run for seconds to tens of seconds — a cold start on
+  top of that produces a bad first-request experience or an outright timeout.
+- **Execution time limits.** Vercel serverless functions have hard execution timeouts
+  (10s on the free/Hobby tier, longer on paid plans, but still capped). A full
+  `/benchmark` run across QPSO/GA/SA/PSO/greedy baselines is not guaranteed to fit
+  inside that window as problem size grows.
+- **Geospatial dependencies (`osmnx`, and transitively `geopandas`/`fiona`/`shapely`,
+  which depend on GDAL).** These are heavy, sometimes-compiled-from-source packages.
+  Vercel's Python serverless build environment is constrained and frequently fails to
+  build packages with native/GDAL dependencies, or produces bundles that exceed the
+  function size limit. Render's web service runtime is a normal persistent Linux
+  container with a full `pip install` — the standard environment these packages are
+  built and tested against.
+
+Vercel (or Netlify) is genuinely the right tool for the **frontend** half: `dashboard.html`
+is a single static file with no build step, and Vercel/Netlify are optimized exactly for
+that (global CDN, instant deploys, generous free tier).
+
+## Backend: Render
+
+Config lives in [`render.yaml`](render.yaml) at the repo root (Render's
+[Blueprint](https://render.com/docs/blueprint-spec) format — Render auto-detects it).
+
+- **Build:** `pip install -r requirements.txt`
+- **Start:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Runtime:** Python 3.11 (pinned via `PYTHON_VERSION` — osmnx's dependency chain is
+  most reliably prebuilt for 3.11 at time of writing; bump this only after confirming
+  wheels exist for a newer version, see verification steps below)
+
+### Deploy steps
+1. On [render.com](https://render.com), **New → Blueprint**, point it at this repo.
+   Render reads `render.yaml` and creates the web service automatically.
+2. Wait for the build to finish and open the Render **build logs**.
+3. **Verify the `osmnx`/GDAL dependency chain actually built** (see below) — this is
+   the single most likely failure point on a fresh Render service.
+4. Once live, note the service URL (`https://<service-name>.onrender.com`) — the
+   frontend needs it (see below).
+
+### Verifying the osmnx/GDAL build (do this once per environment change)
+Render's Python runtime ships manylinux wheels for `shapely`/`fiona`/`pyogrio` in most
+cases, so a plain `pip install -r requirements.txt` *should* succeed without needing to
+apt-install GDAL manually. Confirm this rather than assuming it:
+- Check the Render build log for the `osmnx`, `geopandas`, `fiona` (or `pyogrio`)
+  install lines — a successful build shows wheels being downloaded, not `Building wheel
+  for fiona (pyproject.toml) ...` compiling from source.
+- After deploy, hit `GET /docs` on the live service and exercise an endpoint that
+  exercises `osm_network.py` (e.g. generate a real-map network) to confirm the import
+  works at runtime, not just at install time.
+- If a build does fail on GDAL, the fix is a `render-build.sh` that
+  `apt-get install -y gdal-bin libgdal-dev` before `pip install` — not a switch back to
+  Vercel. Document any such change here.
+
+### CORS note
+`app/main.py` currently sets `allow_origins=["*"]` for local-dev convenience. This is
+fine for the hackathon demo but should be narrowed to the actual deployed frontend
+origin(s) before treating this as a production deployment.
+
+## Frontend: Vercel (or Netlify)
+
+`frontend/dashboard.html` is a static file with a configurable **API Base URL** input
+field built into the page itself (see the `apiBase` field in the dashboard) — so no
+code changes or rebuilds are needed to point it at the deployed Render backend. Deploy
+the `frontend/` directory as-is; there is no build step.
+
+- **Vercel:** import the repo, set the project **root directory to `frontend/`**.
+  [`frontend/vercel.json`](frontend/vercel.json) rewrites `/` to `/dashboard.html` so the
+  dashboard loads at the site root instead of requiring `/dashboard.html` in the URL.
+- **Netlify:** import the repo, set **base directory to `frontend/`**, publish directory
+  `.`. [`frontend/netlify.toml`](frontend/netlify.toml) provides the equivalent redirect.
+
+After both are deployed, open the frontend URL and set the **API Base URL** field to the
+Render backend URL from the previous section.
+
+## Summary — what to tell anyone who suggests "just deploy it all to Vercel"
+
+Point them at this file. The short version: Vercel is great for the static dashboard,
+wrong for a long-running, CPU-bound, GDAL-dependent Python backend. Backend → Render,
+frontend → Vercel/Netlify, connected via the dashboard's existing API Base URL field.
