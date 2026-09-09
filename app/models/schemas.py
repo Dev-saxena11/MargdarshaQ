@@ -112,6 +112,8 @@ class RouteOut(BaseModel):
     customer_sequence: List[int]
     load: float
     full_path: List[int] = Field(default_factory=list, description="Full road-network node sequence (depot -> ... -> depot) including intermediate intersections, for accurate map rendering")
+    congestion_delay_min: float = Field(0.0, description="Minutes lost specifically due to traffic congestion factor > 1.0")
+    avg_congestion: float = Field(1.0, description="Average congestion factor encountered along route edges")
 
 
 class VRPSolveResponse(BaseModel):
@@ -126,6 +128,9 @@ class VRPSolveResponse(BaseModel):
     runtime_ms: float
     n_evaluations: int
     convergence_curve: List[float]
+    congestion_delay_min: float = Field(0.0, description="Total fleet minutes lost to traffic congestion")
+    avg_congestion: float = Field(1.0, description="Fleet-wide average congestion factor across traversed road segments")
+    base_time_min: float = Field(0.0, description="Fleet travel time in free-flow conditions with no congestion")
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +155,37 @@ class BenchmarkAlgoResult(BaseModel):
     runtime_ms: float
     n_evaluations: int
     convergence_curve: List[float]
+    congestion_delay_min: float = Field(0.0, description="Total fleet minutes lost to traffic congestion")
+    avg_congestion: float = Field(1.0, description="Fleet-wide average congestion factor")
 
 
 class BenchmarkResponse(BaseModel):
     vrp_id: str
     results: List[BenchmarkAlgoResult]
+
+
+# ---------------------------------------------------------------------------
+# Before / After Comparison
+# ---------------------------------------------------------------------------
+
+class VRPCompareRequest(BaseModel):
+    vrp_id: str
+    baseline_algo: AlgorithmName = "greedy"
+    optimized_algo: AlgorithmName = "qpso"
+    n_particles: int = Field(50, ge=5, le=500)
+    max_iter: int = Field(150, ge=1, le=5000)
+    seed: int = Field(1)
+    use_local_search: bool = Field(True)
+
+
+class VRPCompareResponse(BaseModel):
+    vrp_id: str
+    baseline: VRPSolveResponse
+    optimized: VRPSolveResponse
+    time_saved_pct: float = Field(..., description="Percentage of travel time saved by optimized route vs baseline")
+    congestion_avoided_pct: float = Field(..., description="Percentage of traffic congestion delay avoided by optimized route")
+    distance_saved_pct: float = Field(..., description="Percentage of total distance saved")
+    time_saved_min: float = Field(..., description="Total minutes saved")
+    delay_saved_min: float = Field(..., description="Total congestion delay minutes avoided")
+    distance_saved_km: float = Field(..., description="Total kilometers saved")
+

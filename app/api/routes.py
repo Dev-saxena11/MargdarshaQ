@@ -28,6 +28,7 @@ from app.models.schemas import (
     VRPGenerateRequest, VRPInstanceResponse, CustomerOut,
     VRPSolveRequest, VRPSolveResponse, RouteOut,
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
+    VRPCompareRequest, VRPCompareResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -175,6 +176,7 @@ def get_vrp_instance(vrp_id: str):
 
 def _routes_with_loads(problem: VRPProblem, routes):
     demand_lookup = {c.node_id: c.demand for c in problem.customers}
+    G = problem.net.graph
     out = []
     for i, route in enumerate(routes):
         if not route:
@@ -193,8 +195,69 @@ def _routes_with_loads(problem: VRPProblem, routes):
             else:
                 full_path.extend(leg)
 
-        out.append(RouteOut(vehicle_id=i, customer_sequence=route, load=load, full_path=full_path))
+        # Calculate route-level congestion metrics along full_path
+        route_base_time = 0.0
+        route_travel_time = 0.0
+        cong_factors = []
+        for u, v in zip(full_path[:-1], full_path[1:]):
+            if G.has_edge(u, v):
+                edge_data = G[u][v]
+                b_time = edge_data.get("base_time", 0.0)
+                c_fac = edge_data.get("congestion_factor", 1.0)
+                route_base_time += b_time
+                route_travel_time += b_time * c_fac
+                cong_factors.append(c_fac)
+
+        route_delay = max(0.0, route_travel_time - route_base_time)
+        avg_cong = float(np.mean(cong_factors)) if cong_factors else 1.0
+
+        out.append(RouteOut(
+            vehicle_id=i,
+            customer_sequence=route,
+            load=load,
+            full_path=full_path,
+            congestion_delay_min=round(route_delay, 2),
+            avg_congestion=round(avg_cong, 2),
+        ))
     return out
+
+
+def _build_solve_response(problem: VRPProblem, sol, curve, n_eval, name, runtime_ms):
+    routes_out = _routes_with_loads(problem, sol.routes)
+    G = problem.net.graph
+
+    total_base_time = 0.0
+    total_effective_time = 0.0
+    all_cong = []
+
+    for r in routes_out:
+        for u, v in zip(r.full_path[:-1], r.full_path[1:]):
+            if G.has_edge(u, v):
+                b_time = G[u][v].get("base_time", 0.0)
+                c_fac = G[u][v].get("congestion_factor", 1.0)
+                total_base_time += b_time
+                total_effective_time += b_time * c_fac
+                all_cong.append(c_fac)
+
+    total_delay = max(0.0, total_effective_time - total_base_time)
+    avg_cong = float(np.mean(all_cong)) if all_cong else 1.0
+
+    return VRPSolveResponse(
+        algorithm=name,
+        routes=routes_out,
+        total_distance=round(sol.total_distance, 2),
+        total_time=round(sol.total_time, 2),
+        capacity_violation=round(sol.capacity_violation, 2),
+        time_window_violation=round(sol.time_window_violation, 2),
+        feasible=sol.feasible,
+        fitness=round(sol.fitness, 2),
+        runtime_ms=round(runtime_ms, 2),
+        n_evaluations=n_eval,
+        convergence_curve=curve,
+        congestion_delay_min=round(total_delay, 2),
+        avg_congestion=round(avg_cong, 2),
+        base_time_min=round(total_base_time, 2),
+    )
 
 
 def _solve_one(problem: VRPProblem, algorithm: str, n_particles: int,
@@ -245,19 +308,7 @@ def solve_vrp(req: VRPSolveRequest):
     if sol is None:
         raise HTTPException(status_code=500, detail="Solver failed to produce a solution")
 
-    return VRPSolveResponse(
-        algorithm=name,
-        routes=_routes_with_loads(problem, sol.routes),
-        total_distance=sol.total_distance,
-        total_time=sol.total_time,
-        capacity_violation=sol.capacity_violation,
-        time_window_violation=sol.time_window_violation,
-        feasible=sol.feasible,
-        fitness=sol.fitness,
-        runtime_ms=runtime_ms,
-        n_evaluations=n_eval,
-        convergence_curve=curve,
-    )
+    return _build_solve_response(problem, sol, curve, n_eval, name, runtime_ms)
 
 
 # ---------------------------------------------------------------------------
@@ -284,10 +335,73 @@ def run_benchmark(req: BenchmarkRequest):
         )
         if sol is None:
             continue
+
+        resp = _build_solve_response(problem, sol, curve, n_eval, name, runtime_ms)
         results.append(BenchmarkAlgoResult(
-            algorithm=name, fitness=sol.fitness, distance=sol.total_distance,
-            time=sol.total_time, feasible=sol.feasible, runtime_ms=runtime_ms,
+            algorithm=name, fitness=resp.fitness, distance=resp.total_distance,
+            time=resp.total_time, feasible=resp.feasible, runtime_ms=resp.runtime_ms,
             n_evaluations=n_eval, convergence_curve=curve,
+            congestion_delay_min=resp.congestion_delay_min,
+            avg_congestion=resp.avg_congestion,
         ))
 
     return BenchmarkResponse(vrp_id=req.vrp_id, results=results)
+
+
+# ---------------------------------------------------------------------------
+# Before / After Comparison
+# ---------------------------------------------------------------------------
+
+@router.post("/vrp/compare", response_model=VRPCompareResponse)
+def compare_vrp(req: VRPCompareRequest):
+    try:
+        problem = store.get_vrp(req.vrp_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    # Solve baseline
+    base_sol, base_curve, base_neval, base_name, base_rt = _solve_one(
+        problem, req.baseline_algo, n_particles=req.n_particles,
+        max_iter=req.max_iter, seed=req.seed, use_local_search=False
+    )
+    if base_sol is None:
+        raise HTTPException(status_code=500, detail="Baseline solver failed")
+    baseline_resp = _build_solve_response(problem, base_sol, base_curve, base_neval, base_name, base_rt)
+
+    # Solve optimized
+    opt_sol, opt_curve, opt_neval, opt_name, opt_rt = _solve_one(
+        problem, req.optimized_algo, n_particles=req.n_particles,
+        max_iter=req.max_iter, seed=req.seed, use_local_search=req.use_local_search
+    )
+    if opt_sol is None:
+        raise HTTPException(status_code=500, detail="Optimized solver failed")
+    optimized_resp = _build_solve_response(problem, opt_sol, opt_curve, opt_neval, opt_name, opt_rt)
+
+    # Compute deltas
+    base_time = baseline_resp.total_time
+    opt_time = optimized_resp.total_time
+    time_saved_min = max(0.0, base_time - opt_time)
+    time_saved_pct = (time_saved_min / base_time * 100.0) if base_time > 0 else 0.0
+
+    base_dist = baseline_resp.total_distance
+    opt_dist = optimized_resp.total_distance
+    dist_saved_km = max(0.0, base_dist - opt_dist)
+    dist_saved_pct = (dist_saved_km / base_dist * 100.0) if base_dist > 0 else 0.0
+
+    base_delay = baseline_resp.congestion_delay_min
+    opt_delay = optimized_resp.congestion_delay_min
+    delay_saved_min = max(0.0, base_delay - opt_delay)
+    delay_saved_pct = (delay_saved_min / base_delay * 100.0) if base_delay > 0 else 0.0
+
+    return VRPCompareResponse(
+        vrp_id=req.vrp_id,
+        baseline=baseline_resp,
+        optimized=optimized_resp,
+        time_saved_pct=round(time_saved_pct, 1),
+        congestion_avoided_pct=round(delay_saved_pct, 1),
+        distance_saved_pct=round(dist_saved_pct, 1),
+        time_saved_min=round(time_saved_min, 1),
+        delay_saved_min=round(delay_saved_min, 1),
+        distance_saved_km=round(dist_saved_km, 1),
+    )
+
