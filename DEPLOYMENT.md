@@ -72,10 +72,33 @@ apt-install GDAL manually. Confirm this rather than assuming it:
   `apt-get install -y gdal-bin libgdal-dev` before `pip install` — not a switch back to
   Vercel. Document any such change here.
 
+## Environment variables
+
+### Render (backend)
+
+Set in the Render dashboard → your service → **Environment** tab (already pre-filled if
+deploying via the `render.yaml` Blueprint):
+
+| Key | Value | Required? |
+|---|---|---|
+| `PYTHON_VERSION` | `3.11.9` | Recommended — pins the runtime so osmnx's dependency wheels resolve predictably. |
+| `CORS_ORIGINS` | `*` (default) or a comma-separated list, e.g. `https://sih26137.vercel.app` | Optional but strongly recommended once the frontend URL is known — see CORS note below. |
+
+`PORT` is injected automatically by Render — do not set it yourself.
+
+### Vercel / Netlify (frontend)
+
+**None required.** `frontend/dashboard.html` is a static file with no build step, so
+there's nowhere for a platform env var to be read into it. It has a plain-text **API
+Base URL** input field built into the page itself instead — set that by hand (or bake a
+default into the HTML) rather than via a Vercel/Netlify env var.
+
 ### CORS note
-`app/main.py` currently sets `allow_origins=["*"]` for local-dev convenience. This is
-fine for the hackathon demo but should be narrowed to the actual deployed frontend
-origin(s) before treating this as a production deployment.
+`app/main.py` reads `CORS_ORIGINS` (comma-separated origins) at startup, defaulting to
+`*` for local-dev convenience — see the code in `app/main.py`. Once the frontend is
+deployed, set `CORS_ORIGINS` on Render to the exact frontend origin(s) (e.g.
+`https://sih26137.vercel.app`) instead of leaving it at `*` — `*` is fine for the
+hackathon demo but shouldn't be treated as the production setting.
 
 ## Frontend: Vercel (or Netlify)
 

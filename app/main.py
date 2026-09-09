@@ -10,6 +10,8 @@ Run with:
 Then open http://127.0.0.1:8000/docs for interactive Swagger UI.
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,12 +28,22 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Permissive CORS for local development / hackathon demo purposes.
-# Tighten this (specific origins) before any real deployment.
+# CORS origins are configurable via the CORS_ORIGINS env var (comma-separated
+# list of allowed origins, e.g. "https://sih26137.vercel.app"). Defaults to
+# "*" (allow all) for local development / hackathon demo convenience — set
+# CORS_ORIGINS explicitly once deployed so the API isn't wide open to any
+# origin. See DEPLOYMENT.md.
+_cors_origins_env = os.getenv("CORS_ORIGINS", "*")
+_allow_origins = (
+    ["*"]
+    if _cors_origins_env.strip() == "*"
+    else [origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -9,3 +9,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: CORS_ORIGINS
+        value: "*"
+        # Replace "*" with your deployed frontend origin(s), comma-separated,
+        # e.g. "https://sih26137.vercel.app" — set this in the Render
+        # dashboard (Environment tab) once the frontend URL is known.
+        # See DEPLOYMENT.md.
