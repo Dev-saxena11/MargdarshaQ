@@ -23,12 +23,14 @@ from app.core.classical_baselines_vrp import (
     run_ga_vrp, run_sa_vrp, run_standard_pso_vrp, run_greedy_nn_vrp
 )
 from app.core import store
+from app.core.assistant import assistant_engine
 from app.models.schemas import (
     NetworkGenerateRequest, NetworkResponse, NodeOut, EdgeOut, OSMNetworkRequest,
     VRPGenerateRequest, VRPInstanceResponse, CustomerOut,
     VRPSolveRequest, VRPSolveResponse, RouteOut,
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
     VRPCompareRequest, VRPCompareResponse,
+    AssistantChatRequest, AssistantChatResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -404,4 +406,15 @@ def compare_vrp(req: VRPCompareRequest):
         delay_saved_min=round(delay_saved_min, 1),
         distance_saved_km=round(dist_saved_km, 1),
     )
+
+
+# ---------------------------------------------------------------------------
+# In-Dashboard AI Assistant (Issue #32)
+# ---------------------------------------------------------------------------
+
+@router.post("/assistant/chat", response_model=AssistantChatResponse)
+def assistant_chat(req: AssistantChatRequest):
+    """Answers judge/user questions about current solve results, QPSO, and map."""
+    return assistant_engine.chat(req)
+
 
