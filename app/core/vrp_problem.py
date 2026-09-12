@@ -55,6 +55,12 @@ class VRPProblem:
     vehicle_capacity: float
     n_vehicles: int
 
+    # Optional per-vehicle capacities, indexed by vehicle. Used for mid-route
+    # re-planning, where each vehicle has already consumed part of its load and
+    # so has less room left than a fresh vehicle. None (the default) means every
+    # vehicle has the uniform `vehicle_capacity`.
+    vehicle_capacities: Optional[List[float]] = None
+
     # precomputed after __post_init__
     time_matrix: Dict[Tuple[int, int], float] = field(default_factory=dict)
     dist_matrix: Dict[Tuple[int, int], float] = field(default_factory=dict)
@@ -115,6 +121,18 @@ class VRPProblem:
 
     def total_demand(self) -> float:
         return sum(c.demand for c in self.customers)
+
+    def capacity_for(self, vehicle_index: int) -> float:
+        """
+        Capacity available to one vehicle. Falls back to the uniform
+        `vehicle_capacity` unless per-vehicle capacities were supplied
+        (see `vehicle_capacities`).
+        """
+        if self.vehicle_capacities is None:
+            return self.vehicle_capacity
+        if 0 <= vehicle_index < len(self.vehicle_capacities):
+            return self.vehicle_capacities[vehicle_index]
+        return self.vehicle_capacity
 
 
 # ---------------------------------------------------------------------------
@@ -214,14 +232,16 @@ def evaluate_solution(
     capacity_violation = 0.0
     time_window_violation = 0.0
 
-    for route in routes:
+    for v_idx, route in enumerate(routes):
         if not route:
             continue
 
-        # capacity check
+        # capacity check (per-vehicle, so partially-loaded vehicles mid-route
+        # are held to the capacity they actually have left)
+        route_capacity = problem.capacity_for(v_idx)
         route_demand = sum(customer_lookup[n].demand for n in route)
-        if route_demand > problem.vehicle_capacity:
-            capacity_violation += (route_demand - problem.vehicle_capacity)
+        if route_demand > route_capacity:
+            capacity_violation += (route_demand - route_capacity)
 
         # walk the route: depot -> c1 -> c2 -> ... -> depot
         current_node = problem.depot

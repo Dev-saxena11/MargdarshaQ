@@ -28,6 +28,9 @@ class TrafficIncident:
     factor: float
     start_time: float = 0.0
     duration_min: Optional[float] = None
+    # Congestion factor the edge carried before this incident, so the network
+    # can be restored to its pre-incident state (see clear_incidents).
+    original_factor: Optional[float] = None
 
     def is_active(self, current_time: float) -> bool:
         if current_time < self.start_time:
@@ -109,13 +112,26 @@ class TrafficNetwork:
         self, u: int, v: int, factor: float, start_time: float = 0.0, duration_min: Optional[float] = None
     ) -> TrafficIncident:
         """Register a traffic incident/bottleneck on edge (u, v)."""
-        inc = TrafficIncident(u=u, v=v, factor=factor, start_time=start_time, duration_min=duration_min)
+        prev = self.graph[u][v].get("congestion_factor") if self.graph.has_edge(u, v) else None
+        inc = TrafficIncident(
+            u=u, v=v, factor=factor, start_time=start_time,
+            duration_min=duration_min, original_factor=prev,
+        )
         self.incidents.append(inc)
         self.update_congestion(u, v, factor)
         return inc
 
     def clear_incidents(self):
-        """Clear all active incidents and reset edge factors."""
+        """
+        Clear all active incidents and restore each affected edge's congestion
+        factor to what it was before the incident was applied.
+
+        Incidents are undone newest-first so that overlapping incidents on the
+        same edge unwind to the correct original value.
+        """
+        for inc in reversed(self.incidents):
+            if inc.original_factor is not None and self.graph.has_edge(inc.u, inc.v):
+                self.graph[inc.u][inc.v]["congestion_factor"] = inc.original_factor
         self.incidents.clear()
 
     def randomize_congestion(self, seed: Optional[int] = None,

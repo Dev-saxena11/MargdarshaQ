@@ -452,12 +452,19 @@ def solve_dynamic_vrp(req: DynamicSolveRequest):
             max_iter=req.max_iter,
             seed=req.seed,
         )
-    except Exception as e:
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid dynamic simulation parameters: {e}")
+    except RuntimeError as e:
         raise HTTPException(status_code=500, detail=f"Dynamic VRP simulation failed: {e}")
 
+    # The simulation runs on an isolated copy so the stored instance keeps its
+    # original traffic. Congestion-aware metrics and full_path reconstruction
+    # must therefore come from that copy, not from `problem`.
+    sim_problem = res.simulated_problem or problem
+
     init_resp = _build_solve_response(problem, res.initial_solution, [], 0, "Initial Plan (t=0)", 0.0)
-    static_resp = _build_solve_response(problem, res.static_solution, [], 0, "Static Execution (Blind to Traffic)", 0.0)
-    dynamic_resp = _build_solve_response(problem, res.dynamic_solution, [], 0, f"Dynamic QPSO (Re-routed at t={req.trigger_time_min:.0f}m)", 0.0)
+    static_resp = _build_solve_response(sim_problem, res.static_solution, [], 0, "Static Execution (Blind to Traffic)", 0.0)
+    dynamic_resp = _build_solve_response(sim_problem, res.dynamic_solution, [], 0, f"Dynamic QPSO (Re-routed at t={req.trigger_time_min:.0f}m)", 0.0)
 
     return DynamicSolveResponse(
         vrp_id=req.vrp_id,

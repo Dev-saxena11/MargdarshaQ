@@ -16,6 +16,7 @@ Workflow:
 """
 
 from __future__ import annotations
+import copy
 import time
 import numpy as np
 from dataclasses import dataclass, field
@@ -44,6 +45,10 @@ class DynamicVRPResult:
     tw_violations_avoided: float
     served_customer_ids: List[int]
     unserved_customer_ids: List[int]
+    # The isolated problem copy the incident was applied to. Callers that need
+    # to render routes/paths under post-incident traffic must use this, not the
+    # caller's problem, which is deliberately left untouched.
+    simulated_problem: Optional[VRPProblem] = None
 
 
 def simulate_dynamic_reroute(
@@ -59,7 +64,15 @@ def simulate_dynamic_reroute(
 ) -> DynamicVRPResult:
     """
     Runs an end-to-end dynamic traffic experiment on a VRP instance.
+
+    The caller's `problem` is never modified. Applying an incident permanently
+    rewrites edge congestion factors and the cached travel-time matrices, so the
+    simulation runs against a deep copy; otherwise a single dynamic run would
+    silently degrade every later solve/benchmark sharing that stored instance.
+    The mutated copy is returned as `DynamicVRPResult.simulated_problem`.
     """
+    problem = copy.deepcopy(problem)
+
     # 1. Initial solve at t=0
     if algorithm == "qpso":
         opt = QPSOVRPOptimizer(problem, n_particles=n_particles, max_iter=max_iter, seed=seed)
@@ -160,12 +173,18 @@ def simulate_dynamic_reroute(
     else:
         # Create subproblem for unserved customers
         unserved_cust_objects = [c for c in problem.customers if c.node_id in unserved_cust_ids]
+        # Each vehicle is already partly loaded from the legs it completed before
+        # the incident, so the re-plan must respect the capacity it has LEFT.
+        # Passing the full vehicle_capacity here produced routes that beat the
+        # static plan on time only by overloading trucks.
+        remaining_caps = [vs["remaining_capacity"] for vs in vehicle_states]
         sub_problem = VRPProblem(
             net=problem.net,
             depot=problem.depot,
             customers=unserved_cust_objects,
             vehicle_capacity=problem.vehicle_capacity,
             n_vehicles=problem.n_vehicles,
+            vehicle_capacities=remaining_caps,
         )
 
         # Solve subproblem with QPSO
@@ -187,15 +206,20 @@ def simulate_dynamic_reroute(
         dynamic_sol = evaluate_solution(problem, new_routes)
 
     # 6. Compute Comparison Metrics
-    time_saved_min = max(0.0, static_sol.total_time - dynamic_sol.total_time)
+    # These are reported SIGNED. Clamping them at zero would mean a re-plan that
+    # came out worse than doing nothing still displayed as "0.0 min saved",
+    # hiding the regression — the benchmark has to be able to show the feature
+    # losing, or it isn't a benchmark.
+    time_saved_min = static_sol.total_time - dynamic_sol.total_time
     time_saved_pct = (time_saved_min / static_sol.total_time * 100.0) if static_sol.total_time > 0 else 0.0
 
     static_delay = max(0.0, static_sol.total_time - initial_sol.total_time)
     dynamic_delay = max(0.0, dynamic_sol.total_time - initial_sol.total_time)
-    delay_avoided_min = max(0.0, static_delay - dynamic_delay)
+    delay_avoided_min = static_delay - dynamic_delay
     delay_avoided_pct = (delay_avoided_min / static_delay * 100.0) if static_delay > 0 else 0.0
 
-    tw_avoided = max(0.0, static_sol.time_window_violation - dynamic_sol.time_window_violation)
+    # Signed for the same reason: negative means re-planning made lateness worse.
+    tw_avoided = static_sol.time_window_violation - dynamic_sol.time_window_violation
 
     return DynamicVRPResult(
         vrp_id=getattr(problem, "vrp_id", "dynamic_test"),
@@ -211,6 +235,7 @@ def simulate_dynamic_reroute(
         tw_violations_avoided=round(tw_avoided, 2),
         served_customer_ids=served_cust_ids,
         unserved_customer_ids=unserved_cust_ids,
+        simulated_problem=problem,
     )
 
 
