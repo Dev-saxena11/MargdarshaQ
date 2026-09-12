@@ -9,18 +9,22 @@ Provides context-grounded natural language explanations for:
   3. Interactive map elements (congestion friction, shortest road paths, depot, customers).
   4. Convergence curve interpretations and constraint satisfaction (CVRPTW).
 
-Ultra Token-Efficient Hybrid Architecture:
-  - Primary: Deterministic, high-fidelity offline reasoning engine grounded in
-    active session metrics and quantum metaheuristic domain knowledge.
-  - Story-Card Caching: Caches a compact 1-paragraph summary per solve/scenario
-    to cut external LLM input tokens by >85%.
-  - Optional: Enriches via Google Gemini (gemini-1.5-flash) or OpenAI API if
-    GEMINI_API_KEY or OPENAI_API_KEY is present, with tight output constraints
-    (max 150 tokens) and instant fallback to the local engine.
+Hybrid architecture:
+  - Primary: a deterministic offline engine grounded in the live session
+    metrics. Always available, costs nothing, and never invents a number —
+    with no run executed it reports that instead of filling in placeholders.
+  - Story-Card caching: a compact one-paragraph summary per solve/scenario,
+    so LLM prompt size stays near-constant instead of growing with raw JSON.
+  - Optional LLM enrichment for free-text questions, via whichever provider is
+    configured (OpenRouter free models by default) — see
+    `app/core/llm_providers.py`. Any failure falls back to the local engine.
+
+Document grounding (RAG) is tracked separately in issue #33 and is deliberately
+not designed here — see `_call_external_llm` for where retrieved context would
+be added to the prompt.
 """
 
 from __future__ import annotations
-import os
 import json
 import logging
 from typing import Dict, Any, Optional
@@ -30,6 +34,7 @@ from app.models.schemas import (
     AssistantChatRequest,
     AssistantChatResponse,
 )
+from app.core.llm_providers import LLMProvider, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +102,6 @@ class AIAssistantExplainer:
     """Core in-dashboard AI assistant engine with token-budget optimization."""
 
     def __init__(self):
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self._story_card_cache: Dict[str, str] = {}
 
     def chat(self, req: AssistantChatRequest) -> AssistantChatResponse:
@@ -107,18 +110,25 @@ class AIAssistantExplainer:
         msg = (req.message or "").strip().lower()
         chip = req.chip or ""
 
-        # Preset chips use local deterministic engine to preserve 100% of API tokens
-        if not chip and (self.gemini_api_key or self.openai_api_key):
-            try:
-                llm_reply = self._call_external_llm(req.message, ctx)
-                if llm_reply:
-                    return AssistantChatResponse(
-                        reply=llm_reply,
-                        suggested_chips=SUGGESTED_CHIPS,
-                        metrics_summary=self._extract_metrics_summary(ctx),
+        # Preset chips are answered by the local deterministic engine: they map
+        # to fixed explanations, so spending an API call on them would buy
+        # nothing. Free-text questions are where an LLM actually helps.
+        if not chip:
+            provider = get_provider()
+            if provider is not None:
+                try:
+                    llm_reply = self._call_external_llm(req.message, ctx, provider)
+                    if llm_reply:
+                        return AssistantChatResponse(
+                            reply=llm_reply,
+                            suggested_chips=SUGGESTED_CHIPS,
+                            metrics_summary=self._extract_metrics_summary(ctx),
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "Provider '%s' failed, falling back to local engine: %s",
+                        provider.name, e,
                     )
-            except Exception as e:
-                logger.warning(f"External LLM call failed, falling back to local engine: {e}")
 
         # Local context-grounded reasoning engine (Fast, zero API tokens, 100% reliable)
         reply = self._generate_local_response(msg, chip, ctx)
@@ -469,74 +479,42 @@ class AIAssistantExplainer:
         )
 
     # -----------------------------------------------------------------------
-    # Ultra Token-Efficient External LLM Integration (Story-Card Powered)
+    # External LLM Integration (Story-Card context)
     # -----------------------------------------------------------------------
 
-    def _call_external_llm(self, prompt: str, ctx: AssistantContext) -> Optional[str]:
+    def _call_external_llm(self, prompt: str, ctx: AssistantContext,
+                           provider: LLMProvider) -> Optional[str]:
         """
-        Calls Gemini or OpenAI using an ultra-compact Story Card cache.
-        Consumes only ~80-110 prompt tokens and limits output to 150 tokens.
+        Ask the configured provider, grounded in the Story Card: a compact
+        summary of the live session metrics, which keeps prompt size
+        near-constant instead of re-sending raw JSON every turn.
+
+        Document grounding (RAG) is issue #33 and is not implemented here. If
+        you are picking that up: retrieved passages would be appended to
+        `system_parts` between the session context and the instructions, and
+        the instruction block below already tells the model to say when a
+        question isn't answerable from the context it was given.
+
+        Returns None on any failure so the caller falls back to the local
+        deterministic engine, which always works.
         """
         story_card = self._get_or_create_story_card(ctx)
-        system_prompt = (
-            f"You are QuantaRoute AI Copilot for intelligent traffic route optimization. "
-            f"Context: {story_card}\n"
-            "Instructions: Be direct, concise, and professional. Max 2-3 short bullet points. "
-            "Use exact percentages from context. Avoid fluff, filler, or preamble."
+
+        system_parts = [
+            "You are QuantaRoute AI Copilot, an assistant for a quantum-inspired "
+            "(QPSO) traffic route optimization platform.",
+            f"SESSION CONTEXT: {story_card}",
+            "INSTRUCTIONS: Be direct, concise and professional. Prefer 2-4 short "
+            "bullet points. Quote figures exactly as given in the session context - "
+            "never estimate, extrapolate or invent a number. If the context says a "
+            "value was not measured, say it was not measured. If the question is not "
+            "answerable from the context above, say so plainly instead of guessing.",
+        ]
+
+        return provider.complete(
+            system_prompt="\n\n".join(system_parts),
+            user_prompt=prompt,
         )
-
-        # 1. Google Gemini API (gemini-1.5-flash: high speed, ultra-low cost)
-        if self.gemini_api_key:
-            try:
-                import urllib.request
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_api_key}"
-                payload = {
-                    "contents": [
-                        {"role": "user", "parts": [{"text": f"{system_prompt}\nUser query: {prompt}"}]}
-                    ],
-                    "generationConfig": {
-                        "temperature": 0.2,
-                        "maxOutputTokens": 150
-                    }
-                }
-                data = json.dumps(payload).encode("utf-8")
-                req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=3.5) as resp:
-                    res_json = json.loads(resp.read().decode("utf-8"))
-                    text = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                    if text:
-                        return text.strip()
-            except Exception as e:
-                logger.debug(f"Gemini API call timed out or failed: {e}")
-
-        # 2. OpenAI API (gpt-4o-mini: low cost fallback)
-        if self.openai_api_key:
-            try:
-                import urllib.request
-                url = "https://api.openai.com/v1/chat/completions"
-                payload = {
-                    "model": "gpt-4o-mini",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.2,
-                    "max_tokens": 150
-                }
-                data = json.dumps(payload).encode("utf-8")
-                req = urllib.request.Request(
-                    url, data=data,
-                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.openai_api_key}"}
-                )
-                with urllib.request.urlopen(req, timeout=3.5) as resp:
-                    res_json = json.loads(resp.read().decode("utf-8"))
-                    text = res_json["choices"][0]["message"]["content"]
-                    if text:
-                        return text.strip()
-            except Exception as e:
-                logger.debug(f"OpenAI API call timed out or failed: {e}")
-
-        return None
 
 
 # Global singleton instance

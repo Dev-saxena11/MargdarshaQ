@@ -90,8 +90,14 @@ deploying via the `render.yaml` Blueprint):
 |---|---|---|
 | `PYTHON_VERSION` | `3.11.9` | Recommended — pins the runtime so osmnx's dependency wheels resolve predictably. |
 | `CORS_ORIGINS` | `*` (default) or a comma-separated list, e.g. `https://sih-26137.vercel.app` | Optional but strongly recommended once the frontend URL is known — see CORS note below. |
+| `OPENROUTER_API_KEY` | Your key from [openrouter.ai/keys](https://openrouter.ai/keys) | Optional — enables free-text AI Assistant answers. Without it the assistant still works on its local engine. |
+| `OPENROUTER_MODEL` | `openrouter/free` (default) | Optional. Must be a free model (`openrouter/free` or `*:free`); a paid id is rejected at startup. |
 
 `PORT` is injected automatically by Render — do not set it yourself.
+
+**Set API keys in the Render dashboard only — never in a committed file.**
+`.env` is gitignored; [`.env.example`](.env.example) holds placeholders. See
+[docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md) for the full assistant setup.
 
 ### Vercel / Netlify (frontend)
 
