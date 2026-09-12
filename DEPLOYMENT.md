@@ -89,7 +89,8 @@ deploying via the `render.yaml` Blueprint):
 | Key | Value | Required? |
 |---|---|---|
 | `PYTHON_VERSION` | `3.11.9` | Recommended — pins the runtime so osmnx's dependency wheels resolve predictably. |
-| `CORS_ORIGINS` | `*` (default) or a comma-separated list, e.g. `https://sih-26137.vercel.app` | Optional but strongly recommended once the frontend URL is known — see CORS note below. |
+| `CORS_ORIGINS` | `*` (default) or a comma-separated list, e.g. `https://sih-26137.vercel.app,http://localhost:5500` | Optional but strongly recommended once the frontend URL is known — see CORS note below. |
+| `CORS_ORIGIN_REGEX` | e.g. `https://sih-26137-[a-z0-9-]+\.vercel\.app` | Optional. Needed to allow Vercel preview/branch deploys, whose hostname changes per deploy. |
 | `OPENROUTER_API_KEY` | Your key from [openrouter.ai/keys](https://openrouter.ai/keys) | Optional — enables free-text AI Assistant answers. Without it the assistant still works on its local engine. |
 | `OPENROUTER_MODEL` | `openrouter/free` (default) | Optional. Must be a free model (`openrouter/free` or `*:free`); a paid id is rejected at startup. |
 
@@ -107,11 +108,46 @@ Base URL** input field built into the page itself instead — set that by hand (
 default into the HTML) rather than via a Vercel/Netlify env var.
 
 ### CORS note
-`app/main.py` reads `CORS_ORIGINS` (comma-separated origins) at startup, defaulting to
-`*` for local-dev convenience — see the code in `app/main.py`. Once the frontend is
-deployed, set `CORS_ORIGINS` on Render to the exact frontend origin(s) (e.g.
-`https://sih-26137.vercel.app`) instead of leaving it at `*` — `*` is fine for the
-hackathon demo but shouldn't be treated as the production setting.
+
+`app/main.py` allows an origin if it matches **either** env var:
+
+| Variable | Purpose |
+| :--- | :--- |
+| `CORS_ORIGINS` | Comma-separated exact origins, or `*` for all (the local-dev default). |
+| `CORS_ORIGIN_REGEX` | Regex matched against the whole `Origin` header. |
+
+Recommended production values:
+
+```
+CORS_ORIGINS=https://sih-26137.vercel.app,http://localhost:5500,http://127.0.0.1:5500
+CORS_ORIGIN_REGEX=https://sih-26137-[a-z0-9-]+\.vercel\.app
+```
+
+Include the localhost entries: without them a dashboard served locally cannot call the
+deployed backend.
+
+**Why the regex is needed.** Vercel mints a new hostname for every preview and branch
+deploy (`sih-26137-git-<branch>-<team>.vercel.app`), so those origins can't be
+enumerated in advance. The regex covers them all.
+
+**How a CORS failure presents.** It does not look like a CORS error from the outside:
+the server still returns **HTTP 200**, but with no `access-control-allow-origin` header
+the browser discards the response. The dashboard shows a failed request and the API
+looks down even though it is healthy. If the API answers `curl` but not the browser,
+check this first — confirm with:
+
+```bash
+curl -s -i -X OPTIONS https://sih26137.onrender.com/api/network/generate \
+  -H "Origin: <the origin you're loading the dashboard from>" \
+  -H "Access-Control-Request-Method: POST" | grep -i access-control-allow-origin
+```
+
+No output means that origin is blocked.
+
+An invalid `CORS_ORIGIN_REGEX` is logged and ignored rather than crashing the app or
+widening access; the exact-origin list still applies. Covered by
+`test_cors_config.py`, which also checks the pattern can't be prefix-spoofed by a
+lookalike domain (matching uses `fullmatch`).
 
 ## Frontend: Vercel (or Netlify)
 
