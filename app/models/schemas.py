@@ -189,3 +189,53 @@ class VRPCompareResponse(BaseModel):
     delay_saved_min: float = Field(..., description="Total congestion delay minutes avoided")
     distance_saved_km: float = Field(..., description="Total kilometers saved")
 
+
+# ---------------------------------------------------------------------------
+# Dynamic Traffic Simulation & Re-optimization
+# ---------------------------------------------------------------------------
+
+class TrafficIncidentRequest(BaseModel):
+    network_id: str
+    u: int
+    v: int
+    factor: float = Field(3.5, ge=1.0, le=10.0, description="Congestion multiplier (e.g. 3.5 = 350% travel time)")
+    start_time: float = Field(0.0, ge=0.0)
+    duration_min: Optional[float] = Field(None, description="Incident duration in minutes (None = permanent)")
+
+
+class TrafficIncidentResponse(BaseModel):
+    network_id: str
+    u: int
+    v: int
+    factor: float
+    message: str
+
+
+class DynamicSolveRequest(BaseModel):
+    vrp_id: str
+    incident_u: Optional[int] = Field(None, description="Node u of congested edge (optional, auto-selected if omitted)")
+    incident_v: Optional[int] = Field(None, description="Node v of congested edge")
+    incident_factor: float = Field(3.5, ge=1.0, le=10.0)
+    trigger_time_min: float = Field(60.0, ge=0.0, description="Simulation time (minutes) when traffic incident occurs mid-route")
+    algorithm: AlgorithmName = "qpso"
+    n_particles: int = Field(50, ge=5, le=500)
+    max_iter: int = Field(150, ge=1, le=5000)
+    seed: int = Field(1)
+
+
+class DynamicSolveResponse(BaseModel):
+    vrp_id: str
+    trigger_time_min: float
+    incident: Optional[Dict[str, Any]]
+    initial_solution: VRPSolveResponse
+    static_affected_solution: VRPSolveResponse
+    dynamic_rerouted_solution: VRPSolveResponse
+    time_saved_min: float
+    time_saved_pct: float
+    delay_avoided_min: float
+    delay_avoided_pct: float
+    tw_violations_avoided: float
+    served_customer_ids: List[int]
+    unserved_customer_ids: List[int]
+
+
