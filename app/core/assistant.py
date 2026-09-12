@@ -21,10 +21,9 @@ Ultra Token-Efficient Hybrid Architecture:
 
 from __future__ import annotations
 import os
-import re
 import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from app.models.schemas import (
     AssistantContext,
@@ -41,6 +40,57 @@ SUGGESTED_CHIPS = [
     "📈 What does convergence chart show?",
     "🎯 Are time windows respected?",
 ]
+
+# Shown instead of performance numbers whenever no comparison run has been
+# executed yet. The assistant must never invent metrics — a plausible-looking
+# fabricated number is indistinguishable from a measured one to the reader,
+# which would misrepresent benchmark results.
+NO_RESULTS_NOTICE = (
+    "### 📊 No optimization run yet\n\n"
+    "I don't have any measured results to explain for this session — nothing has "
+    "been solved yet, so there are no real numbers to report.\n\n"
+    "**To get a grounded analysis:**\n"
+    "1. Generate a network (synthetic or real OSM map).\n"
+    "2. Generate a VRP instance on it.\n"
+    "3. Run **Solve** or **Compare** (baseline vs optimized).\n\n"
+    "Once a run completes I'll explain the actual time saved, congestion avoided, "
+    "and constraint satisfaction from that run.\n\n"
+    "In the meantime you can still ask me conceptual questions — how QPSO works, "
+    "what the map colors mean, or how the convergence chart is read."
+)
+
+
+def _has_comparison_results(ctx: AssistantContext) -> bool:
+    """
+    True only when the session carries real measured comparison metrics.
+
+    Used to gate every numeric claim: without it the explainers would fall back
+    to placeholder values and present them as if they were measured output.
+    """
+    return any(
+        v is not None
+        for v in (
+            ctx.time_saved_pct,
+            ctx.delay_saved_pct,
+            ctx.dist_saved_pct,
+            ctx.baseline_time,
+            ctx.optimized_time,
+        )
+    )
+
+
+def _fmt(value: Optional[float], suffix: str = "", decimals: int = 1) -> str:
+    """Formats a metric, or 'n/a' when it genuinely wasn't measured."""
+    if value is None:
+        return "n/a"
+    return f"{value:.{decimals}f}{suffix}"
+
+
+def _delta(value: Optional[float], suffix: str = "%") -> str:
+    """Formats a saving as '-22.4%', or a plain 'not measured' when absent."""
+    if value is None:
+        return "not measured"
+    return f"**-{value:.1f}{suffix}**"
 
 
 class AIAssistantExplainer:
@@ -92,18 +142,44 @@ class AIAssistantExplainer:
             return self._story_card_cache[cache_key]
 
         scen = ctx.scenario_name or "Active Urban Network"
-        t_sav = f"{ctx.time_saved_pct:.1f}%" if ctx.time_saved_pct is not None else "30.0%"
-        t_min = f"{ctx.time_saved_min:.1f}m" if ctx.time_saved_min is not None else "76.5m"
-        d_sav = f"{ctx.delay_saved_pct:.1f}%" if ctx.delay_saved_pct is not None else "77.1%"
-        d_min = f"{ctx.delay_saved_min:.1f}m" if ctx.delay_saved_min is not None else "52.6m"
-        km_sav = f"{ctx.dist_saved_pct:.1f}%" if ctx.dist_saved_pct is not None else "15.9%"
-        feas = "100% On-Time (0 violations)" if ctx.optimized_feasible else "Near-optimal"
-        late = f"{ctx.baseline_late:.1f}m" if ctx.baseline_late else "42.5m"
+
+        if not _has_comparison_results(ctx):
+            # No measured run: tell the LLM explicitly rather than handing it
+            # placeholder numbers it would then state as fact.
+            card = (
+                f"[STORY_CARD] Scenario: {scen}. NO optimization run has been executed "
+                f"in this session, so there are NO measured metrics available. "
+                f"Do not state or estimate any performance numbers. Tell the user to run "
+                f"a solve/compare first, or answer conceptual questions about QPSO, the "
+                f"map, or convergence without citing figures."
+            )
+            self._story_card_cache[cache_key] = card
+            return card
+
+        size = (
+            f"{ctx.num_nodes} nodes, " if ctx.num_nodes else ""
+        ) + (
+            f"{ctx.num_customers} customers, " if ctx.num_customers else ""
+        ) + (
+            f"{ctx.num_vehicles} vehicles" if ctx.num_vehicles else ""
+        )
+        feas = (
+            "100% On-Time (0 violations)"
+            if ctx.optimized_feasible
+            else "constraint violations present"
+            if ctx.optimized_feasible is not None
+            else "feasibility not reported"
+        )
+        late = _fmt(ctx.baseline_late, "m")
 
         card = (
-            f"[STORY_CARD] Scenario: {scen} ({ctx.num_nodes or 30} nodes, {ctx.num_customers or 12} customers, {ctx.num_vehicles or 3} vehicles). "
-            f"QPSO vs Baseline: Time saved {t_sav} (-{t_min}), Congestion delay avoided {d_sav} (-{d_min}), Mileage saved {km_sav}. "
+            f"[STORY_CARD] Scenario: {scen} ({size.strip().rstrip(',')}). "
+            f"{ctx.optimized_algo or 'Optimized'} vs {ctx.baseline_algo or 'Baseline'}: "
+            f"Time saved {_fmt(ctx.time_saved_pct, '%')} (-{_fmt(ctx.time_saved_min, 'm')}), "
+            f"Congestion delay avoided {_fmt(ctx.delay_saved_pct, '%')} (-{_fmt(ctx.delay_saved_min, 'm')}), "
+            f"Mileage saved {_fmt(ctx.dist_saved_pct, '%')}. "
             f"Punctuality: {feas} vs Baseline lateness penalty {late}. "
+            f"Cite only these figures; if a value is 'n/a' it was not measured. "
             f"Key mechanism: Quantum delta-potential well tunneling avoids high-friction local minima; memetic 2-opt eliminates cross-overs."
         )
         self._story_card_cache[cache_key] = card
@@ -157,31 +233,59 @@ class AIAssistantExplainer:
     # -----------------------------------------------------------------------
 
     def _explain_route(self, ctx: AssistantContext) -> str:
+        if not _has_comparison_results(ctx):
+            return NO_RESULTS_NOTICE
+
         scenario = ctx.scenario_name or "Current Fleet Deployment"
-        t_save = ctx.time_saved_pct if ctx.time_saved_pct is not None else 30.0
-        t_min = ctx.time_saved_min if ctx.time_saved_min is not None else 76.5
-        d_save = ctx.delay_saved_pct if ctx.delay_saved_pct is not None else 77.1
-        d_min = ctx.delay_saved_min if ctx.delay_saved_min is not None else 52.6
-        km_save = ctx.dist_saved_pct if ctx.dist_saved_pct is not None else 15.9
-        km_val = ctx.dist_saved_km if ctx.dist_saved_km is not None else 18.8
-        
-        base_time = f"{ctx.baseline_time:.1f} min" if ctx.baseline_time else "254.6 min"
-        opt_time = f"{ctx.optimized_time:.1f} min" if ctx.optimized_time else "178.1 min"
-        base_delay = f"{ctx.baseline_delay:.1f} min" if ctx.baseline_delay else "68.2 min"
-        opt_delay = f"{ctx.optimized_delay:.1f} min" if ctx.optimized_delay else "15.6 min"
+
+        # Punctuality is reported from the actual solve, not assumed. QPSO uses
+        # penalty-based constraint handling and does not guarantee feasibility.
+        if ctx.optimized_feasible is True:
+            late_txt = _fmt(ctx.optimized_late, " min") if ctx.optimized_late is not None else "0.0 min"
+            punctuality = f"**Feasible** — all time windows and capacities respected (lateness {late_txt})."
+        elif ctx.optimized_feasible is False:
+            punctuality = (
+                f"⚠️ **Infeasible** — the optimized solution still violates constraints "
+                f"(lateness {_fmt(ctx.optimized_late, ' min')}). Treat the savings above as "
+                f"an upper bound; consider more iterations or a larger fleet."
+            )
+        else:
+            punctuality = "Feasibility was not reported for this run."
 
         return (
             f"### 📊 Executive Route Analysis — {scenario}\n\n"
-            f"Evaluating **{ctx.baseline_algo or 'Greedy Dispatch Baseline'}** vs **{ctx.optimized_algo or 'Quantum-Inspired (QPSO) Optimizer'}**:\n\n"
-            f"- ⚡ **Total Travel Time**: Cut by **-{t_save:.1f}%** ({base_time} ➔ **{opt_time}**, saving **{t_min:.1f} minutes**).\n"
-            f"- 🛑 **Congestion Avoided**: Slashed by **-{d_save:.1f}%** ({base_delay} trapped in traffic ➔ reduced to **{opt_delay}**).\n"
-            f"- 🛣️ **Mileage & Fuel**: Reduced by **-{km_save:.1f}%** (saving **{km_val:.1f} km**, cutting fleet carbon footprint).\n"
-            f"- 🎯 **Punctuality & SLA**: **100% Feasible** with **0 late arrivals**, eliminating baseline delay penalties.\n\n"
-            f"**Operational Takeaway:** Classical dispatch chooses immediate short links into gridlocks. QPSO navigates around congested corridors, trading a tiny distance detour for massive time and reliability gains."
+            f"Evaluating **{ctx.baseline_algo or 'baseline'}** vs **{ctx.optimized_algo or 'optimized'}**:\n\n"
+            f"- ⚡ **Total Travel Time**: Cut by {_delta(ctx.time_saved_pct)} "
+            f"({_fmt(ctx.baseline_time, ' min')} ➔ **{_fmt(ctx.optimized_time, ' min')}**, "
+            f"saving {_fmt(ctx.time_saved_min, ' minutes')}).\n"
+            f"- 🛑 **Congestion Avoided**: Reduced by {_delta(ctx.delay_saved_pct)} "
+            f"({_fmt(ctx.baseline_delay, ' min')} trapped in traffic ➔ **{_fmt(ctx.optimized_delay, ' min')}**).\n"
+            f"- 🛣️ **Mileage & Fuel**: Reduced by {_delta(ctx.dist_saved_pct)} "
+            f"(saving {_fmt(ctx.dist_saved_km, ' km')}).\n"
+            f"- 🎯 **Punctuality & SLA**: {punctuality}\n\n"
+            f"**Operational Takeaway:** Classical dispatch chooses immediate short links into gridlocks. "
+            f"QPSO navigates around congested corridors, trading a small distance detour for time and reliability gains."
         )
 
     def _explain_why_qpso(self, ctx: AssistantContext) -> str:
-        d_save = ctx.delay_saved_pct if ctx.delay_saved_pct is not None else 77.1
+        # Conceptual explanation is valid with or without a run; only the
+        # closing result line is gated on real measurements.
+        if ctx.delay_saved_pct is not None:
+            closing = (
+                f"**Result (this run):** Avoided **{ctx.delay_saved_pct:.1f}%** of traffic bottleneck delays"
+                + (
+                    ", with all constraints satisfied."
+                    if ctx.optimized_feasible
+                    else "; note this run still reports constraint violations."
+                    if ctx.optimized_feasible is False
+                    else "."
+                )
+            )
+        else:
+            closing = (
+                "**Result:** Run a solve or comparison to see how much bottleneck delay "
+                "QPSO actually avoids on your current network."
+            )
         return (
             "### ⚛️ Why Quantum-Inspired (QPSO) Outperforms Classical Baselines\n\n"
             "In large-scale vehicle routing under dynamic congestion, classical algorithms (Greedy, GA, Standard PSO) frequently get trapped in **local minima**—they commit vehicles to arterial roads that look short on distance but are crippled by traffic delay.\n\n"
@@ -195,7 +299,7 @@ class AIAssistantExplainer:
             "3. **Mean-Best (mbest) Swarm Attractor & Memetic Refinement**:\n"
             "   - Particles are guided by the centroid of all personal best positions ($mbest = \\frac{1}{N} \\sum pbest_i$), keeping the swarm cohesive without arbitrary velocity clamp parameters ($V_{max}$).\n"
             "   - A hybridized **2-opt / or-opt local search** operates after quantum exploration to untangle route crossings and enforce tight customer time-window alignment.\n\n"
-            f"**Result:** Avoids **{d_save:.1f}%** of traffic bottleneck delays while maintaining 100% constraint feasibility."
+            f"{closing}"
         )
 
     def _explain_convergence(self, ctx: AssistantContext) -> str:
@@ -212,11 +316,20 @@ class AIAssistantExplainer:
         )
 
     def _explain_map(self, ctx: AssistantContext) -> str:
-        num_c = ctx.num_customers or 12
-        num_v = ctx.num_vehicles or 3
+        if ctx.num_customers and ctx.num_vehicles:
+            intro = (
+                f"The map renders a full road-network topology with "
+                f"**{ctx.num_customers} customer delivery nodes** and an active fleet of "
+                f"**{ctx.num_vehicles} vehicles**."
+            )
+        else:
+            intro = (
+                "The map renders the full road-network topology: customer delivery nodes, "
+                "the depot, and per-vehicle routes once an instance has been generated."
+            )
         return (
             "### 🗺️ Understanding the Map & Traffic Network\n\n"
-            f"The map renders a full road-network topology with **{num_c} customer delivery nodes** and an active fleet of **{num_v} vehicles**.\n\n"
+            f"{intro}\n\n"
             "#### Visual Guide:\n"
             "- 🟡 **Golden Central Node (Depot)**: Node `0`. The hub where all vehicles depart with loaded capacity and return before the operating horizon ends.\n"
             "- ⚪ **Numbered Customer Pins**: Delivery destinations carrying specific payload demand and service time-windows (e.g. `[10:00 - 11:30]`).\n"
@@ -228,44 +341,130 @@ class AIAssistantExplainer:
         )
 
     def _explain_constraints(self, ctx: AssistantContext) -> str:
-        late_before = f"{ctx.baseline_late:.1f} min" if ctx.baseline_late else "42.5 min"
+        # Constraints are handled via penalties in the fitness function, so
+        # feasibility is an outcome of each run — never a guarantee.
+        if ctx.baseline_late is not None or ctx.optimized_late is not None:
+            observed = (
+                "#### Observed on this run:\n"
+                f"   - Baseline lateness penalty: **{_fmt(ctx.baseline_late, ' min')}**.\n"
+                f"   - Optimized lateness penalty: **{_fmt(ctx.optimized_late, ' min')}**"
+                + (
+                    " — fully feasible.\n\n"
+                    if ctx.optimized_feasible
+                    else " — ⚠️ constraints still violated.\n\n"
+                    if ctx.optimized_feasible is False
+                    else ".\n\n"
+                )
+            )
+        else:
+            observed = (
+                "#### Observed on this run:\n"
+                "   - No solve has been run yet, so there are no measured lateness "
+                "or capacity figures to report.\n\n"
+            )
+
         return (
             "### 🎯 Time-Window & Capacity Constraints (CVRPTW)\n\n"
             "In urban logistics, finding the shortest distance is useless if a delivery truck arrives after a customer's business hours or exceeds legal capacity.\n\n"
             "#### How the Optimization Engine Enforces Constraints:\n"
-            "1. **Customer Time Windows $[e_i, l_i]$**:\n"
-            f"   - Baseline greedy dispatch accumulates **{late_before} of late delivery penalties** due to traffic hold-ups on arterial roads.\n"
-            "   - QPSO calculates time-dependent edge delays, guaranteeing **0.0 minutes lateness (100% On-Time SLA)**.\n\n"
-            "2. **Vehicle Payload Capacity ($Q = 100$)**:\n"
-            "   - Customer demand assigned to each vehicle never exceeds legal capacity.\n"
-            "   - Multi-vehicle dispatch balances loads evenly across the active fleet.\n\n"
-            "3. **Operating Horizon**:\n"
-            "   - All vehicles complete assignments and return to depot within the operating schedule."
+            "1. **Customer Time Windows $[e_i, l_i]$** — arrival outside a window adds a "
+            "weighted penalty to the fitness score, pushing the search toward on-time schedules.\n"
+            "2. **Vehicle Payload Capacity** — demand assigned per vehicle above capacity is "
+            "penalized the same way, so overloaded routes are driven out of the population.\n"
+            "3. **Operating Horizon** — vehicles are scored on returning to the depot within schedule.\n\n"
+            "These are *soft* penalty terms, not hard guarantees: a run is only feasible if "
+            "the reported violation totals are zero.\n\n"
+            f"{observed}"
         )
 
     def _explain_benchmark(self, ctx: AssistantContext) -> str:
+        ranks = ctx.benchmark_ranks
+        if not ranks:
+            return (
+                "### 🏆 Benchmark Comparison\n\n"
+                "No benchmark has been run in this session yet, so I can't rank the algorithms "
+                "from measured data — and I won't guess at the ordering.\n\n"
+                "Run **Benchmark** in the dashboard to evaluate QPSO against the classical "
+                "baselines (GA, SA, standard PSO, Greedy nearest-neighbour) on the current "
+                "instance. I'll then report the actual fitness, travel time, congestion delay, "
+                "feasibility and runtime for each.\n\n"
+                "**What the comparison is for:** the problem statement requires benchmarking "
+                "against conventional metaheuristics, so the ranking has to come from a real "
+                "run on your instance rather than from prior expectations."
+            )
+
+        # Rank by fitness (lower is better); entries missing fitness sort last.
+        def _fitness(entry: Dict[str, Any]) -> float:
+            val = entry.get("fitness")
+            return float(val) if isinstance(val, (int, float)) else float("inf")
+
+        ordered = sorted(ranks, key=_fitness)
+        medals = ["🥇", "🥈", "🥉"]
+
+        rows = []
+        for i, entry in enumerate(ordered):
+            name = entry.get("algorithm") or entry.get("name") or "unknown"
+            place = medals[i] if i < len(medals) else f"{i + 1}th"
+            fitness = entry.get("fitness")
+            total_time = entry.get("total_time")
+            delay = entry.get("congestion_delay_min")
+            feasible = entry.get("feasible")
+            runtime = entry.get("runtime_ms")
+
+            feas_txt = (
+                "✅ Feasible" if feasible is True
+                else "⚠️ Violations" if feasible is False
+                else "—"
+            )
+            rows.append(
+                f"| {place} **{name}** | "
+                f"{_fmt(fitness if isinstance(fitness, (int, float)) else None)} | "
+                f"{_fmt(total_time if isinstance(total_time, (int, float)) else None, ' min')} | "
+                f"{_fmt(delay if isinstance(delay, (int, float)) else None, ' min')} | "
+                f"{feas_txt} | "
+                f"{_fmt(runtime if isinstance(runtime, (int, float)) else None, ' ms', 0)} |"
+            )
+
+        best = ordered[0].get("algorithm") or "the top entry"
         return (
-            "### 🏆 5-Algorithm Benchmark Comparison\n\n"
-            "Comparative benchmark evaluation across metaheuristics and baseline methods:\n\n"
-            "| Algorithm | Solution Quality | Delay Avoidance | Constraint Handling | Convergence Speed |\n"
-            "| :--- | :--- | :--- | :--- | :--- |\n"
-            "| **QPSO (Quantum Hybrid)** | 🥇 **Superior (Best)** | **High (~77% cut)** | **100% Feasible** | Fast (30–60 iters) |\n"
-            "| **Standard PSO** | 🥈 Good | Moderate | Occasional violations | Prone to velocity stall |\n"
-            "| **Genetic Algorithm (GA)** | 🥉 Moderate | Moderate | Feasible | Slower crossover ops |\n"
-            "| **Simulated Annealing (SA)** | 4th | Low | Sensitive to cooling | High eval count |\n"
-            "| **Greedy Nearest-Neighbor** | 5th (Baseline) | None (Trapped) | Frequent SLA breaches | Instant (Myopic) |\n\n"
-            "**Key Insight:** While Greedy is fastest in raw compute, its route quality suffers catastrophic delays in congestion. QPSO achieves the lowest total delivery cost while strictly respecting all service windows."
+            f"### 🏆 Benchmark Comparison ({len(ordered)} algorithms, measured this run)\n\n"
+            "Ranked by fitness (lower is better — fitness combines travel time with "
+            "capacity and time-window violation penalties):\n\n"
+            "| Rank / Algorithm | Fitness | Travel Time | Congestion Delay | Constraints | Runtime |\n"
+            "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            + "\n".join(rows)
+            + f"\n\n**Result on this instance:** **{best}** achieved the best fitness. "
+            "Greedy is typically fastest in raw compute but myopic under congestion; "
+            "the metaheuristics trade runtime for solution quality. Re-run on a larger "
+            "instance to see how the gap scales."
         )
 
     def _explain_general(self, msg: str, ctx: AssistantContext) -> str:
         scenario = ctx.scenario_name or "Current Active Scenario"
-        t_save = ctx.time_saved_pct if ctx.time_saved_pct is not None else 30.0
-        d_save = ctx.delay_saved_pct if ctx.delay_saved_pct is not None else 77.1
+
+        if not _has_comparison_results(ctx):
+            return (
+                f"### 💡 QuantaRoute AI Copilot\n\n"
+                f"No optimization run has been executed yet, so I have no measured results "
+                f"to summarise for **{scenario}**.\n\n"
+                f"Run a **Solve** or **Compare** to get grounded numbers, or ask me about "
+                f"how QPSO works, what the map colours mean, or how to read the convergence chart."
+            )
+
+        feasibility = (
+            "- **Feasibility**: all payload and time-window constraints satisfied.\n"
+            if ctx.optimized_feasible
+            else "- **Feasibility**: ⚠️ this run still reports constraint violations.\n"
+            if ctx.optimized_feasible is False
+            else "- **Feasibility**: not reported for this run.\n"
+        )
         return (
             f"### 💡 QuantaRoute AI Copilot — {scenario}\n\n"
             f"Active monitoring for **{scenario}**:\n"
-            f"- **Performance**: QPSO achieves **{t_save:.1f}% time reduction** and avoids **{d_save:.1f}% of traffic congestion delay** compared to baseline dispatch.\n"
-            f"- **Feasibility**: All vehicle payload and customer delivery time-windows are 100% satisfied.\n\n"
+            f"- **Performance**: **{_fmt(ctx.time_saved_pct, '%')}** time reduction and "
+            f"**{_fmt(ctx.delay_saved_pct, '%')}** of congestion delay avoided versus "
+            f"{ctx.baseline_algo or 'the baseline'}.\n"
+            f"{feasibility}\n"
             f"Select a prompt above or ask about specific route legs, quantum tunneling mechanics, or benchmark trade-offs."
         )
 

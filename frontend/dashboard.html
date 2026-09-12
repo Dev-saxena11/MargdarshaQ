@@ -1219,7 +1219,7 @@
   <div class="ai-context-strip">
     <span class="ai-context-dot"></span>
     <span class="ai-context-label">CONTEXT:</span>
-    <span id="aiContextText" class="ai-context-value">Rush-Hour Gridlock · -77.1% Delay · 100% Feasible</span>
+    <span id="aiContextText" class="ai-context-value">awaiting run</span>
   </div>
 
   <!-- Quick-Prompt Chips Container -->
@@ -2087,6 +2087,9 @@ async function runBenchmark() {
         seed: 1,
       }),
     });
+    // Retained so the AI assistant can cite the measured ranking instead of
+    // asserting a fixed one.
+    state.benchmarkResults = bench.results;
     renderBenchTable(bench.results);
     drawConvergence(bench.results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
 
@@ -2373,32 +2376,43 @@ function buildAssistantContext() {
   const scenKey = document.getElementById('judgePreset') ? document.getElementById('judgePreset').value : 'rush_hour';
   const scenName = (typeof DEMO_SCENARIOS !== 'undefined' && DEMO_SCENARIOS[scenKey] && DEMO_SCENARIOS[scenKey].name) || 'Current Scenario';
 
+  // Every metric below is null unless it was actually measured this session.
+  // Do NOT substitute placeholder numbers here: the assistant renders whatever
+  // it receives as a measured result, so a plausible-looking default becomes an
+  // invented benchmark figure presented to the user as real.
+  // `pick` also avoids `||`, which would discard a legitimate 0.
+  const pick = (...vals) => {
+    for (const v of vals) if (v !== undefined && v !== null) return v;
+    return null;
+  };
+
   return {
     scenario_name: scenName,
-    num_nodes: state.network ? (state.network.num_nodes || state.network.nodes.length) : 30,
-    num_customers: state.vrp ? (state.vrp.customers ? state.vrp.customers.length : 12) : 12,
-    num_vehicles: state.vrp ? state.vrp.n_vehicles : 3,
-    depot: state.vrp ? state.vrp.depot : 0,
-    baseline_algo: m.baselineAlgo || base.algorithm || 'Greedy Nearest-Neighbor',
-    optimized_algo: m.optimizedAlgo || opt.algorithm || 'QPSO (Quantum-Inspired PSO)',
-    time_saved_pct: m.timeSavedPct !== undefined ? m.timeSavedPct : 30.0,
-    time_saved_min: m.timeSavedMin !== undefined ? m.timeSavedMin : 76.5,
-    delay_saved_pct: m.delaySavedPct !== undefined ? m.delaySavedPct : 77.1,
-    delay_saved_min: m.delaySavedMin !== undefined ? m.delaySavedMin : 52.6,
-    dist_saved_pct: m.distSavedPct !== undefined ? m.distSavedPct : 15.9,
-    dist_saved_km: m.distSavedKm !== undefined ? m.distSavedKm : 18.8,
-    baseline_time: m.timeBefore || base.total_time || 254.6,
-    optimized_time: m.timeAfter || opt.total_time || 178.1,
-    baseline_dist: m.distBefore || base.total_distance || 118.2,
-    optimized_dist: m.distAfter || opt.total_distance || 99.4,
-    baseline_delay: m.delayBefore || base.congestion_delay_min || 68.2,
-    optimized_delay: m.delayAfter || opt.congestion_delay_min || 15.6,
-    baseline_late: m.lateBefore || base.time_window_violation || 42.5,
-    optimized_late: m.lateAfter || opt.time_window_violation || 0.0,
-    baseline_feasible: base.feasible !== undefined ? base.feasible : false,
-    optimized_feasible: opt.feasible !== undefined ? opt.feasible : true,
-    avg_congestion_baseline: base.avg_congestion || 2.18,
-    avg_congestion_optimized: opt.avg_congestion || 1.15,
+    num_nodes: state.network ? pick(state.network.num_nodes, state.network.nodes && state.network.nodes.length) : null,
+    num_customers: state.vrp && state.vrp.customers ? state.vrp.customers.length : null,
+    num_vehicles: state.vrp ? pick(state.vrp.n_vehicles) : null,
+    depot: state.vrp ? pick(state.vrp.depot) : null,
+    baseline_algo: pick(m.baselineAlgo, base.algorithm),
+    optimized_algo: pick(m.optimizedAlgo, opt.algorithm),
+    time_saved_pct: pick(m.timeSavedPct),
+    time_saved_min: pick(m.timeSavedMin),
+    delay_saved_pct: pick(m.delaySavedPct),
+    delay_saved_min: pick(m.delaySavedMin),
+    dist_saved_pct: pick(m.distSavedPct),
+    dist_saved_km: pick(m.distSavedKm),
+    baseline_time: pick(m.timeBefore, base.total_time),
+    optimized_time: pick(m.timeAfter, opt.total_time),
+    baseline_dist: pick(m.distBefore, base.total_distance),
+    optimized_dist: pick(m.distAfter, opt.total_distance),
+    baseline_delay: pick(m.delayBefore, base.congestion_delay_min),
+    optimized_delay: pick(m.delayAfter, opt.congestion_delay_min),
+    baseline_late: pick(m.lateBefore, base.time_window_violation),
+    optimized_late: pick(m.lateAfter, opt.time_window_violation),
+    baseline_feasible: pick(base.feasible),
+    optimized_feasible: pick(opt.feasible),
+    avg_congestion_baseline: pick(base.avg_congestion),
+    avg_congestion_optimized: pick(opt.avg_congestion),
+    benchmark_ranks: state.benchmarkResults || null,
     active_view: state.viewMode || 'judge'
   };
 }
@@ -2407,8 +2421,14 @@ function syncAssistantContext() {
   const ctx = buildAssistantContext();
   const textEl = document.getElementById('aiContextText');
   if (textEl) {
-    const delayPct = ctx.delay_saved_pct != null ? ctx.delay_saved_pct.toFixed(1) : '77.1';
-    textEl.textContent = `${ctx.scenario_name} · -${delayPct}% Delay · ${ctx.optimized_feasible ? '100% Feasible' : 'Near-optimal'}`;
+    if (ctx.delay_saved_pct == null) {
+      textEl.textContent = `${ctx.scenario_name} · awaiting run`;
+    } else {
+      const feas = ctx.optimized_feasible === true ? 'Feasible'
+                 : ctx.optimized_feasible === false ? 'Constraints violated'
+                 : 'Feasibility n/a';
+      textEl.textContent = `${ctx.scenario_name} · -${ctx.delay_saved_pct.toFixed(1)}% Delay · ${feas}`;
+    }
   }
 }
 
@@ -2552,18 +2572,47 @@ function renderAssistantMarkdown(md) {
 
 function generateClientFallbackExplanation(msg, chip, ctx) {
   const m = msg.toLowerCase();
+
+  // Mirrors the backend contract: never invent a metric. `f` renders 'n/a'
+  // rather than fabricating a value, and hasResults gates all numeric claims.
+  const f = (v, suffix = '', dp = 1) =>
+    (v === null || v === undefined) ? 'n/a' : `${v.toFixed(dp)}${suffix}`;
+  const hasResults = [
+    ctx.time_saved_pct, ctx.delay_saved_pct, ctx.dist_saved_pct,
+    ctx.baseline_time, ctx.optimized_time,
+  ].some(v => v !== null && v !== undefined);
+
+  const NO_RESULTS = `### 📊 No optimization run yet
+
+I don't have any measured results for this session — nothing has been solved yet, so there are no real numbers to report.
+
+**To get a grounded analysis:**
+1. Generate a network (synthetic or real OSM map).
+2. Generate a VRP instance on it.
+3. Run **Solve** or **Compare** (baseline vs optimized).
+
+You can still ask me conceptual questions in the meantime — how QPSO works, what the map colours mean, or how to read the convergence chart.`;
+
   if (chip === 'explain_route' || m.includes('explain route') || m.includes('saving') || m.includes('summary')) {
+    if (!hasResults) return NO_RESULTS;
+
+    const punctuality = ctx.optimized_feasible === true
+      ? `**Feasible** — all time windows and capacities respected (lateness ${f(ctx.optimized_late, ' min')}).`
+      : ctx.optimized_feasible === false
+        ? `⚠️ **Infeasible** — constraints still violated (lateness ${f(ctx.optimized_late, ' min')}). Treat the savings above as an upper bound.`
+        : `Feasibility was not reported for this run.`;
+
     return `### 📊 Executive Route Analysis — ${ctx.scenario_name}
 
-You are viewing the **${ctx.baseline_algo}** compared against the **${ctx.optimized_algo}**.
+You are viewing **${ctx.baseline_algo || 'the baseline'}** compared against **${ctx.optimized_algo || 'the optimized run'}**.
 
 #### Key Operational Impacts:
-- ⚡ **Travel Time**: Reduced by **-${ctx.time_saved_pct.toFixed(1)}%** (${ctx.baseline_time.toFixed(1)}m ➔ **${ctx.optimized_time.toFixed(1)}m**, saving **${ctx.time_saved_min.toFixed(1)} minutes**).
-- 🛑 **Congestion Avoided**: Slashed by **-${ctx.delay_saved_pct.toFixed(1)}%** (${ctx.baseline_delay.toFixed(1)}m delay ➔ **${ctx.optimized_delay.toFixed(1)}m**).
-- 🛣️ **Mileage & Carbon**: Slashed by **-${ctx.dist_saved_pct.toFixed(1)}%** (saving **${ctx.dist_saved_km.toFixed(1)} km**).
-- 🎯 **Punctuality**: **100% Feasible** with **0 late arrivals**, eliminating the baseline's SLA penalties.
+- ⚡ **Travel Time**: Reduced by **-${f(ctx.time_saved_pct, '%')}** (${f(ctx.baseline_time, 'm')} ➔ **${f(ctx.optimized_time, 'm')}**, saving **${f(ctx.time_saved_min, ' minutes')}**).
+- 🛑 **Congestion Avoided**: Reduced by **-${f(ctx.delay_saved_pct, '%')}** (${f(ctx.baseline_delay, 'm')} delay ➔ **${f(ctx.optimized_delay, 'm')}**).
+- 🛣️ **Mileage & Carbon**: Reduced by **-${f(ctx.dist_saved_pct, '%')}** (saving **${f(ctx.dist_saved_km, ' km')}**).
+- 🎯 **Punctuality**: ${punctuality}
 
-**Takeaway:** Classical greedy dispatch rushes vehicles directly into congested arterial choke points. QPSO navigates along decongested secondary corridors, trading minor distance for massive time and reliability savings.`;
+**Takeaway:** Classical greedy dispatch rushes vehicles directly into congested arterial choke points. QPSO navigates along decongested secondary corridors, trading minor distance for time and reliability savings.`;
   }
 
   if (chip === 'why_qpso' || m.includes('why qpso') || m.includes('quantum') || m.includes('advantage') || m.includes('beat')) {
@@ -2579,13 +2628,17 @@ In large-scale Vehicle Routing under dynamic congestion, classical algorithms (G
 3. **Mean-Best (mbest) Swarm Attractor & Memetic Refinement**:
    - Particles are guided by the centroid of all personal bests, followed by hybridized 2-opt/or-opt local search to untangle delivery sequences.
 
-**Result:** Avoids **${ctx.delay_saved_pct.toFixed(1)}%** of bottleneck traffic delays with 100% constraint feasibility.`;
+${ctx.delay_saved_pct != null
+  ? `**Result (this run):** Avoided **${ctx.delay_saved_pct.toFixed(1)}%** of bottleneck traffic delays.`
+  : `**Result:** Run a solve or comparison to see how much bottleneck delay QPSO actually avoids on your network.`}`;
   }
 
   if (chip === 'explain_map' || m.includes('map') || m.includes('color') || m.includes('red') || m.includes('green') || m.includes('traffic')) {
     return `### 🗺️ Understanding the Map & Traffic Network
 
-The map renders an active urban graph with **${ctx.num_customers} customer delivery points** and an active fleet of **${ctx.num_vehicles} vehicles**.
+${(ctx.num_customers != null && ctx.num_vehicles != null)
+  ? `The map renders an active urban graph with **${ctx.num_customers} customer delivery points** and an active fleet of **${ctx.num_vehicles} vehicles**.`
+  : `The map renders the urban road graph: the depot, customer delivery points, and per-vehicle routes once an instance has been generated.`}
 
 #### Visual Guide:
 - 🟡 **Golden Central Node (Depot)**: Hub where all vehicles start loaded and return before the operating horizon ends.
@@ -2611,16 +2664,23 @@ The **Convergence Curve** tracks objective optimization fitness across iteration
   if (chip === 'explain_tw' || m.includes('time window') || m.includes('late') || m.includes('sla') || m.includes('penalty')) {
     return `### 🎯 Time-Window & Capacity Constraints (CVRPTW)
 
-- **Baseline Lateness**: Greedy dispatch arrives **${ctx.baseline_late.toFixed(1)} minutes late** due to unexpected congestion delays along arterial roads.
-- **QPSO Feasibility**: Predicts time-dependent edge delays and adjusts dispatch sequences, guaranteeing **0.0 minutes lateness (100% on-time SLA)**.
-- **Payload Capacity**: Vehicle capacities ($Q = 100$) are strictly respected with zero overloading.`;
+Time windows and capacity are enforced as **weighted penalty terms** in the fitness function — soft constraints, not hard guarantees. A run is only feasible if its reported violation totals are zero.
+
+${(ctx.baseline_late != null || ctx.optimized_late != null)
+  ? `#### Observed on this run:
+- **Baseline lateness penalty**: **${f(ctx.baseline_late, ' min')}**.
+- **Optimized lateness penalty**: **${f(ctx.optimized_late, ' min')}**${ctx.optimized_feasible === true ? ' — fully feasible.' : ctx.optimized_feasible === false ? ' — ⚠️ constraints still violated.' : '.'}`
+  : `#### Observed on this run:
+- No solve has been run yet, so there are no measured lateness or capacity figures to report.`}`;
   }
+
+  if (!hasResults) return NO_RESULTS;
 
   return `### 💡 AI Routing Copilot — ${ctx.scenario_name}
 
 I am monitoring the active optimization run for **${ctx.scenario_name}**.
-- **Performance**: QPSO achieves **${ctx.time_saved_pct.toFixed(1)}% time savings** and avoids **${ctx.delay_saved_pct.toFixed(1)}% traffic delay**.
-- **Constraint Status**: 100% Feasible with zero SLA violations.
+- **Performance**: **${f(ctx.time_saved_pct, '%')}** time saved, **${f(ctx.delay_saved_pct, '%')}** of congestion delay avoided versus ${ctx.baseline_algo || 'the baseline'}.
+- **Constraint Status**: ${ctx.optimized_feasible === true ? 'feasible — no violations.' : ctx.optimized_feasible === false ? '⚠️ constraints violated on this run.' : 'not reported for this run.'}
 
 Feel free to ask me to explain specific routes, quantum tunneling mechanisms, map colors, or algorithm benchmark comparisons!`;
 }
@@ -2634,7 +2694,11 @@ function initAssistantChat(force = false) {
   const welcomeHtml = `
     <h3>👋 QuantaRoute AI Copilot Active</h3>
     <p>I am your embedded AI routing assistant. I provide instant, context-aware traffic intelligence, analyzing multi-vehicle dispatch routes, quantum tunneling mechanisms, and bottleneck avoidance metrics in real time.</p>
-    <p><b>Active Context:</b> <code>${ctx.scenario_name}</code> (QPSO achieves <b>-${(ctx.delay_saved_pct || 77.1).toFixed(1)}% delay reduction</b> vs Baseline).</p>
+    <p><b>Active Context:</b> <code>${ctx.scenario_name}</code>${
+      ctx.delay_saved_pct != null
+        ? ` (measured <b>-${ctx.delay_saved_pct.toFixed(1)}% delay reduction</b> vs ${ctx.baseline_algo || 'baseline'}).`
+        : ` — no optimization run yet, so I have no measured results to cite. Run a solve or comparison first.`
+    }</p>
     <p>Select any quick prompt above or type a custom question below.</p>
   `;
   appendAssistantMessage('assistant', welcomeHtml, 'COPILOT · ONLINE');
