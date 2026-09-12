@@ -1,8 +1,30 @@
 # SIH26137 — Quantum-Inspired Intelligent Traffic Route Optimization
 
+[![Live Dashboard](https://img.shields.io/badge/Live%20Dashboard-sih--26137.vercel.app-000000?logo=vercel&logoColor=white)](https://sih-26137.vercel.app)
+[![Live API](https://img.shields.io/badge/Live%20API-sih26137.onrender.com-46E3B7?logo=render&logoColor=white)](https://sih26137.onrender.com/docs)
+
 A quantum-inspired metaheuristic optimization framework (QPSO) for solving
 large-scale Vehicle Routing Problems (VRP) under traffic congestion, benchmarked
 against classical metaheuristics (GA, SA, standard PSO) and exact/greedy baselines.
+
+## 🚀 Live Demo
+
+The platform is deployed as two services (see [DEPLOYMENT.md](DEPLOYMENT.md) for why):
+
+| | URL | Hosted on |
+| :--- | :--- | :--- |
+| **Dashboard (UI)** | **https://sih-26137.vercel.app** | Vercel (static) |
+| **Backend API** | **https://sih26137.onrender.com** · [Swagger docs](https://sih26137.onrender.com/docs) | Render (web service) |
+
+Just open the dashboard link — when served from a deployed origin it points itself at the
+live API automatically. Run it locally and it defaults to `http://127.0.0.1:8000` instead,
+so local development is unaffected. Either way you can override the target in the
+**API Base URL** field at the top of the dashboard.
+
+> ⏱️ **First request may take 30–50 seconds.** The API runs on Render's free tier, which
+> sleeps after ~15 minutes of inactivity and cold-starts on the next request. It is not
+> broken — give the first call a moment, then it responds normally. Warm it up by opening
+> the [API docs](https://sih26137.onrender.com/docs) a minute before a demo.
 
 ## Setup (on your machine)
 
@@ -71,6 +93,8 @@ cases in map rendering for very large OSM networks).
 Backend and frontend deploy to **different platforms** (Render for the backend,
 Vercel/Netlify for the frontend) — see [DEPLOYMENT.md](DEPLOYMENT.md) for why and how.
 Do not attempt to deploy the whole app to Vercel.
+
+Both are already live — see [Live Demo](#-live-demo) above for the URLs.
 
 ## Running the standalone benchmark scripts (no API needed)
 

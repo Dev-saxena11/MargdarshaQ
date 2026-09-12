@@ -1,7 +1,7 @@
 """
 main.py
 --------
-FastAPI application entrypoint for SIH26137: Quantum-Inspired Intelligent
+FastAPI application entrypoint for QuantaRoute ENTERPRISE: Quantum-Inspired Intelligent
 Traffic Route Optimization.
 
 Run with:
@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 
 app = FastAPI(
-    title="SIH26137 - Quantum-Inspired Traffic Route Optimization",
+    title="QuantaRoute ENTERPRISE - Quantum-Inspired Traffic Route Optimization",
     description=(
         "Quantum-inspired metaheuristic (QPSO) framework for solving "
         "large-scale Vehicle Routing Problems (VRP) under traffic congestion, "
@@ -29,8 +29,8 @@ app = FastAPI(
 )
 
 # CORS origins are configurable via the CORS_ORIGINS env var (comma-separated
-# list of allowed origins, e.g. "https://sih26137.vercel.app"). Defaults to
-# "*" (allow all) for local development / hackathon demo convenience — set
+# list of allowed origins, e.g. "https://quantaroute.app"). Defaults to
+# "*" (allow all) for local development convenience — set
 # CORS_ORIGINS explicitly once deployed so the API isn't wide open to any
 # origin. See DEPLOYMENT.md.
 _cors_origins_env = os.getenv("CORS_ORIGINS", "*")
@@ -54,7 +54,7 @@ app.include_router(router)
 @app.get("/")
 def root():
     return {
-        "project": "SIH26137",
+        "project": "QuantaRoute ENTERPRISE",
         "status": "running",
         "docs": "/docs",
     }

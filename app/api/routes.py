@@ -24,6 +24,7 @@ from app.core.classical_baselines_vrp import (
 )
 from app.core.dynamic_vrp import simulate_dynamic_reroute
 from app.core import store
+from app.core.assistant import assistant_engine
 from app.models.schemas import (
     NetworkGenerateRequest, NetworkResponse, NodeOut, EdgeOut, OSMNetworkRequest,
     VRPGenerateRequest, VRPInstanceResponse, CustomerOut,
@@ -31,6 +32,7 @@ from app.models.schemas import (
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
     VRPCompareRequest, VRPCompareResponse,
     TrafficIncidentRequest, TrafficIncidentResponse, DynamicSolveRequest, DynamicSolveResponse,
+    AssistantChatRequest, AssistantChatResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -473,4 +475,12 @@ def solve_dynamic_vrp(req: DynamicSolveRequest):
         unserved_customer_ids=res.unserved_customer_ids,
     )
 
+
+# In-Dashboard AI Assistant (Issue #32)
+# ---------------------------------------------------------------------------
+
+@router.post("/assistant/chat", response_model=AssistantChatResponse)
+def assistant_chat(req: AssistantChatRequest):
+    """Answers judge/user questions about current solve results, QPSO, and map."""
+    return assistant_engine.chat(req)
 
