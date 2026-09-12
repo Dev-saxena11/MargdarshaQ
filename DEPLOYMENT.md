@@ -8,10 +8,17 @@
 This app deploys as **two separate services on two different platforms**, not as one
 unified deployment:
 
-| Component | Platform | Type |
-|---|---|---|
-| Backend (`app/`, FastAPI) | **Render** | Persistent web service |
-| Frontend (`frontend/dashboard.html`) | **Vercel** (or Netlify) | Static site |
+| Component | Platform | Type | Live URL |
+|---|---|---|---|
+| Backend (`app/`, FastAPI) | **Render** | Persistent web service | https://sih26137.onrender.com |
+| Frontend (`frontend/dashboard.html`) | **Vercel** (or Netlify) | Static site | https://sih-26137.vercel.app |
+
+Both services are deployed and verified working together: the backend answers on
+`/api/health`, and CORS is restricted to the Vercel origin (not `*`) via the
+`CORS_ORIGINS` env var described below.
+
+> ⏱️ Render's free tier sleeps after ~15 minutes idle, so the first request after a
+> quiet period takes 30–50 seconds to cold-start. Warm it up before a live demo.
 
 ## Why not "just deploy it all to Vercel"
 
@@ -82,7 +89,7 @@ deploying via the `render.yaml` Blueprint):
 | Key | Value | Required? |
 |---|---|---|
 | `PYTHON_VERSION` | `3.11.9` | Recommended — pins the runtime so osmnx's dependency wheels resolve predictably. |
-| `CORS_ORIGINS` | `*` (default) or a comma-separated list, e.g. `https://sih26137.vercel.app` | Optional but strongly recommended once the frontend URL is known — see CORS note below. |
+| `CORS_ORIGINS` | `*` (default) or a comma-separated list, e.g. `https://sih-26137.vercel.app` | Optional but strongly recommended once the frontend URL is known — see CORS note below. |
 
 `PORT` is injected automatically by Render — do not set it yourself.
 
@@ -97,7 +104,7 @@ default into the HTML) rather than via a Vercel/Netlify env var.
 `app/main.py` reads `CORS_ORIGINS` (comma-separated origins) at startup, defaulting to
 `*` for local-dev convenience — see the code in `app/main.py`. Once the frontend is
 deployed, set `CORS_ORIGINS` on Render to the exact frontend origin(s) (e.g.
-`https://sih26137.vercel.app`) instead of leaving it at `*` — `*` is fine for the
+`https://sih-26137.vercel.app`) instead of leaving it at `*` — `*` is fine for the
 hackathon demo but shouldn't be treated as the production setting.
 
 ## Frontend: Vercel (or Netlify)

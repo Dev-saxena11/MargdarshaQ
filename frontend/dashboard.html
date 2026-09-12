@@ -1274,6 +1274,23 @@ let state = {
 const ROUTE_COLORS = ['#00F5D4', '#FF8A5C', '#FEE440', '#7B5CFF', '#00BBF9', '#FF0054'];
 const BASELINE_COLORS = ['#F59E0B', '#EF4444', '#EC4899', '#D97706', '#F43F5E'];
 
+// Backend used when the dashboard is served from a deployed origin. Locally the
+// field keeps its 127.0.0.1 default, so `python -m http.server` still talks to a
+// local uvicorn without anyone editing the field.
+const DEPLOYED_API_BASE = 'https://sih26137.onrender.com';
+
+function isLocalHost() {
+  return ['localhost', '127.0.0.1', '0.0.0.0', ''].includes(location.hostname);
+}
+
+// Point the field at the live API when this page is itself served remotely
+// (e.g. the Vercel deployment), so the public demo works without manual setup.
+function initApiBase() {
+  const el = document.getElementById('apiBase');
+  if (!el || isLocalHost()) return;
+  if (/127\.0\.0\.1|localhost/.test(el.value)) el.value = DEPLOYED_API_BASE;
+}
+
 function apiBase(){ return document.getElementById('apiBase').value.replace(/\/$/, ''); }
 
 async function api(path, opts={}) {
@@ -2708,6 +2725,7 @@ function initAssistantChat(force = false) {
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
+initApiBase();   // must run before checkHealth() so it probes the right backend
 checkHealth();
 loadPresetScenario();
 setTimeout(initAssistantChat, 100);
