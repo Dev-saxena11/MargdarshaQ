@@ -6,7 +6,7 @@ Pydantic request/response models for the SIH26137 FastAPI backend.
 
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
 
 # ---------------------------------------------------------------------------
@@ -188,4 +188,51 @@ class VRPCompareResponse(BaseModel):
     time_saved_min: float = Field(..., description="Total minutes saved")
     delay_saved_min: float = Field(..., description="Total congestion delay minutes avoided")
     distance_saved_km: float = Field(..., description="Total kilometers saved")
+
+
+# ---------------------------------------------------------------------------
+# In-Dashboard AI Assistant (Issue #32)
+# ---------------------------------------------------------------------------
+
+class AssistantContext(BaseModel):
+    scenario_name: Optional[str] = Field(None, description="Active demo or custom scenario name")
+    num_nodes: Optional[int] = Field(None, description="Network intersection count")
+    num_customers: Optional[int] = Field(None, description="Customer order count")
+    num_vehicles: Optional[int] = Field(None, description="Active vehicle fleet size")
+    depot: Optional[int] = Field(None, description="Depot node id")
+    baseline_algo: Optional[str] = Field(None, description="Baseline algorithm name (e.g. Greedy Nearest-Neighbor)")
+    optimized_algo: Optional[str] = Field(None, description="Optimized algorithm name (e.g. QPSO)")
+    time_saved_pct: Optional[float] = Field(None, description="Percentage time saved")
+    time_saved_min: Optional[float] = Field(None, description="Minutes saved")
+    delay_saved_pct: Optional[float] = Field(None, description="Congestion delay percentage avoided")
+    delay_saved_min: Optional[float] = Field(None, description="Congestion delay minutes avoided")
+    dist_saved_pct: Optional[float] = Field(None, description="Distance percentage saved")
+    dist_saved_km: Optional[float] = Field(None, description="Kilometers saved")
+    baseline_time: Optional[float] = None
+    optimized_time: Optional[float] = None
+    baseline_dist: Optional[float] = None
+    optimized_dist: Optional[float] = None
+    baseline_delay: Optional[float] = None
+    optimized_delay: Optional[float] = None
+    baseline_late: Optional[float] = None
+    optimized_late: Optional[float] = None
+    baseline_feasible: Optional[bool] = None
+    optimized_feasible: Optional[bool] = None
+    avg_congestion_baseline: Optional[float] = None
+    avg_congestion_optimized: Optional[float] = None
+    benchmark_ranks: Optional[List[Dict[str, Any]]] = None
+    active_view: Optional[str] = Field(None, description="Active UI view: 'judge' or 'control'")
+
+
+class AssistantChatRequest(BaseModel):
+    message: str = Field("", description="User query or selected prompt text")
+    chip: Optional[str] = Field(None, description="Preset chip identifier if triggered by quick prompt")
+    context: Optional[AssistantContext] = Field(None, description="Current session state and metrics snapshot")
+
+
+class AssistantChatResponse(BaseModel):
+    reply: str = Field(..., description="Formatted markdown explanation for presentation")
+    suggested_chips: List[str] = Field(default_factory=list, description="Follow-up quick action prompts")
+    metrics_summary: Optional[Dict[str, Any]] = Field(None, description="Key extracted quantitative metrics for UI badges")
+
 
