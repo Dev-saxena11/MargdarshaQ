@@ -10,6 +10,12 @@ venv/
 *.egg-info/
 .pytest_cache/
 
+# Secrets — real API keys live here and must never be committed.
+# .env.example (placeholders only) is tracked deliberately.
+.env
+.env.*
+!.env.example
+
 # Node / frontend
 node_modules/
 

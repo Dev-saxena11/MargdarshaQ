@@ -88,6 +88,17 @@ separately, but test the actual UI end-to-end first thing on your machine and
 expect to fix small integration issues (e.g. CORS, port mismatches, edge
 cases in map rendering for very large OSM networks).
 
+## AI Assistant
+
+The dashboard has an in-built assistant that explains routes, benchmark results
+and the algorithm. It works with no configuration (local deterministic engine)
+and gains free-text answers when an LLM key is set — free models via
+[OpenRouter](https://openrouter.ai) by default.
+
+Copy [`.env.example`](.env.example) to `.env` and set `OPENROUTER_API_KEY`.
+Architecture and the no-fabrication rule are documented in
+[docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
+
 ## Deploying
 
 Backend and frontend deploy to **different platforms** (Render for the backend,
