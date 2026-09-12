@@ -67,19 +67,16 @@ class VRPProblem:
         self.node_index = {n: i for i, n in enumerate(self.all_nodes)}
         self._precompute_matrices()
 
-    def _precompute_matrices(self):
+    def _precompute_matrices(self, current_time: Optional[float] = None):
         """
-        For every node of interest (depot + customers), run Dijkstra once to get
-        shortest travel TIME to every other node of interest. Distance along
-        that same shortest-time path is also recorded (so time and distance
-        are consistent with the same physical route, not two different paths).
+        For every node of interest (depot + customers), run Dijkstra to get
+        shortest travel TIME to every other node of interest based on current network travel times.
         """
         G = self.net.graph
-        nodes_set = set(self.all_nodes)
 
         for s in self.all_nodes:
             times, paths = nx.single_source_dijkstra(
-                G, s, weight=lambda u, v, d: self.net.travel_time(u, v)
+                G, s, weight=lambda u, v, d: self.net.travel_time(u, v, current_time=current_time)
             )
             for t in self.all_nodes:
                 if t == s:
@@ -97,6 +94,10 @@ class VRPProblem:
                 dist = sum(G[u][v]["distance"] for u, v in zip(path[:-1], path[1:]))
                 self.dist_matrix[(s, t)] = dist
                 self.path_matrix[(s, t)] = path
+
+    def recompute_matrices(self, current_time: Optional[float] = None):
+        """Recompute time, distance, and path matrices after a network congestion update or traffic incident."""
+        self._precompute_matrices(current_time=current_time)
 
     def path_between(self, a: int, b: int) -> List[int]:
         """Full sequence of road-network nodes (intermediate intersections

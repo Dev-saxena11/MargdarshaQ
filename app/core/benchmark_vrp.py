@@ -188,7 +188,30 @@ def run_robustness_check(problem: VRPProblem, n_seeds: int = 5, max_iter: int = 
     return summary
 
 
+def run_dynamic_traffic_benchmark(vrp: VRPProblem, incident_factors: List[float] = [2.0, 3.5, 5.0]) -> Dict[float, Any]:
+    """Benchmark Static vs Dynamic QPSO re-optimization across varying traffic incident severities."""
+    from app.core.dynamic_vrp import simulate_dynamic_reroute
+
+    print(f"\n{'Incident Severity':<18} {'Static Time':>12} {'Dynamic Time':>13} {'Time Saved':>12} {'Delay Avoided %':>17}")
+    print("-" * 75)
+
+    dyn_results = {}
+    for factor in incident_factors:
+        res = simulate_dynamic_reroute(
+            problem=vrp, incident_factor=factor, trigger_time_min=60.0,
+            algorithm="qpso", n_particles=50, max_iter=150, seed=1
+        )
+        dyn_results[factor] = res
+        print(f"{factor:.1f}x Congestion {res.static_solution.total_time:>12.1f}m {res.dynamic_solution.total_time:>13.1f}m "
+              f"{res.time_saved_min:>10.1f}m ({res.time_saved_pct:.1f}%) {res.delay_avoided_pct:>16.1f}%")
+
+    return dyn_results
+
+
 if __name__ == "__main__":
+    import os
+    os.makedirs("data", exist_ok=True)
+
     print("=" * 95)
     print("VRP BENCHMARK: Single instance, all algorithms")
     print("=" * 95)
@@ -196,7 +219,12 @@ if __name__ == "__main__":
     vrp = generate_synthetic_vrp(net, n_customers=18, depot=0, vehicle_capacity=80, seed=3)
     results = run_full_vrp_benchmark(vrp, max_iter=200, seed=1)
     print_vrp_comparison_table(results)
-    plot_vrp_convergence(results, save_path="/home/claude/sih26137/data/vrp_convergence.png")
+    plot_vrp_convergence(results, save_path="data/vrp_convergence.png")
+
+    print("\n" + "=" * 95)
+    print("DYNAMIC TRAFFIC BENCHMARK (Static vs Dynamic QPSO Rerouting)")
+    print("=" * 95)
+    run_dynamic_traffic_benchmark(vrp, incident_factors=[2.0, 3.5, 5.0])
 
     print("\n" + "=" * 95)
     print("ROBUSTNESS CHECK (5 seeds per algorithm)")
@@ -207,10 +235,11 @@ if __name__ == "__main__":
     print("VRP SCALABILITY TEST (fixed budget -- for comparison)")
     print("=" * 95)
     scal_fixed = run_vrp_scalability_test(customer_counts=[10, 20, 40, 60], seed=1, scale_budget=False)
-    plot_vrp_scalability(scal_fixed, save_path="/home/claude/sih26137/data/vrp_scalability_fixed_budget.png")
+    plot_vrp_scalability(scal_fixed, save_path="data/vrp_scalability_fixed_budget.png")
 
     print("\n" + "=" * 95)
     print("VRP SCALABILITY TEST (scaled budget -- fair per-dimension search effort)")
     print("=" * 95)
     scal_scaled = run_vrp_scalability_test(customer_counts=[10, 20, 40, 60], seed=1, scale_budget=True)
-    plot_vrp_scalability(scal_scaled, save_path="/home/claude/sih26137/data/vrp_scalability_scaled_budget.png")
+    plot_vrp_scalability(scal_scaled, save_path="data/vrp_scalability_scaled_budget.png")
+

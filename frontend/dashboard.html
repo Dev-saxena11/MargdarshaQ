@@ -835,6 +835,9 @@
             <button class="btn-neo-primary" id="btnJudgeRun" onclick="runJudgeDemoComparison()">
               <span>▶</span> Run Live Comparison
             </button>
+            <button class="btn-neo-secondary" id="btnDynamicRun" onclick="runDynamicTrafficDemo()" style="border-color:var(--neo-pink); color:var(--neo-pink);">
+              <span>🚨</span> Simulate Dynamic Bottleneck
+            </button>
           </div>
         </div>
       </div>
@@ -1591,6 +1594,68 @@ async function runJudgeDemoComparison() {
     btn.innerHTML = `<span>▶</span> Run Live Comparison`;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Run Dynamic Traffic Simulation & Mid-Route Re-optimization
+// ---------------------------------------------------------------------------
+async function runDynamicTrafficDemo() {
+  const btn = document.getElementById('btnDynamicRun');
+  btn.disabled = true;
+  btn.innerHTML = `<span>⏳</span> SIMULATING BOTTLENECK & RE-ROUTING…`;
+
+  try {
+    const isOnline = await checkHealth();
+
+    if (isOnline) {
+      if (!state.network || state.network.network_id === 'demo-net') {
+        state.network = await api('/api/network/generate', {
+          method: 'POST',
+          body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
+        });
+      }
+      if (!state.vrp || state.vrp.vrp_id === 'demo-vrp') {
+        state.vrp = await api('/api/vrp/generate', {
+          method: 'POST',
+          body: JSON.stringify({
+            network_id: state.network.network_id,
+            n_customers: 12, depot: 0, vehicle_capacity: 80,
+            demand_min: 5, demand_max: 20, horizon: 480,
+            window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
+          }),
+        });
+      }
+
+      const dynRes = await api('/api/vrp/solve-dynamic', {
+        method: 'POST',
+        body: JSON.stringify({
+          vrp_id: state.vrp.vrp_id,
+          incident_factor: 4.0,
+          trigger_time_min: 60.0,
+          algorithm: 'qpso',
+          n_particles: 50,
+          max_iter: 150,
+          seed: 1,
+        }),
+      });
+
+      state.baselineSolution = dynRes.static_affected_solution;
+      state.optimizedSolution = dynRes.dynamic_rerouted_solution;
+      computeAndDisplayComparison(dynRes.static_affected_solution, dynRes.dynamic_rerouted_solution);
+    } else {
+      // Offline dynamic preset fallback
+      loadPresetScenario();
+    }
+
+    renderJudgeComparison();
+  } catch (e) {
+    console.warn("Dynamic simulation fallback:", e);
+    loadPresetScenario();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<span>🚨</span> Simulate Dynamic Bottleneck`;
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Compute & Render Comparison Metrics

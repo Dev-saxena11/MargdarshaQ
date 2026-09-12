@@ -14,16 +14,35 @@ lets the routing engine react to dynamic conditions instead of just static short
 
 from __future__ import annotations
 import random
+import numpy as np
 import networkx as nx
 from dataclasses import dataclass, field
 from typing import Dict, Tuple, List, Optional
 
 
+
+@dataclass
+class TrafficIncident:
+    u: int
+    v: int
+    factor: float
+    start_time: float = 0.0
+    duration_min: Optional[float] = None
+
+    def is_active(self, current_time: float) -> bool:
+        if current_time < self.start_time:
+            return False
+        if self.duration_min is not None and current_time > (self.start_time + self.duration_min):
+            return False
+        return True
+
+
 @dataclass
 class TrafficNetwork:
-    """Wraps a networkx.Graph with transportation-specific edge attributes."""
+    """Wraps a networkx.Graph with transportation-specific edge attributes and dynamic traffic features."""
 
     graph: nx.Graph = field(default_factory=nx.Graph)
+    incidents: List[TrafficIncident] = field(default_factory=list)
 
     # ---------- construction helpers ----------
 
@@ -54,17 +73,53 @@ class TrafficNetwork:
 
     # ---------- dynamic traffic ----------
 
-    def travel_time(self, u: int, v: int) -> float:
+    def get_edge_congestion(self, u: int, v: int, current_time: Optional[float] = None) -> float:
+        """Calculate effective congestion factor considering base factor, active incidents, and time-of-day surge."""
+        if not self.graph.has_edge(u, v):
+            return 1.0
+        edge = self.graph[u][v]
+        cong = edge.get("congestion_factor", 1.0)
+
+        # Check for active incidents on this edge
+        for inc in self.incidents:
+            if (inc.u == u and inc.v == v) or (inc.u == v and inc.v == u):
+                if current_time is None or inc.is_active(current_time):
+                    cong = max(cong, inc.factor)
+
+        # Time-varying rush-hour modulation (if current_time is provided)
+        if current_time is not None:
+            # Gaussian rush hour peak at t=120 min with std=30 min
+            rush_surge = 0.5 * np.exp(-((current_time - 120.0) / 30.0) ** 2)
+            cong += rush_surge
+
+        return max(1.0, float(cong))
+
+    def travel_time(self, u: int, v: int, current_time: Optional[float] = None) -> float:
         """Current effective travel time (minutes) for edge u-v, congestion-adjusted."""
         edge = self.graph[u][v]
-        return edge["base_time"] * edge["congestion_factor"]
+        cong = self.get_edge_congestion(u, v, current_time)
+        return edge["base_time"] * cong
 
     def update_congestion(self, u: int, v: int, factor: float):
         """Set a new congestion factor for an edge (simulating real-time traffic)."""
-        self.graph[u][v]["congestion_factor"] = max(1.0, factor)
+        if self.graph.has_edge(u, v):
+            self.graph[u][v]["congestion_factor"] = max(1.0, factor)
+
+    def apply_incident(
+        self, u: int, v: int, factor: float, start_time: float = 0.0, duration_min: Optional[float] = None
+    ) -> TrafficIncident:
+        """Register a traffic incident/bottleneck on edge (u, v)."""
+        inc = TrafficIncident(u=u, v=v, factor=factor, start_time=start_time, duration_min=duration_min)
+        self.incidents.append(inc)
+        self.update_congestion(u, v, factor)
+        return inc
+
+    def clear_incidents(self):
+        """Clear all active incidents and reset edge factors."""
+        self.incidents.clear()
 
     def randomize_congestion(self, seed: Optional[int] = None,
-                              low: float = 1.0, high: float = 3.0):
+                               low: float = 1.0, high: float = 3.0):
         """Simulate real-time traffic by randomizing congestion on every edge."""
         rng = random.Random(seed)
         for u, v in self.graph.edges():

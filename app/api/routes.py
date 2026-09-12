@@ -22,6 +22,7 @@ from app.core.qpso_vrp import QPSOVRPOptimizer
 from app.core.classical_baselines_vrp import (
     run_ga_vrp, run_sa_vrp, run_standard_pso_vrp, run_greedy_nn_vrp
 )
+from app.core.dynamic_vrp import simulate_dynamic_reroute
 from app.core import store
 from app.core.assistant import assistant_engine
 from app.models.schemas import (
@@ -30,6 +31,7 @@ from app.models.schemas import (
     VRPSolveRequest, VRPSolveResponse, RouteOut,
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
     VRPCompareRequest, VRPCompareResponse,
+    TrafficIncidentRequest, TrafficIncidentResponse, DynamicSolveRequest, DynamicSolveResponse,
     AssistantChatRequest, AssistantChatResponse,
 )
 
@@ -409,6 +411,71 @@ def compare_vrp(req: VRPCompareRequest):
 
 
 # ---------------------------------------------------------------------------
+# Dynamic Traffic & Mid-Route Re-Optimization
+# ---------------------------------------------------------------------------
+
+@router.post("/traffic/incident", response_model=TrafficIncidentResponse)
+def create_traffic_incident(req: TrafficIncidentRequest):
+    try:
+        net = store.get_network(req.network_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if not net.graph.has_edge(req.u, req.v):
+        raise HTTPException(status_code=400, detail=f"Edge ({req.u}, {req.v}) does not exist in network '{req.network_id}'")
+
+    net.apply_incident(req.u, req.v, req.factor, start_time=req.start_time, duration_min=req.duration_min)
+
+    return TrafficIncidentResponse(
+        network_id=req.network_id,
+        u=req.u, v=req.v, factor=req.factor,
+        message=f"Traffic incident applied to edge ({req.u}, {req.v}) with {req.factor:.1f}x congestion multiplier"
+    )
+
+
+@router.post("/vrp/solve-dynamic", response_model=DynamicSolveResponse)
+def solve_dynamic_vrp(req: DynamicSolveRequest):
+    try:
+        problem = store.get_vrp(req.vrp_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    try:
+        res = simulate_dynamic_reroute(
+            problem=problem,
+            incident_u=req.incident_u,
+            incident_v=req.incident_v,
+            incident_factor=req.incident_factor,
+            trigger_time_min=req.trigger_time_min,
+            algorithm=req.algorithm,
+            n_particles=req.n_particles,
+            max_iter=req.max_iter,
+            seed=req.seed,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Dynamic VRP simulation failed: {e}")
+
+    init_resp = _build_solve_response(problem, res.initial_solution, [], 0, "Initial Plan (t=0)", 0.0)
+    static_resp = _build_solve_response(problem, res.static_solution, [], 0, "Static Execution (Blind to Traffic)", 0.0)
+    dynamic_resp = _build_solve_response(problem, res.dynamic_solution, [], 0, f"Dynamic QPSO (Re-routed at t={req.trigger_time_min:.0f}m)", 0.0)
+
+    return DynamicSolveResponse(
+        vrp_id=req.vrp_id,
+        trigger_time_min=res.trigger_time_min,
+        incident=res.incident,
+        initial_solution=init_resp,
+        static_affected_solution=static_resp,
+        dynamic_rerouted_solution=dynamic_resp,
+        time_saved_min=res.time_saved_min,
+        time_saved_pct=res.time_saved_pct,
+        delay_avoided_min=res.delay_avoided_min,
+        delay_avoided_pct=res.delay_avoided_pct,
+        tw_violations_avoided=res.tw_violations_avoided,
+        served_customer_ids=res.served_customer_ids,
+        unserved_customer_ids=res.unserved_customer_ids,
+    )
+
+
 # In-Dashboard AI Assistant (Issue #32)
 # ---------------------------------------------------------------------------
 
@@ -416,5 +483,4 @@ def compare_vrp(req: VRPCompareRequest):
 def assistant_chat(req: AssistantChatRequest):
     """Answers judge/user questions about current solve results, QPSO, and map."""
     return assistant_engine.chat(req)
-
 
