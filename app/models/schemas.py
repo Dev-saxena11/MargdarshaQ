@@ -54,6 +54,15 @@ class OSMNetworkRequest(BaseModel):
     seed: int = Field(1, description="Seed for simulated congestion randomization")
 
 
+class CachedNetworkRequest(BaseModel):
+    """
+    Load a real OSM road network that was downloaded ahead of time and shipped
+    in the repository, instead of fetching from OpenStreetMap at request time.
+    """
+    name: str = Field("delhi_central", description="Cached network name (see data/networks/)")
+    seed: int = Field(42, description="Seed for simulated congestion randomization")
+
+
 # ---------------------------------------------------------------------------
 # VRP instance generation
 # ---------------------------------------------------------------------------

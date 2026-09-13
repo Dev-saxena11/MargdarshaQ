@@ -17,6 +17,9 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
+from app.core.cached_network import (
+    load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
+)
 from app.core.vrp_problem import generate_synthetic_vrp, VRPProblem, evaluate_solution
 from app.core.qpso_vrp import QPSOVRPOptimizer
 from app.core.classical_baselines_vrp import (
@@ -27,6 +30,7 @@ from app.core import store
 from app.core.assistant import assistant_engine
 from app.models.schemas import (
     NetworkGenerateRequest, NetworkResponse, NodeOut, EdgeOut, OSMNetworkRequest,
+    CachedNetworkRequest,
     VRPGenerateRequest, VRPInstanceResponse, CustomerOut,
     VRPSolveRequest, VRPSolveResponse, RouteOut,
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
@@ -103,6 +107,33 @@ def generate_network_from_osm(req: OSMNetworkRequest):
         num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
     )
 
+
+@router.get("/network/cached")
+def list_cached_networks():
+    """Real OSM networks shipped with the app, loadable without touching the internet."""
+    return {"networks": available_networks()}
+
+
+@router.post("/network/from_cache", response_model=NetworkResponse)
+def network_from_cache(req: CachedNetworkRequest):
+    """
+    Load a pre-downloaded real city network from disk.
+
+    Serves the same real roads as /network/from_osm — including one-way
+    restrictions — but in milliseconds and with no dependency on OpenStreetMap
+    being reachable, which it frequently is not from shared hosting.
+    """
+    try:
+        net = load_cached_network(req.name, congestion_seed=req.seed)
+    except CachedNetworkNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    network_id = store.put_network(net, is_geo=True)
+    nodes, edges = _network_payload(net)
+    return NetworkResponse(
+        network_id=network_id, num_nodes=net.num_nodes(),
+        num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+    )
 
 @router.get("/network/{network_id}", response_model=NetworkResponse)
 def get_network(network_id: str):

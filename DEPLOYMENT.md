@@ -149,6 +149,43 @@ widening access; the exact-origin list still applies. Covered by
 `test_cors_config.py`, which also checks the pattern can't be prefix-spoofed by a
 lookalike domain (matching uses `fullmatch`).
 
+## Real-city map data
+
+The "Delhi Urban Corridor" demo serves a road network that was downloaded from
+OpenStreetMap ahead of time and committed to `data/networks/delhi_central.json`
+(481 nodes, 1177 directed edges, 191 of them genuinely one-way).
+
+**Why it is cached rather than fetched live.** Downloading at request time was
+measured against this deployed backend at 44s, 169s, and outright failure (502)
+within the same hour. OpenStreetMap's public endpoints rate-limit by IP, and
+Render's free tier shares an IP with other tenants — so the demo could be
+blocked by traffic that isn't ours. The cache loads in ~20 ms and cannot fail
+that way.
+
+The roads are real, including one-way restrictions. Only the download moved
+offline: congestion is still randomised per run, so traffic conditions are not
+frozen along with the geometry.
+
+### Refreshing or adding a network
+
+```bash
+python scripts/build_osm_cache.py --name delhi_central
+python scripts/build_osm_cache.py --name mumbai_south --label "South Mumbai"     --south 18.90 --north 18.95 --west 72.80 --east 72.85
+```
+
+Run it from a machine OpenStreetMap is willing to talk to (a laptop is fine;
+the deployed host often is not), then commit the JSON. The script talks to the
+Overpass API directly, so it needs no geospatial dependencies.
+
+Map data is © OpenStreetMap contributors, licensed ODbL. The attribution is
+stored in the cache file and shown on the dashboard maps; keep it there.
+
+### Load order at demo time
+
+1. `POST /api/network/from_cache` — the committed network, ~20 ms
+2. `POST /api/network/from_osm` — a live download, if no cache exists
+3. the synthetic city, with an on-screen notice, if neither is available
+
 ## Frontend: Vercel (or Netlify)
 
 `frontend/dashboard.html` is a static file with a configurable **API Base URL** input

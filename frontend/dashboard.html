@@ -1857,23 +1857,39 @@ const DELHI_BBOX = {
 };
 
 async function loadRealCityNetwork(onStatus) {
-  if (onStatus) onStatus('Downloading the real Delhi road network from OpenStreetMap… '
-                       + 'this can take up to a couple of minutes.');
-  return await api('/api/network/from_osm', {
+  // 1. Pre-downloaded real Delhi roads, shipped with the app. Loads in
+  //    milliseconds and cannot be rate-limited, so this is the demo path.
+  try {
+    if (onStatus) onStatus('Loading the real Delhi road network…');
+    const network = await api('/api/network/from_cache', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'delhi_central', seed: 42 }),
+    });
+    return { network, live: false };
+  } catch (err) {
+    console.warn('Cached city network unavailable, trying a live OSM download:', err);
+  }
+
+  // 2. Live download. Kept as a backstop for when no cache has been built,
+  //    but it depends on OpenStreetMap answering, which from shared hosting is
+  //    unreliable — measured at 44s, 169s and outright failure within one hour.
+  if (onStatus) onStatus('Downloading live from OpenStreetMap — this can take a minute or two…');
+  const network = await api('/api/network/from_osm', {
     method: 'POST',
     body: JSON.stringify(DELHI_BBOX),
   });
+  return { network, live: true };
 }
 
-// Falls back to the synthetic city rather than leaving the demo dead if
-// OpenStreetMap is unreachable. Returns {network, usedFallback}.
+// Falls back to the synthetic city rather than leaving the demo dead if no real
+// network can be obtained at all. Returns {network, usedFallback}.
 async function loadPresetNetwork(presetKey, onStatus) {
   if (presetKey === 'delhi_osm') {
     try {
-      const network = await loadRealCityNetwork(onStatus);
+      const { network } = await loadRealCityNetwork(onStatus);
       return { network, usedFallback: false };
     } catch (err) {
-      console.warn('OSM network load failed, falling back to the synthetic city:', err);
+      console.warn('No real city network available, falling back to the synthetic city:', err);
       if (onStatus) onStatus('OpenStreetMap did not respond — falling back to the synthetic city network.');
     }
   }
@@ -2334,12 +2350,12 @@ function renderJudgeLeaflet() {
 
   if (!state.judgeMapBefore) {
     state.judgeMapBefore = L.map('leafletJudgeBefore', { zoomControl: false });
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }).addTo(state.judgeMapBefore);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri | Road data © OpenStreetMap contributors (ODbL)' }).addTo(state.judgeMapBefore);
     state.judgeLayerBefore = L.layerGroup().addTo(state.judgeMapBefore);
   }
   if (!state.judgeMapAfter) {
     state.judgeMapAfter = L.map('leafletJudgeAfter', { zoomControl: true });
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }).addTo(state.judgeMapAfter);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri | Road data © OpenStreetMap contributors (ODbL)' }).addTo(state.judgeMapAfter);
     state.judgeLayerAfter = L.layerGroup().addTo(state.judgeMapAfter);
   }
 
