@@ -129,8 +129,13 @@ def load_osm_network(
             speed_kph = speed_kph[0]
         distance_km = length_m / 1000.0
         
-        # Since we are using the directed G, we preserve real-world one-way streets!
-        net.add_edge(u, v, distance=distance_km, base_speed_kmph=speed_kph)
+        # Real road directions are preserved: OSM's graph is directed, and
+        # bidirectional=False adds only this direction. A genuine two-way street
+        # appears in OSM as both (u, v) and (v, u), so it still ends up traversable
+        # both ways — while a one-way street stays one-way and the router cannot
+        # send a vehicle the wrong way up it.
+        net.add_edge(u, v, distance=distance_km, base_speed_kmph=speed_kph,
+                     bidirectional=False)
 
     net.randomize_congestion(seed=congestion_seed, low=congestion_low, high=congestion_high)
 

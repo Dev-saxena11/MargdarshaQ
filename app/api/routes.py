@@ -38,6 +38,24 @@ from app.models.schemas import (
 router = APIRouter(prefix="/api")
 
 
+def _network_payload(net):
+    """
+    Node and edge lists for the API response.
+
+    The network is a DiGraph, so an ordinary two-way road is two opposing edges.
+    Drawing both would paint every street twice and report double the edge count,
+    so each physical road is emitted once (see TrafficNetwork.road_pairs).
+    """
+    nodes = [NodeOut(id=n, x=d["x"], y=d["y"]) for n, d in net.graph.nodes(data=True)]
+    edges = []
+    for u, v in net.road_pairs():
+        d = net.graph[u][v]
+        edges.append(EdgeOut(u=u, v=v, distance=d["distance"], base_time=d["base_time"],
+                             congestion_factor=d["congestion_factor"]))
+    return nodes, edges
+
+
+
 # ---------------------------------------------------------------------------
 # Network generation
 # ---------------------------------------------------------------------------
@@ -50,16 +68,11 @@ def generate_network(req: NetworkGenerateRequest):
     )
     network_id = store.put_network(net, is_geo=False)
 
-    nodes = [NodeOut(id=n, x=d["x"], y=d["y"]) for n, d in net.graph.nodes(data=True)]
-    edges = [
-        EdgeOut(u=u, v=v, distance=d["distance"], base_time=d["base_time"],
-                congestion_factor=d["congestion_factor"])
-        for u, v, d in net.graph.edges(data=True)
-    ]
+    nodes, edges = _network_payload(net)
 
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
-        num_edges=net.graph.number_of_edges(), is_geo=False, nodes=nodes, edges=edges,
+        num_edges=len(edges), is_geo=False, nodes=nodes, edges=edges,
     )
 
 
@@ -83,16 +96,11 @@ def generate_network_from_osm(req: OSMNetworkRequest):
 
     network_id = store.put_network(net, is_geo=True)
 
-    nodes = [NodeOut(id=n, x=d["x"], y=d["y"]) for n, d in net.graph.nodes(data=True)]
-    edges = [
-        EdgeOut(u=u, v=v, distance=d["distance"], base_time=d["base_time"],
-                congestion_factor=d["congestion_factor"])
-        for u, v, d in net.graph.edges(data=True)
-    ]
+    nodes, edges = _network_payload(net)
 
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
-        num_edges=net.graph.number_of_edges(), is_geo=True, nodes=nodes, edges=edges,
+        num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
     )
 
 
@@ -104,15 +112,10 @@ def get_network(network_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
     is_geo = store.is_geo_network(network_id)
-    nodes = [NodeOut(id=n, x=d["x"], y=d["y"]) for n, d in net.graph.nodes(data=True)]
-    edges = [
-        EdgeOut(u=u, v=v, distance=d["distance"], base_time=d["base_time"],
-                congestion_factor=d["congestion_factor"])
-        for u, v, d in net.graph.edges(data=True)
-    ]
+    nodes, edges = _network_payload(net)
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
-        num_edges=net.graph.number_of_edges(), is_geo=is_geo, nodes=nodes, edges=edges,
+        num_edges=len(edges), is_geo=is_geo, nodes=nodes, edges=edges,
     )
 
 

@@ -30,10 +30,14 @@ Thumbs.db
 # Local runner helpers
 powershell.bat
 
-# Local testing and debug scripts
-test_*.py
-benchmark_*.py
+# Local scratch/debug scripts only.
+# Do NOT ignore test_*.py or benchmark_*.py: the project's test suites live at
+# the repo root (test_dynamic_correctness.py, test_assistant_providers.py,
+# test_cors_config.py, test_dynamic_smoke.py) and app/core/benchmark_vrp.py is
+# source. Ignoring those patterns silently refuses every newly added test —
+# `git add test_foo.py` fails and the file never shows up in `git status`.
 debug_*.py
+scratch_*.py
 
 # OSMnx Cache
 cache/

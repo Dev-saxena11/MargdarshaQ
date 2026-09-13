@@ -28,9 +28,12 @@ class TrafficIncident:
     factor: float
     start_time: float = 0.0
     duration_min: Optional[float] = None
-    # Congestion factor the edge carried before this incident, so the network
-    # can be restored to its pre-incident state (see clear_incidents).
+    # Congestion factors the road carried before this incident, so the network
+    # can be restored to its pre-incident state (see clear_incidents). The two
+    # directions are tracked separately because a one-way street has no reverse
+    # edge, and earlier incidents can leave the directions holding different values.
     original_factor: Optional[float] = None
+    original_factor_reverse: Optional[float] = None
 
     def is_active(self, current_time: float) -> bool:
         if current_time < self.start_time:
@@ -44,7 +47,11 @@ class TrafficIncident:
 class TrafficNetwork:
     """Wraps a networkx.Graph with transportation-specific edge attributes and dynamic traffic features."""
 
-    graph: nx.Graph = field(default_factory=nx.Graph)
+    # Directed, so that a one-way street stays one-way. Two-way roads are stored
+    # as a pair of opposing edges (see add_edge's `bidirectional` flag), which
+    # reproduces the previous undirected behaviour for synthetic networks while
+    # letting the OSM loader keep real road directions.
+    graph: nx.DiGraph = field(default_factory=nx.DiGraph)
     incidents: List[TrafficIncident] = field(default_factory=list)
 
     # ---------- construction helpers ----------
@@ -60,11 +67,15 @@ class TrafficNetwork:
         distance: float,
         base_speed_kmph: float = 40.0,
         congestion_factor: float = 1.0,
+        bidirectional: bool = True,
     ):
         """
         distance: km
         base_speed_kmph: free-flow speed on this road segment
         congestion_factor: >=1.0, multiplies travel time (1.0 = no congestion)
+        bidirectional: True adds the return edge too (an ordinary two-way road).
+            Pass False for a genuine one-way street — the OSM loader does this so
+            real road directions survive into the routing engine.
         """
         base_time = (distance / base_speed_kmph) * 60.0  # minutes
         self.graph.add_edge(
@@ -73,6 +84,28 @@ class TrafficNetwork:
             base_time=base_time,
             congestion_factor=congestion_factor,
         )
+        if bidirectional:
+            self.graph.add_edge(
+                v, u,
+                distance=distance,
+                base_time=base_time,
+                congestion_factor=congestion_factor,
+            )
+
+    def road_pairs(self):
+        """
+        Yields each physical road once as (u, v), rather than once per direction.
+
+        Use this anywhere a two-way road should be treated as a single thing —
+        assigning it a congestion level, or drawing it on a map — so it isn't
+        counted or rendered twice.
+        """
+        seen = set()
+        for u, v in self.graph.edges():
+            if (v, u) in seen:
+                continue
+            seen.add((u, v))
+            yield u, v
 
     # ---------- dynamic traffic ----------
 
@@ -103,19 +136,33 @@ class TrafficNetwork:
         cong = self.get_edge_congestion(u, v, current_time)
         return edge["base_time"] * cong
 
-    def update_congestion(self, u: int, v: int, factor: float):
-        """Set a new congestion factor for an edge (simulating real-time traffic)."""
+    def update_congestion(self, u: int, v: int, factor: float, both_ways: bool = True):
+        """
+        Set a new congestion factor for a road (simulating real-time traffic).
+
+        Applies to both directions by default: a jam on a two-way street slows
+        traffic going each way, and this also preserves the behaviour from when
+        the network was undirected. Pass both_ways=False to congest only the
+        u -> v direction.
+        """
         if self.graph.has_edge(u, v):
             self.graph[u][v]["congestion_factor"] = max(1.0, factor)
+        if both_ways and self.graph.has_edge(v, u):
+            self.graph[v][u]["congestion_factor"] = max(1.0, factor)
 
     def apply_incident(
         self, u: int, v: int, factor: float, start_time: float = 0.0, duration_min: Optional[float] = None
     ) -> TrafficIncident:
-        """Register a traffic incident/bottleneck on edge (u, v)."""
+        """Register a traffic incident/bottleneck on the road (u, v)."""
         prev = self.graph[u][v].get("congestion_factor") if self.graph.has_edge(u, v) else None
+        # The opposing direction is recorded separately: on a one-way street it
+        # doesn't exist, and after an earlier incident the two directions can
+        # hold different values, so restoring needs both.
+        prev_rev = self.graph[v][u].get("congestion_factor") if self.graph.has_edge(v, u) else None
         inc = TrafficIncident(
             u=u, v=v, factor=factor, start_time=start_time,
             duration_min=duration_min, original_factor=prev,
+            original_factor_reverse=prev_rev,
         )
         self.incidents.append(inc)
         self.update_congestion(u, v, factor)
@@ -132,14 +179,26 @@ class TrafficNetwork:
         for inc in reversed(self.incidents):
             if inc.original_factor is not None and self.graph.has_edge(inc.u, inc.v):
                 self.graph[inc.u][inc.v]["congestion_factor"] = inc.original_factor
+            if inc.original_factor_reverse is not None and self.graph.has_edge(inc.v, inc.u):
+                self.graph[inc.v][inc.u]["congestion_factor"] = inc.original_factor_reverse
         self.incidents.clear()
 
     def randomize_congestion(self, seed: Optional[int] = None,
                                low: float = 1.0, high: float = 3.0):
-        """Simulate real-time traffic by randomizing congestion on every edge."""
+        """
+        Simulate real-time traffic by randomizing congestion on every road.
+
+        One draw per physical road, applied to both directions — a jammed street
+        is jammed whichever way you drive it. Drawing per directed edge instead
+        would consume two random numbers per road and change every seeded result
+        in the benchmarks.
+        """
         rng = random.Random(seed)
-        for u, v in self.graph.edges():
-            self.graph[u][v]["congestion_factor"] = rng.uniform(low, high)
+        for u, v in self.road_pairs():
+            factor = rng.uniform(low, high)
+            self.graph[u][v]["congestion_factor"] = factor
+            if self.graph.has_edge(v, u):
+                self.graph[v][u]["congestion_factor"] = factor
 
     # ---------- route evaluation ----------
 
@@ -226,9 +285,12 @@ def generate_synthetic_city_graph(
                 base_speed = rng.choice([30, 40, 50, 60])  # kmph, road-type variety
                 net.add_edge(i, j, distance=distance_km, base_speed_kmph=base_speed)
 
-    # 3. Ensure connectivity: link any isolated components with a bridge edge
-    if not nx.is_connected(net.graph):
-        components = list(nx.connected_components(net.graph))
+    # 3. Ensure connectivity: link any isolated components with a bridge edge.
+    # Every synthetic road is two-way, so weak and strong connectivity coincide
+    # here; weakly_connected_components is the DiGraph equivalent of the
+    # undirected connected_components this used before.
+    if not nx.is_weakly_connected(net.graph):
+        components = list(nx.weakly_connected_components(net.graph))
         for a, b in zip(components[:-1], components[1:]):
             u, v = next(iter(a)), next(iter(b))
             distance_km = max(round(euclidean(u, v) / 5.0, 2), 0.3)
@@ -244,7 +306,7 @@ if __name__ == "__main__":
     # quick smoke test
     net = generate_synthetic_city_graph(n_nodes=15, seed=1)
     print(f"Nodes: {net.num_nodes()}, Edges: {net.graph.number_of_edges()}")
-    print("Connected:", nx.is_connected(net.graph))
+    print("Connected:", nx.is_weakly_connected(net.graph))
     sample_route = list(nx.shortest_path(net.graph, 0, 5))
     print("Sample shortest path 0->5:", sample_route)
     print("Cost:", net.route_cost(sample_route))
