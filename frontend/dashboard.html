@@ -907,6 +907,70 @@
         </div>
       </div>
 
+      <!-- Before / After Route Comparison Section -->
+      <div class="comparison-section">
+        <div class="comparison-header">
+          <div class="comparison-title">
+            <h3><span>🗺️</span> Start here: the same city, planned two ways</h3>
+            <span>Same vans, same customers, same traffic — only the plan is different.
+                  <b>Red roads are jammed.</b> On the left the usual method drives straight through them.
+                  On the right, ours goes around. Everything below this simply measures that difference.</span>
+          </div>
+          <div class="comp-mode-pills">
+            <button class="comp-pill active" id="pill_split" onclick="setCompareMode('split')">◫ Show both</button>
+            <button class="comp-pill" id="pill_before" onclick="setCompareMode('before')">◀ Usual method only</button>
+            <button class="comp-pill" id="pill_after" onclick="setCompareMode('after')">Our method only ▶</button>
+            <button class="comp-pill" id="pill_overlay" onclick="setCompareMode('overlay')">⊕ Overlay them</button>
+          </div>
+        </div>
+
+        <div class="judge-maps-grid" id="judgeMapsContainer">
+          <!-- Left Map: Before (Baseline) -->
+          <div class="map-box" id="boxBefore">
+            <div class="map-box-titlebar">
+              <div class="titlebar-left">
+                <div class="window-dots"><span class="w-dot w-red"></span><span class="w-dot w-yellow"></span><span class="w-dot w-green"></span></div>
+                <span class="map-badge-tag before">BEFORE</span>
+                <span class="titlebar-desc">Usual method — always head to the nearest stop</span>
+              </div>
+              <span class="tag-badge" style="background:#0F172A; color:var(--neo-amber); border-color:var(--neo-amber);">Congested</span>
+            </div>
+            <div class="map-canvas-wrap">
+              <svg id="svgJudgeBefore" viewBox="0 0 1000 1000"></svg>
+              <div id="leafletJudgeBefore" class="leaflet-container-judge" style="display:none;"></div>
+            </div>
+            <div class="map-bottom-alert">
+              <span style="color:var(--neo-amber); display:flex; align-items:center; gap:8px; font-weight:700;">
+                ⚠️ <b>Fleet routed into 3 red bottlenecks</b> — 68.2 min delay accumulated
+              </span>
+              <span class="mono" id="labelStatsBefore">Dist: 118.2 km | Time: 254.6 min</span>
+            </div>
+          </div>
+
+          <!-- Right Map: After (QPSO) -->
+          <div class="map-box" id="boxAfter">
+            <div class="map-box-titlebar">
+              <div class="titlebar-left">
+                <div class="window-dots"><span class="w-dot w-green"></span><span class="w-dot w-yellow"></span><span class="w-dot w-green"></span></div>
+                <span class="map-badge-tag after">AFTER</span>
+                <span class="titlebar-desc">Our method — planned around the traffic</span>
+              </div>
+              <span class="tag-badge" style="background:var(--neo-mint); color:#000000;">Optimal Decongested</span>
+            </div>
+            <div class="map-canvas-wrap">
+              <svg id="svgJudgeAfter" viewBox="0 0 1000 1000"></svg>
+              <div id="leafletJudgeAfter" class="leaflet-container-judge" style="display:none;"></div>
+            </div>
+            <div class="map-bottom-alert">
+              <span style="color:var(--neo-mint); display:flex; align-items:center; gap:8px; font-weight:700;">
+                ✨ <b>Intelligent dynamic bypass</b> — 100% time windows met with zero delay
+              </span>
+              <span class="mono" id="labelStatsAfter">Dist: 99.4 km | Time: 178.1 min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Executive KPI Cards Grid (4 High-Impact Neo-Brutalist Blocks) -->
       <div class="kpi-grid">
         <!-- 1. Travel Time -->
@@ -1067,68 +1131,6 @@
               <li class="impact-empty">Run the comparison to see this.</li>
             </ul>
             <div class="impact-assumption" id="impactScaleAssumption"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Before / After Route Comparison Section -->
-      <div class="comparison-section">
-        <div class="comparison-header">
-          <div class="comparison-title">
-            <h3><span>🗺️</span> The same city, planned two ways</h3>
-            <span>Left: the usual method drives into the red, congested roads. Right: ours plans around them.</span>
-          </div>
-          <div class="comp-mode-pills">
-            <button class="comp-pill active" id="pill_split" onclick="setCompareMode('split')">◫ Show both</button>
-            <button class="comp-pill" id="pill_before" onclick="setCompareMode('before')">◀ Usual method only</button>
-            <button class="comp-pill" id="pill_after" onclick="setCompareMode('after')">Our method only ▶</button>
-            <button class="comp-pill" id="pill_overlay" onclick="setCompareMode('overlay')">⊕ Overlay them</button>
-          </div>
-        </div>
-
-        <div class="judge-maps-grid" id="judgeMapsContainer">
-          <!-- Left Map: Before (Baseline) -->
-          <div class="map-box" id="boxBefore">
-            <div class="map-box-titlebar">
-              <div class="titlebar-left">
-                <div class="window-dots"><span class="w-dot w-red"></span><span class="w-dot w-yellow"></span><span class="w-dot w-green"></span></div>
-                <span class="map-badge-tag before">BEFORE</span>
-                <span class="titlebar-desc">Usual method — always head to the nearest stop</span>
-              </div>
-              <span class="tag-badge" style="background:#0F172A; color:var(--neo-amber); border-color:var(--neo-amber);">Congested</span>
-            </div>
-            <div class="map-canvas-wrap">
-              <svg id="svgJudgeBefore" viewBox="0 0 1000 1000"></svg>
-              <div id="leafletJudgeBefore" class="leaflet-container-judge" style="display:none;"></div>
-            </div>
-            <div class="map-bottom-alert">
-              <span style="color:var(--neo-amber); display:flex; align-items:center; gap:8px; font-weight:700;">
-                ⚠️ <b>Fleet routed into 3 red bottlenecks</b> — 68.2 min delay accumulated
-              </span>
-              <span class="mono" id="labelStatsBefore">Dist: 118.2 km | Time: 254.6 min</span>
-            </div>
-          </div>
-
-          <!-- Right Map: After (QPSO) -->
-          <div class="map-box" id="boxAfter">
-            <div class="map-box-titlebar">
-              <div class="titlebar-left">
-                <div class="window-dots"><span class="w-dot w-green"></span><span class="w-dot w-yellow"></span><span class="w-dot w-green"></span></div>
-                <span class="map-badge-tag after">AFTER</span>
-                <span class="titlebar-desc">Our method — planned around the traffic</span>
-              </div>
-              <span class="tag-badge" style="background:var(--neo-mint); color:#000000;">Optimal Decongested</span>
-            </div>
-            <div class="map-canvas-wrap">
-              <svg id="svgJudgeAfter" viewBox="0 0 1000 1000"></svg>
-              <div id="leafletJudgeAfter" class="leaflet-container-judge" style="display:none;"></div>
-            </div>
-            <div class="map-bottom-alert">
-              <span style="color:var(--neo-mint); display:flex; align-items:center; gap:8px; font-weight:700;">
-                ✨ <b>Intelligent dynamic bypass</b> — 100% time windows met with zero delay
-              </span>
-              <span class="mono" id="labelStatsAfter">Dist: 99.4 km | Time: 178.1 min</span>
-            </div>
           </div>
         </div>
       </div>
