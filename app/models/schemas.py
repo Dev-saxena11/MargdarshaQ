@@ -41,6 +41,10 @@ class NetworkResponse(BaseModel):
     is_geo: bool = Field(False, description="True if node x/y are real longitude/latitude (OSM); False for synthetic planar coords")
     nodes: List[NodeOut]
     edges: List[EdgeOut]
+    # Present for real-world networks so the UI can name the place on screen and
+    # carry OpenStreetMap's required attribution. None for synthetic networks.
+    area_label: Optional[str] = Field(None, description="Human-readable area, e.g. 'Connaught Place, New Delhi'")
+    attribution: Optional[str] = Field(None, description="Data attribution to display with the map")
 
 
 class OSMNetworkRequest(BaseModel):

@@ -128,11 +128,13 @@ def network_from_cache(req: CachedNetworkRequest):
     except CachedNetworkNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+    meta = cache_metadata(req.name)
     network_id = store.put_network(net, is_geo=True)
     nodes, edges = _network_payload(net)
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
         num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+        area_label=meta.get("label"), attribution=meta.get("attribution"),
     )
 
 @router.get("/network/{network_id}", response_model=NetworkResponse)
@@ -415,20 +417,26 @@ def compare_vrp(req: VRPCompareRequest):
         raise HTTPException(status_code=500, detail="Optimized solver failed")
     optimized_resp = _build_solve_response(problem, opt_sol, opt_curve, opt_neval, opt_name, opt_rt)
 
-    # Compute deltas
+    # Deltas are SIGNED. Clamping them at zero would report "0.0 km saved"
+    # whenever the optimized plan does worse on that measure, which is both
+    # wrong and self-defeating: on a real road network QPSO routinely drives
+    # FURTHER than the greedy baseline, on purpose, because going around a jam
+    # beats queueing in it. Reported as 0.0 that reads as "saves no fuel";
+    # reported as -2.4 km alongside -44% travel time it reads as the trade-off
+    # it actually is. A comparison that cannot show a loss isn't a comparison.
     base_time = baseline_resp.total_time
     opt_time = optimized_resp.total_time
-    time_saved_min = max(0.0, base_time - opt_time)
+    time_saved_min = base_time - opt_time
     time_saved_pct = (time_saved_min / base_time * 100.0) if base_time > 0 else 0.0
 
     base_dist = baseline_resp.total_distance
     opt_dist = optimized_resp.total_distance
-    dist_saved_km = max(0.0, base_dist - opt_dist)
+    dist_saved_km = base_dist - opt_dist
     dist_saved_pct = (dist_saved_km / base_dist * 100.0) if base_dist > 0 else 0.0
 
     base_delay = baseline_resp.congestion_delay_min
     opt_delay = optimized_resp.congestion_delay_min
-    delay_saved_min = max(0.0, base_delay - opt_delay)
+    delay_saved_min = base_delay - opt_delay
     delay_saved_pct = (delay_saved_min / base_delay * 100.0) if base_delay > 0 else 0.0
 
     return VRPCompareResponse(
