@@ -320,6 +320,9 @@
   .tag-mint{background:var(--neo-mint); color:#000000;}
   .tag-yellow{background:var(--neo-yellow); color:#000000;}
   .tag-purple{background:var(--neo-purple-light); color:#000000;}
+  /* Applied when a measure got WORSE, so a regression can never be shown
+     in the same colour as an improvement. */
+  .tag-red{background:var(--neo-pink, #FF2E63); color:#FFFFFF;}
   .tag-pink{background:var(--neo-pink); color:#FFFFFF;}
 
   .kpi-main-stat{
@@ -1959,6 +1962,16 @@ async function loadPresetNetwork(presetKey, onStatus) {
 }
 
 
+
+// Colours a KPI badge by outcome. A regression must not sit in the same green
+// as an improvement — that is how "0.0% / Save 0m" managed to look like a win.
+function setKpiTone(badgeId, improved, goodClass) {
+  const el = document.getElementById(badgeId);
+  if (!el) return;
+  el.classList.remove('tag-mint', 'tag-yellow', 'tag-purple', 'tag-red');
+  el.classList.add(improved ? goodClass : 'tag-red');
+}
+
 // Savings are reported signed by the API: a positive "saved" value means the
 // metric went DOWN (good), a negative one means it went UP. Rendering a bare
 // "-" in front would print "--2.4%" for a regression and read as an improvement.
@@ -1976,37 +1989,52 @@ function asChange(saved, unit = '%', digits = 1) {
 function computeAndDisplayComparison(baseline, optimized) {
   const timeBefore = baseline.total_time;
   const timeAfter = optimized.total_time;
-  const timeSavedMin = Math.max(0, timeBefore - timeAfter);
+  // Signed, like the API. Clamping here hid real regressions behind a green
+  // "Save 0m" badge: the dynamic-bottleneck demo can legitimately come out
+  // worse than doing nothing, and showing that as 0.0% is not a comparison.
+  const timeSavedMin = timeBefore - timeAfter;
   const timeSavedPct = timeBefore > 0 ? (timeSavedMin / timeBefore * 100) : 0;
 
   const delayBefore = baseline.congestion_delay_min || (baseline.total_time - (baseline.base_time_min || baseline.total_time * 0.75));
   const delayAfter = optimized.congestion_delay_min || (optimized.total_time - (optimized.base_time_min || optimized.total_time * 0.9));
-  const delaySavedMin = Math.max(0, delayBefore - delayAfter);
+  const delaySavedMin = delayBefore - delayAfter;
   const delaySavedPct = delayBefore > 0 ? (delaySavedMin / delayBefore * 100) : 0;
 
   const distBefore = baseline.total_distance;
   const distAfter = optimized.total_distance;
-  const distSavedKm = Math.max(0, distBefore - distAfter);
+  const distSavedKm = distBefore - distAfter;
   const distSavedPct = distBefore > 0 ? (distSavedKm / distBefore * 100) : 0;
 
   // 1. KPI: Travel Time
   document.getElementById('kpi_time_saved').textContent = asChange(timeSavedPct);
   document.getElementById('kpi_time_badge').textContent = (timeSavedMin >= 0 ? `Save ${timeSavedMin.toFixed(0)}m` : `${Math.abs(timeSavedMin).toFixed(0)}m slower`);
-  document.getElementById('kpi_time_sub').textContent = `Fleet travel reduced from ${timeBefore.toFixed(1)}m to ${timeAfter.toFixed(1)}m`;
+  document.getElementById('kpi_time_sub').textContent = timeSavedMin >= 0
+    ? `Fleet time down from ${timeBefore.toFixed(1)}m to ${timeAfter.toFixed(1)}m`
+    : `Fleet time UP from ${timeBefore.toFixed(1)}m to ${timeAfter.toFixed(1)}m on this run`;
+  setKpiTone('kpi_time_badge', timeSavedMin >= 0, 'tag-mint');
   document.getElementById('kpi_time_before').textContent = `${timeBefore.toFixed(1)} min`;
   document.getElementById('kpi_time_after').textContent = `${timeAfter.toFixed(1)} min`;
 
   // 2. KPI: Traffic Congestion Avoided
   document.getElementById('kpi_delay_saved').textContent = asChange(delaySavedPct);
   document.getElementById('kpi_delay_badge').textContent = (delaySavedMin >= 0 ? `-${delaySavedMin.toFixed(0)}m Delay` : `+${Math.abs(delaySavedMin).toFixed(0)}m Delay`);
-  document.getElementById('kpi_delay_sub').textContent = `Bottleneck traffic delay avoided across all routes`;
+  document.getElementById('kpi_delay_sub').textContent = delaySavedMin >= 0
+    ? `Bottleneck traffic delay avoided across all routes`
+    : `This plan sits in MORE congestion than the one it is compared against`;
+  setKpiTone('kpi_delay_badge', delaySavedMin >= 0, 'tag-yellow');
   document.getElementById('kpi_delay_before').textContent = `${delayBefore.toFixed(1)} min`;
   document.getElementById('kpi_delay_after').textContent = `${delayAfter.toFixed(1)} min`;
 
   // 3. KPI: Distance & Carbon
   document.getElementById('kpi_dist_saved').textContent = asChange(distSavedPct);
   document.getElementById('kpi_dist_badge').textContent = (distSavedKm >= 0 ? `-${distSavedKm.toFixed(1)} km` : `+${Math.abs(distSavedKm).toFixed(1)} km`);
-  document.getElementById('kpi_dist_sub').textContent = `Est. ~${(distSavedKm * 0.22).toFixed(1)} kg CO₂ carbon reduction`;
+  // Only call the extra distance a deliberate detour when it actually bought
+  // something — if congestion got worse too, this plan is simply worse.
+  document.getElementById('kpi_dist_sub').textContent =
+    distSavedKm >= 0 ? `Est. ~${(distSavedKm * 0.22).toFixed(1)} kg CO₂ less carbon`
+    : delaySavedMin > 0 ? `Drives further on purpose — the detour that avoids the jams`
+    : `Drives further AND sits in more traffic — this plan is worse on both`;
+  setKpiTone('kpi_dist_badge', distSavedKm >= 0, 'tag-purple');
   document.getElementById('kpi_dist_before').textContent = `${distBefore.toFixed(1)} km`;
   document.getElementById('kpi_dist_after').textContent = `${distAfter.toFixed(1)} km`;
 
