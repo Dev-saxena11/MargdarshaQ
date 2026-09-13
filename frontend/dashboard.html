@@ -266,6 +266,21 @@
     background:var(--bg, #0F172A); color:inherit; font:inherit; font-weight:700;
   }
 
+
+  /* ---- "you are looking at <real place>" banner above the maps ---- */
+  .area-banner{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-bottom:12px; padding:10px 14px; border-radius:6px;
+    border:2px solid var(--neo-mint); background:rgba(0,245,212,0.07);
+    font-size:13px; line-height:1.5;
+  }
+  .area-banner .area-pin{ font-size:16px; }
+  .area-banner .area-name{ font-weight:800; color:var(--neo-mint); }
+  .area-banner .area-meta{ color:var(--text-muted); font-size:12px; }
+  .area-banner.is-synthetic{
+    border-color:var(--border-bold); background:rgba(255,255,255,0.03);
+  }
+  .area-banner.is-synthetic .area-name{ color:var(--text-soft, #CBD5E1); }
   /* ---- progress / fallback line under the hero buttons ---- */
   .judge-status{
     margin-top:14px; padding:10px 14px; border-radius:6px;
@@ -937,6 +952,10 @@
           </div>
         </div>
 
+        <!-- Names the real place on screen. A judge should never have to ask
+             "where is this?", and OSM's licence requires the attribution. -->
+        <div id="areaBanner" class="area-banner" hidden></div>
+
         <div class="judge-maps-grid" id="judgeMapsContainer">
           <!-- Left Map: Before (Baseline) -->
           <div class="map-box" id="boxBefore">
@@ -997,7 +1016,7 @@
               <span class="kpi-num" id="kpi_time_saved">—</span>
               <span class="kpi-pill tag-mint" id="kpi_time_badge">— Faster</span>
             </div>
-            <div class="kpi-desc" id="kpi_time_sub">How long every van is driving, added together</div>
+            <div class="kpi-desc" id="kpi_time_sub">Every van's time on duty — driving plus waiting for time windows</div>
           </div>
           <div class="kpi-split-footer">
             <div class="split-box">
@@ -1706,6 +1725,7 @@ async function runJudgeDemoComparison() {
       const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
       state.network = loaded.network;
       state.usedOsmFallback = loaded.usedFallback;
+      renderAreaBanner();
       setJudgeStatus(
         loaded.usedFallback
           ? 'OpenStreetMap was unavailable, so this run uses the synthetic city network instead of real Delhi roads.'
@@ -1772,6 +1792,7 @@ async function runDynamicTrafficDemo() {
       const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
       state.network = loaded.network;
       state.usedOsmFallback = loaded.usedFallback;
+      renderAreaBanner();
       setJudgeStatus(
         loaded.usedFallback
           ? 'OpenStreetMap was unavailable, so this run uses the synthetic city network instead of real Delhi roads.'
@@ -1825,6 +1846,36 @@ async function runDynamicTrafficDemo() {
 
 
 
+
+// Tells the viewer which real place the map shows, and carries OpenStreetMap's
+// required attribution. Falls back to naming the synthetic city honestly rather
+// than implying a real location.
+function renderAreaBanner() {
+  const el = document.getElementById('areaBanner');
+  if (!el) return;
+  const nodes = state.network ? (state.network.num_nodes || 0) : 0;
+  const roads = state.network ? (state.network.num_edges || 0) : 0;
+
+  if (state.areaLabel) {
+    el.hidden = false;
+    el.classList.remove('is-synthetic');
+    el.innerHTML =
+      `<span class="area-pin">📍</span>`
+      + `<span>Real road network — <span class="area-name">${state.areaLabel}</span></span>`
+      + `<span class="area-meta">${nodes} junctions · ${roads} streets · `
+      + `${state.areaAttribution || '© OpenStreetMap contributors'}</span>`;
+  } else if (state.network) {
+    el.hidden = false;
+    el.classList.add('is-synthetic');
+    el.innerHTML =
+      `<span class="area-pin">🧪</span>`
+      + `<span><span class="area-name">Synthetic test city</span> — not a real place</span>`
+      + `<span class="area-meta">${nodes} junctions · ${roads} streets</span>`;
+  } else {
+    el.hidden = true;
+  }
+}
+
 // Shows progress under the hero buttons. Passing null hides the line.
 function setJudgeStatus(message, isWarning) {
   const el = document.getElementById('judgeStatus');
@@ -1865,6 +1916,8 @@ async function loadRealCityNetwork(onStatus) {
       method: 'POST',
       body: JSON.stringify({ name: 'delhi_central', seed: 42 }),
     });
+    state.areaLabel = network.area_label || null;
+    state.areaAttribution = network.attribution || null;
     return { network, live: false };
   } catch (err) {
     console.warn('Cached city network unavailable, trying a live OSM download:', err);
@@ -1878,6 +1931,8 @@ async function loadRealCityNetwork(onStatus) {
     method: 'POST',
     body: JSON.stringify(DELHI_BBOX),
   });
+  state.areaLabel = network.area_label || 'Central New Delhi';
+  state.areaAttribution = network.attribution || '© OpenStreetMap contributors (ODbL)';
   return { network, live: true };
 }
 
@@ -1898,7 +1953,21 @@ async function loadPresetNetwork(presetKey, onStatus) {
     method: 'POST',
     body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
   });
+  state.areaLabel = null;
+  state.areaAttribution = null;
   return { network, usedFallback: presetKey === 'delhi_osm' };
+}
+
+
+// Savings are reported signed by the API: a positive "saved" value means the
+// metric went DOWN (good), a negative one means it went UP. Rendering a bare
+// "-" in front would print "--2.4%" for a regression and read as an improvement.
+// asChange() turns a saving into the change it represents: -22.4% or +5.1%.
+function asChange(saved, unit = '%', digits = 1) {
+  if (saved === null || saved === undefined || isNaN(saved)) return 'n/a';
+  const change = -saved;                       // a saving is a negative change
+  const sign = change > 0 ? '+' : change < 0 ? '-' : '';
+  return `${sign}${Math.abs(change).toFixed(digits)}${unit}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1921,22 +1990,22 @@ function computeAndDisplayComparison(baseline, optimized) {
   const distSavedPct = distBefore > 0 ? (distSavedKm / distBefore * 100) : 0;
 
   // 1. KPI: Travel Time
-  document.getElementById('kpi_time_saved').textContent = `-${timeSavedPct.toFixed(1)}%`;
-  document.getElementById('kpi_time_badge').textContent = `Save ${timeSavedMin.toFixed(0)}m`;
+  document.getElementById('kpi_time_saved').textContent = asChange(timeSavedPct);
+  document.getElementById('kpi_time_badge').textContent = (timeSavedMin >= 0 ? `Save ${timeSavedMin.toFixed(0)}m` : `${Math.abs(timeSavedMin).toFixed(0)}m slower`);
   document.getElementById('kpi_time_sub').textContent = `Fleet travel reduced from ${timeBefore.toFixed(1)}m to ${timeAfter.toFixed(1)}m`;
   document.getElementById('kpi_time_before').textContent = `${timeBefore.toFixed(1)} min`;
   document.getElementById('kpi_time_after').textContent = `${timeAfter.toFixed(1)} min`;
 
   // 2. KPI: Traffic Congestion Avoided
-  document.getElementById('kpi_delay_saved').textContent = `-${delaySavedPct.toFixed(1)}%`;
-  document.getElementById('kpi_delay_badge').textContent = `-${delaySavedMin.toFixed(0)}m Delay`;
+  document.getElementById('kpi_delay_saved').textContent = asChange(delaySavedPct);
+  document.getElementById('kpi_delay_badge').textContent = (delaySavedMin >= 0 ? `-${delaySavedMin.toFixed(0)}m Delay` : `+${Math.abs(delaySavedMin).toFixed(0)}m Delay`);
   document.getElementById('kpi_delay_sub').textContent = `Bottleneck traffic delay avoided across all routes`;
   document.getElementById('kpi_delay_before').textContent = `${delayBefore.toFixed(1)} min`;
   document.getElementById('kpi_delay_after').textContent = `${delayAfter.toFixed(1)} min`;
 
   // 3. KPI: Distance & Carbon
-  document.getElementById('kpi_dist_saved').textContent = `-${distSavedPct.toFixed(1)}%`;
-  document.getElementById('kpi_dist_badge').textContent = `-${distSavedKm.toFixed(1)} km`;
+  document.getElementById('kpi_dist_saved').textContent = asChange(distSavedPct);
+  document.getElementById('kpi_dist_badge').textContent = (distSavedKm >= 0 ? `-${distSavedKm.toFixed(1)} km` : `+${Math.abs(distSavedKm).toFixed(1)} km`);
   document.getElementById('kpi_dist_sub').textContent = `Est. ~${(distSavedKm * 0.22).toFixed(1)} kg CO₂ carbon reduction`;
   document.getElementById('kpi_dist_before').textContent = `${distBefore.toFixed(1)} km`;
   document.getElementById('kpi_dist_after').textContent = `${distAfter.toFixed(1)} km`;
@@ -1961,18 +2030,18 @@ function computeAndDisplayComparison(baseline, optimized) {
   // Breakdown Table Rows
   const rows = [
     {
-      metric: "Time the whole fleet spends driving",
+      metric: "Total time from depot to last delivery",
       before: `${timeBefore.toFixed(1)} min`,
       after: `${timeAfter.toFixed(1)} min`,
-      delta: `-${timeSavedPct.toFixed(1)}% (-${timeSavedMin.toFixed(1)}m)`,
+      delta: `${asChange(timeSavedPct)} (${asChange(timeSavedMin, 'm')})`,
       good: timeAfter <= timeBefore,
-      impact: "Drivers finish earlier; less overtime to pay"
+      impact: "Driving plus any waiting for a customer's window to open — drivers finish earlier"
     },
     {
       metric: "Time lost sitting in traffic",
       before: `${delayBefore.toFixed(1)} min`,
       after: `${delayAfter.toFixed(1)} min`,
-      delta: `-${delaySavedPct.toFixed(1)}% (-${delaySavedMin.toFixed(1)}m)`,
+      delta: `${asChange(delaySavedPct)} (${asChange(delaySavedMin, 'm')})`,
       good: delayAfter <= delayBefore,
       impact: "The fleet goes around the jams instead of queueing in them"
     },
@@ -1990,7 +2059,7 @@ function computeAndDisplayComparison(baseline, optimized) {
       metric: "Distance driven",
       before: `${distBefore.toFixed(1)} km`,
       after: `${distAfter.toFixed(1)} km`,
-      delta: `-${distSavedPct.toFixed(1)}% (-${distSavedKm.toFixed(1)} km)`,
+      delta: `${asChange(distSavedPct)} (${asChange(distSavedKm, ' km')})`,
       good: distAfter <= distBefore,
       impact: "Less fuel burned and less wear on the vans"
     },
@@ -2130,11 +2199,25 @@ function renderImpact() {
   const litres = kmSaved / IMPACT_ASSUMPTIONS.kmPerLitre;
   const co2 = litres * IMPACT_ASSUMPTIONS.kgCO2PerLitre;
 
-  envEl.innerHTML = [
-    row(`${kmSaved.toFixed(1)} km`, 'of driving avoided per day — roads the fleet simply never has to cover'),
-    row(`${litres.toFixed(1)} litres`, 'of fuel not burned'),
-    row(`${co2.toFixed(1)} kg CO₂`, 'kept out of the air, daily'),
-  ].join('');
+  // A negative saving is a real and defensible outcome here: routing around a
+  // jam can mean driving further to arrive sooner. Saying "0.0 km saved" (or
+  // worse, "-2.4 km avoided") hides the trade-off instead of explaining it.
+  if (kmSaved >= 0) {
+    envEl.innerHTML = [
+      row(`${kmSaved.toFixed(1)} km`, 'of driving avoided per day — roads the fleet simply never has to cover'),
+      row(`${litres.toFixed(1)} litres`, 'of fuel not burned'),
+      row(`${co2.toFixed(1)} kg CO₂`, 'kept out of the air, daily'),
+    ].join('');
+  } else {
+    const extraKm = Math.abs(kmSaved), extraL = Math.abs(litres), extraCo2 = Math.abs(co2);
+    const timeTxt = (m.timeSavedPct != null && m.timeSavedPct > 0)
+      ? `, and arrives ${m.timeSavedPct.toFixed(1)}% sooner for it` : '';
+    envEl.innerHTML = [
+      row(`+${extraKm.toFixed(1)} km`, `of extra driving — the fleet deliberately goes around the jams${timeTxt}`),
+      row(`+${extraL.toFixed(1)} litres`, 'of additional fuel, the cost of that detour'),
+      row(`+${extraCo2.toFixed(1)} kg CO₂`, 'added daily — weigh this against the hours of idling avoided'),
+    ].join('');
+  }
 
   document.getElementById('impactEnvAssumption').textContent =
     `Assumes ${IMPACT_ASSUMPTIONS.kmPerLitre} km per litre (diesel delivery van, urban driving) `

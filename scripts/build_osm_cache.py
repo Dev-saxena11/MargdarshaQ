@@ -244,11 +244,23 @@ def largest_scc(adj, nodes):
     return set(max(comps, key=len)) if comps else set()
 
 
-def crop(adj, nodes, max_nodes):
-    """Breadth-first neighbourhood of at most max_nodes, kept strongly connected."""
+def crop(adj, nodes, max_nodes, coords=None, center=None):
+    """
+    Breadth-first neighbourhood of at most max_nodes, kept strongly connected.
+
+    `center` anchors the crop on a landmark (lat, lon). Without it the walk
+    starts from an arbitrary node and drifts to whichever corner of the bounding
+    box that happens to sit in — the first build of this cache ended up in the
+    north-west and did not even contain Connaught Place, despite being labelled
+    "Central New Delhi". Anchoring keeps the result recognisable and repeatable.
+    """
     if len(nodes) <= max_nodes:
         return nodes
-    start = next(iter(nodes))
+    if center and coords:
+        clat, clon = center
+        start = min(nodes, key=lambda n: haversine_km(coords[n][0], coords[n][1], clat, clon))
+    else:
+        start = next(iter(nodes))
     seen, queue = {start}, [start]
     while queue and len(seen) < max_nodes:
         cur = queue.pop(0)
@@ -272,6 +284,9 @@ def main() -> int:
     ap.add_argument("--west", type=float, default=77.195)
     ap.add_argument("--east", type=float, default=77.245)
     ap.add_argument("--max-nodes", type=int, default=500)
+    ap.add_argument("--center-lat", type=float, default=28.6315,
+                    help="anchor the crop here (default: Connaught Place)")
+    ap.add_argument("--center-lon", type=float, default=77.2167)
     ap.add_argument("--out-dir", default="data/networks")
     args = ap.parse_args()
 
@@ -293,7 +308,8 @@ def main() -> int:
     keep = largest_scc(adj, set(coords))
     print(f"  strongly connected: {len(keep)} nodes")
 
-    keep = crop(adj, keep, args.max_nodes)
+    center = (args.center_lat, args.center_lon) if args.center_lat is not None else None
+    keep = crop(adj, keep, args.max_nodes, coords=coords, center=center)
     print(f"  after crop       : {len(keep)} nodes")
 
     if len(keep) < 20:
@@ -324,6 +340,13 @@ def main() -> int:
 
     os.makedirs(args.out_dir, exist_ok=True)
     path = os.path.join(args.out_dir, f"{args.name}.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(doc, fh, separators=(",", ":"))
+
+    lat_vals = [coords[n][0] for n in keep]
+    lon_vals = [coords[n][1] for n in keep]
+    doc["extent"] = {"south": round(min(lat_vals), 6), "north": round(max(lat_vals), 6),
+                     "west": round(min(lon_vals), 6), "east": round(max(lon_vals), 6)}
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(doc, fh, separators=(",", ":"))
 
