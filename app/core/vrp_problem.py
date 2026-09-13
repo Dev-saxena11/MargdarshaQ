@@ -153,6 +153,8 @@ def generate_synthetic_vrp(
 ) -> VRPProblem:
     rng = random.Random(seed)
     all_graph_nodes = list(net.graph.nodes())
+    if depot not in all_graph_nodes:
+        depot = all_graph_nodes[0]
     candidates = [n for n in all_graph_nodes if n != depot]
 
     if n_customers > len(candidates):

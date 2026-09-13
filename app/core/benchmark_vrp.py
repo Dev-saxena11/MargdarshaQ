@@ -243,3 +243,21 @@ if __name__ == "__main__":
     scal_scaled = run_vrp_scalability_test(customer_counts=[10, 20, 40, 60], seed=1, scale_budget=True)
     plot_vrp_scalability(scal_scaled, save_path="data/vrp_scalability_scaled_budget.png")
 
+def run_real_city_demo_benchmark(place: str = "New Delhi, India", max_nodes: int = 1000):
+    from app.core.osm_network import load_osm_network
+    print("\n" + "=" * 95)
+    print(f"REAL CITY DEMO BENCHMARK: {place}")
+    print("=" * 95)
+    try:
+        net = load_osm_network(place=place, max_nodes=max_nodes)
+        vrp = generate_synthetic_vrp(net, n_customers=16, depot=0, vehicle_capacity=80, seed=42)
+        results = run_full_vrp_benchmark(vrp, max_iter=150, seed=1)
+        print_vrp_comparison_table(results)
+    except Exception as e:
+        print(f"Could not run real city benchmark: {e}")
+
+if __name__ == "__main__":
+    # Also run the real city benchmark at the end
+    run_real_city_demo_benchmark()
+
+

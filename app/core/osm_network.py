@@ -83,33 +83,53 @@ def load_osm_network(
         raise ValueError("Provide either `place` (a geocodable name) or `bbox` (north, south, east, west).")
 
     # add real-world speed limits (imputed where missing) and travel times
-    G = ox.add_edge_speeds(G)
-    G = ox.add_edge_travel_times(G)
+    try:
+        G = ox.add_edge_speeds(G)
+        G = ox.add_edge_travel_times(G)
+    except Exception as e:
+        print(f"Warning: ox.add_edge_speeds failed ({e}), falling back to default speeds.")
 
-    G_undirected = _to_undirected(G)
+    # CRITICAL FIX: Ensure the graph is STRONGLY connected! 
+    # Otherwise, random customers might be placed in dead-ends or unreachable
+    # components (like gated communities), which causes the routing engine
+    # to return an empty path, leading to a blank map on the frontend!
+    import networkx as nx
 
-    if max_nodes is not None and G_undirected.number_of_nodes() > max_nodes:
-        import networkx as nx
-        largest_cc = max(nx.connected_components(G_undirected), key=len)
-        G_undirected = G_undirected.subgraph(largest_cc).copy()
-        if G_undirected.number_of_nodes() > max_nodes:
-            # still too big -- trim to an arbitrary subset of the largest component.
-            # (Simple but effective for demo purposes; a production system would
-            # crop by geography instead.)
-            keep_nodes = list(G_undirected.nodes())[:max_nodes]
-            G_undirected = G_undirected.subgraph(keep_nodes).copy()
+    # 1. Ensure the base graph is strongly connected
+    largest_scc = max(nx.strongly_connected_components(G), key=len)
+    G = G.subgraph(largest_scc).copy()
 
+    # 2. Crop to max_nodes while preserving strong connectivity
+    if max_nodes is not None and G.number_of_nodes() > max_nodes:
+        # Simple BFS outward to collect a local neighborhood
+        start_node = list(G.nodes())[0]
+        keep_nodes = {start_node}
+        for u, v in nx.bfs_edges(G, start_node):
+            keep_nodes.add(v)
+            if len(keep_nodes) >= max_nodes:
+                break
+        
+        G = G.subgraph(list(keep_nodes)).copy()
+        
+        # After cropping, the edges might be severed. We MUST run SCC again
+        # so the resulting subgraph has no unreachable nodes!
+        largest_scc = max(nx.strongly_connected_components(G), key=len)
+        G = G.subgraph(largest_scc).copy()
+
+    # 3. Build the backend TrafficNetwork using the strongly connected DiGraph
     net = TrafficNetwork()
-    for node_id, data in G_undirected.nodes(data=True):
+    for node_id, data in G.nodes(data=True):
         net.add_node(node_id, x=data["x"], y=data["y"])  # x=lon, y=lat
 
-    for u, v, data in G_undirected.edges(data=True):
+    for u, v, data in G.edges(data=True):
         # osmnx MultiGraph edges can carry 'length' in meters and 'speed_kph'
         length_m = data.get("length", 100.0)
         speed_kph = data.get("speed_kph", 40.0)
         if isinstance(speed_kph, list):  # osmnx sometimes returns a list for multi-edges
             speed_kph = speed_kph[0]
         distance_km = length_m / 1000.0
+        
+        # Since we are using the directed G, we preserve real-world one-way streets!
         net.add_edge(u, v, distance=distance_km, base_speed_kmph=speed_kph)
 
     net.randomize_congestion(seed=congestion_seed, low=congestion_low, high=congestion_high)
@@ -119,5 +139,5 @@ def load_osm_network(
 
 if __name__ == "__main__":
     # Manual smoke test -- requires internet + osmnx installed. Not run in CI/sandbox.
-    net = load_osm_network(place="Connaught Place, New Delhi, India", max_nodes=500)
+    net = load_osm_network(place="New Delhi, India", max_nodes=500)
     print(f"Loaded OSM network: {net.num_nodes()} nodes, {net.graph.number_of_edges()} edges")

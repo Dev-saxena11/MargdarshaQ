@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="https://unpkg.com/[email protected]/dist/leaflet.css" />
-<script src="https://unpkg.com/[email protected]/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <style>
@@ -1546,23 +1546,28 @@ async function runJudgeDemoComparison() {
     const isOnline = await checkHealth();
 
     if (isOnline) {
-      if (!state.network || state.network.network_id === 'demo-net') {
+      const presetKey = document.getElementById('judgePreset').value;
+      if (presetKey === 'delhi_osm') {
+        state.network = await api('/api/network/from_osm', {
+          method: 'POST',
+          body: JSON.stringify({ place: "New Delhi, India", max_nodes: 1000, network_type: "drive" }),
+        });
+      } else {
         state.network = await api('/api/network/generate', {
           method: 'POST',
           body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
         });
       }
-      if (!state.vrp || state.vrp.vrp_id === 'demo-vrp') {
-        state.vrp = await api('/api/vrp/generate', {
-          method: 'POST',
-          body: JSON.stringify({
-            network_id: state.network.network_id,
-            n_customers: 12, depot: 0, vehicle_capacity: 80,
-            demand_min: 5, demand_max: 20, horizon: 480,
-            window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
-          }),
-        });
-      }
+      
+      state.vrp = await api('/api/vrp/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          network_id: state.network.network_id,
+          n_customers: presetKey === 'delhi_osm' ? 16 : 12, depot: 0, vehicle_capacity: 80,
+          demand_min: 5, demand_max: 20, horizon: 480,
+          window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
+        }),
+      });
 
       // Call new compare endpoint
       const comp = await api('/api/vrp/compare', {
@@ -1607,23 +1612,28 @@ async function runDynamicTrafficDemo() {
     const isOnline = await checkHealth();
 
     if (isOnline) {
-      if (!state.network || state.network.network_id === 'demo-net') {
+      const presetKey = document.getElementById('judgePreset').value;
+      if (presetKey === 'delhi_osm') {
+        state.network = await api('/api/network/from_osm', {
+          method: 'POST',
+          body: JSON.stringify({ place: "New Delhi, India", max_nodes: 1000, network_type: "drive" }),
+        });
+      } else {
         state.network = await api('/api/network/generate', {
           method: 'POST',
           body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
         });
       }
-      if (!state.vrp || state.vrp.vrp_id === 'demo-vrp') {
-        state.vrp = await api('/api/vrp/generate', {
-          method: 'POST',
-          body: JSON.stringify({
-            network_id: state.network.network_id,
-            n_customers: 12, depot: 0, vehicle_capacity: 80,
-            demand_min: 5, demand_max: 20, horizon: 480,
-            window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
-          }),
-        });
-      }
+      
+      state.vrp = await api('/api/vrp/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          network_id: state.network.network_id,
+          n_customers: presetKey === 'delhi_osm' ? 16 : 12, depot: 0, vehicle_capacity: 80,
+          demand_min: 5, demand_max: 20, horizon: 480,
+          window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
+        }),
+      });
 
       const dynRes = await api('/api/vrp/solve-dynamic', {
         method: 'POST',
@@ -1964,18 +1974,22 @@ function renderJudgeLeaflet() {
 
   if (!state.judgeMapBefore) {
     state.judgeMapBefore = L.map('leafletJudgeBefore', { zoomControl: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(state.judgeMapBefore);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }).addTo(state.judgeMapBefore);
     state.judgeLayerBefore = L.layerGroup().addTo(state.judgeMapBefore);
   }
   if (!state.judgeMapAfter) {
     state.judgeMapAfter = L.map('leafletJudgeAfter', { zoomControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(state.judgeMapAfter);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }).addTo(state.judgeMapAfter);
     state.judgeLayerAfter = L.layerGroup().addTo(state.judgeMapAfter);
   }
 
-  const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
-  state.judgeMapBefore.fitBounds(bounds, { padding: [20, 20] });
-  state.judgeMapAfter.fitBounds(bounds, { padding: [20, 20] });
+  setTimeout(() => {
+    state.judgeMapBefore.invalidateSize();
+    state.judgeMapAfter.invalidateSize();
+    const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
+    state.judgeMapBefore.fitBounds(bounds, { padding: [20, 20] });
+    state.judgeMapAfter.fitBounds(bounds, { padding: [20, 20] });
+  }, 50);
 
   // Draw Before Leaflet
   state.judgeLayerBefore.clearLayers();
@@ -2277,9 +2291,14 @@ function renderLeaflet() {
     }).addTo(state.map);
     state.routeLayer = L.layerGroup().addTo(state.map);
   }
+  
   const nodes = state.network.nodes;
-  const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
-  state.map.fitBounds(bounds, { padding: [20, 20] });
+  
+  setTimeout(() => {
+    state.map.invalidateSize();
+    const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
+    state.map.fitBounds(bounds, { padding: [20, 20] });
+  }, 50);
 
   state.routeLayer.clearLayers();
   for (const n of nodes) {
