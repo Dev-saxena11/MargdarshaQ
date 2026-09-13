@@ -266,6 +266,15 @@
     background:var(--bg, #0F172A); color:inherit; font:inherit; font-weight:700;
   }
 
+  /* ---- progress / fallback line under the hero buttons ---- */
+  .judge-status{
+    margin-top:14px; padding:10px 14px; border-radius:6px;
+    border:2px dashed var(--border-bold); background:rgba(255,255,255,0.03);
+    font-size:13px; line-height:1.5; color:var(--text-soft, #CBD5E1);
+    display:flex; align-items:center; gap:9px;
+  }
+  .judge-status.is-warn{ border-color:var(--neo-amber, #F59E0B); }
+
   /* ---- plain-language term with the technical name kept underneath ---- */
   .term-note{
     display:block; margin-top:7px; font-size:11px; color:var(--text-muted);
@@ -904,6 +913,10 @@
               <span>🚨</span> Simulate Dynamic Bottleneck
             </button>
           </div>
+          <!-- Progress line. The real-city network is downloaded live from
+               OpenStreetMap and can take a couple of minutes, so the wait must
+               not be a silent one in front of an audience. -->
+          <div id="judgeStatus" class="judge-status" hidden></div>
         </div>
       </div>
 
@@ -1683,25 +1696,23 @@ function loadPresetScenario() {
 async function runJudgeDemoComparison() {
   const btn = document.getElementById('btnJudgeRun');
   btn.disabled = true;
-  btn.innerHTML = `<span>⏳</span> COMPUTING QUANTUM SWARM…`;
+  btn.innerHTML = `<span>⏳</span> Working…`;
 
   try {
     const isOnline = await checkHealth();
 
     if (isOnline) {
       const presetKey = document.getElementById('judgePreset').value;
-      if (presetKey === 'delhi_osm') {
-        state.network = await api('/api/network/from_osm', {
-          method: 'POST',
-          body: JSON.stringify({ place: "New Delhi, India", max_nodes: 1000, network_type: "drive" }),
-        });
-      } else {
-        state.network = await api('/api/network/generate', {
-          method: 'POST',
-          body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
-        });
-      }
-      
+      const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
+      state.network = loaded.network;
+      state.usedOsmFallback = loaded.usedFallback;
+      setJudgeStatus(
+        loaded.usedFallback
+          ? 'OpenStreetMap was unavailable, so this run uses the synthetic city network instead of real Delhi roads.'
+          : 'Planning routes…',
+        loaded.usedFallback
+      );
+
       state.vrp = await api('/api/vrp/generate', {
         method: 'POST',
         body: JSON.stringify({
@@ -1740,6 +1751,8 @@ async function runJudgeDemoComparison() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<span>▶</span> Run Live Comparison`;
+    // Keep a fallback warning on screen; clear ordinary progress text.
+    if (!state.usedOsmFallback) setJudgeStatus(null);
   }
 }
 
@@ -1756,18 +1769,16 @@ async function runDynamicTrafficDemo() {
 
     if (isOnline) {
       const presetKey = document.getElementById('judgePreset').value;
-      if (presetKey === 'delhi_osm') {
-        state.network = await api('/api/network/from_osm', {
-          method: 'POST',
-          body: JSON.stringify({ place: "New Delhi, India", max_nodes: 1000, network_type: "drive" }),
-        });
-      } else {
-        state.network = await api('/api/network/generate', {
-          method: 'POST',
-          body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
-        });
-      }
-      
+      const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
+      state.network = loaded.network;
+      state.usedOsmFallback = loaded.usedFallback;
+      setJudgeStatus(
+        loaded.usedFallback
+          ? 'OpenStreetMap was unavailable, so this run uses the synthetic city network instead of real Delhi roads.'
+          : 'Planning routes…',
+        loaded.usedFallback
+      );
+
       state.vrp = await api('/api/vrp/generate', {
         method: 'POST',
         body: JSON.stringify({
@@ -1806,9 +1817,73 @@ async function runDynamicTrafficDemo() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<span>🚨</span> Simulate Dynamic Bottleneck`;
+    // Keep a fallback warning on screen; clear ordinary progress text.
+    if (!state.usedOsmFallback) setJudgeStatus(null);
   }
 }
 
+
+
+
+// Shows progress under the hero buttons. Passing null hides the line.
+function setJudgeStatus(message, isWarning) {
+  const el = document.getElementById('judgeStatus');
+  if (!el) return;
+  if (!message) { el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false;
+  el.classList.toggle('is-warn', !!isWarning);
+  el.textContent = message;
+}
+
+// ---------------------------------------------------------------------------
+// Real-city (OpenStreetMap) network loading
+//
+// A bounding box is used rather than place:"New Delhi, India" on purpose.
+// A place name has to be geocoded by Nominatim first, which rate-limits by IP
+// and returns no useful error when it refuses — osmnx then fails with
+// "cannot access local variable 'response'". On shared hosting (Render's free
+// tier) that block can be triggered by another tenant entirely. A bbox skips
+// geocoding, so it only depends on Overpass, and it always covers exactly the
+// same area instead of whatever the geocoder returns that day.
+//
+// Load time is set by Overpass server load, not by how large the area is:
+// the same backend returned 426 nodes in 44s and 316 nodes in 169s minutes
+// apart. So it is treated as slow-and-unpredictable, with a fallback, rather
+// than tuned for speed.
+// ---------------------------------------------------------------------------
+const DELHI_BBOX = {
+  north: 28.655, south: 28.615, east: 77.245, west: 77.195,   // central New Delhi
+  max_nodes: 500, network_type: "drive",
+};
+
+async function loadRealCityNetwork(onStatus) {
+  if (onStatus) onStatus('Downloading the real Delhi road network from OpenStreetMap… '
+                       + 'this can take up to a couple of minutes.');
+  return await api('/api/network/from_osm', {
+    method: 'POST',
+    body: JSON.stringify(DELHI_BBOX),
+  });
+}
+
+// Falls back to the synthetic city rather than leaving the demo dead if
+// OpenStreetMap is unreachable. Returns {network, usedFallback}.
+async function loadPresetNetwork(presetKey, onStatus) {
+  if (presetKey === 'delhi_osm') {
+    try {
+      const network = await loadRealCityNetwork(onStatus);
+      return { network, usedFallback: false };
+    } catch (err) {
+      console.warn('OSM network load failed, falling back to the synthetic city:', err);
+      if (onStatus) onStatus('OpenStreetMap did not respond — falling back to the synthetic city network.');
+    }
+  }
+  if (onStatus && presetKey !== 'delhi_osm') onStatus('Building the synthetic city network…');
+  const network = await api('/api/network/generate', {
+    method: 'POST',
+    body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
+  });
+  return { network, usedFallback: presetKey === 'delhi_osm' };
+}
 
 // ---------------------------------------------------------------------------
 // Compute & Render Comparison Metrics
