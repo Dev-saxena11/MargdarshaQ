@@ -30,3 +30,10 @@ Thumbs.db
 # Local runner helpers
 powershell.bat
 
+# Local testing and debug scripts
+test_*.py
+benchmark_*.py
+debug_*.py
+
+# OSMnx Cache
+cache/
