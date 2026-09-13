@@ -213,6 +213,65 @@
     .kpi-grid{grid-template-columns:repeat(2, 1fr);}
   }
 
+  /* ---- "What this actually means" — plain-language impact panel ---- */
+  .impact-section{
+    background:var(--card-bg); border:2px solid var(--border-neo); border-radius:8px;
+    padding:22px; box-shadow:var(--neo-shadow);
+  }
+  .impact-header h3{
+    margin:0 0 6px; font-size:19px; display:flex; align-items:center; gap:10px;
+  }
+  .impact-header > span{
+    display:block; color:var(--text-muted); font-size:13px; line-height:1.5;
+    max-width:72ch; margin-bottom:18px;
+  }
+  .impact-grid{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;
+  }
+  @media (max-width: 1080px){ .impact-grid{grid-template-columns:1fr;} }
+
+  .impact-card{
+    border:2px solid var(--border-bold); border-radius:8px; padding:16px;
+    display:flex; flex-direction:column; gap:12px; background:rgba(255,255,255,0.02);
+  }
+  .impact-card-scale{ border-style:dashed; }
+
+  .impact-card-head{ display:flex; align-items:flex-start; gap:11px; }
+  .impact-icon{ font-size:22px; line-height:1; }
+  .impact-card-head h4{ margin:0; font-size:15px; }
+  .impact-basis{
+    font-size:11px; color:var(--text-muted); text-transform:uppercase;
+    letter-spacing:0.5px; font-weight:600;
+  }
+  /* Scale-up figures are projections, not measurements — say so visually. */
+  .impact-basis-warn{ color:var(--neo-amber, #F59E0B); }
+
+  .impact-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:11px; }
+  .impact-list li{ display:flex; flex-direction:column; gap:2px; }
+  .impact-list .impact-figure{
+    font-size:21px; font-weight:800; line-height:1.15; color:var(--neo-mint);
+  }
+  .impact-list .impact-label{ font-size:13px; color:var(--text-soft, #CBD5E1); line-height:1.45; }
+  .impact-list .impact-empty{ color:var(--text-muted); font-size:13px; font-style:italic; }
+
+  .impact-assumption{
+    font-size:11px; color:var(--text-muted); line-height:1.5;
+    border-top:1px dashed var(--border-bold); padding-top:9px; margin-top:auto;
+  }
+  .impact-scale-control{
+    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted);
+  }
+  .impact-scale-control input{
+    width:74px; padding:5px 7px; border:2px solid var(--border-bold); border-radius:5px;
+    background:var(--bg, #0F172A); color:inherit; font:inherit; font-weight:700;
+  }
+
+  /* ---- plain-language term with the technical name kept underneath ---- */
+  .term-note{
+    display:block; margin-top:7px; font-size:11px; color:var(--text-muted);
+    font-style:italic; line-height:1.45;
+  }
+
   .kpi-card{
     background:var(--card-bg); border:2px solid var(--border-neo); border-radius:8px;
     padding:18px; box-shadow:var(--neo-shadow); position:relative;
@@ -814,9 +873,9 @@
       <div class="judge-hero">
         <div class="judge-hero-content">
           <div class="hero-eyebrow">
-            <span class="tag-badge" style="background:var(--neo-mint); color:#000;">AUTONOMOUS FLEET</span>
-            <span class="tag-badge" style="background:var(--neo-purple); color:#FFF;">QUANTUM METAMODEL</span>
-            <span class="tag-badge" style="background:var(--neo-yellow); color:#000;">CVRPTW TRAFFIC OPTIMIZER</span>
+            <span class="tag-badge" style="background:var(--neo-mint); color:#000;">DELIVERY FLEETS</span>
+            <span class="tag-badge" style="background:var(--neo-purple); color:#FFF;">QUANTUM-INSPIRED</span>
+            <span class="tag-badge" style="background:var(--neo-yellow); color:#000;">BEATS CITY TRAFFIC</span>
           </div>
           <h2 class="hero-title">
             <span class="hero-icon">⚡</span>
@@ -824,7 +883,13 @@
             <span class="accent">vs Baseline Dispatch</span>
           </h2>
           <p class="hero-subtitle">
-            Standard logistics rely on greedy heuristics that trap vehicle fleets inside congested urban choke points. Our quantum-inspired metaheuristic (QPSO) simulates quantum tunneling through delta-potential-wells, dynamically routing vehicles around gridlocks to achieve 100% on-time delivery with minimal fuel burn.
+            A delivery fleet has to reach every customer on time, through city traffic.
+            Ordinary routing software sends each van to its nearest stop — and drives it
+            straight into the jam. <b>We plan the whole day's routes around the traffic
+            instead.</b> Press the button below to watch both methods run on the same city,
+            side by side, and see the difference for yourself.
+            <span class="term-note">Under the hood: a quantum-inspired optimisation algorithm
+              (QPSO) solving a capacitated vehicle routing problem with time windows.</span>
           </p>
           <div class="judge-hero-actions">
             <select id="judgePreset" class="preset-select" onchange="loadPresetScenario()">
@@ -842,121 +907,20 @@
         </div>
       </div>
 
-      <!-- Executive KPI Cards Grid (4 High-Impact Neo-Brutalist Blocks) -->
-      <div class="kpi-grid">
-        <!-- 1. Travel Time -->
-        <div class="kpi-card">
-          <div>
-            <div class="kpi-card-header">
-              <span class="kpi-title">⏱️ Fleet Travel Time</span>
-              <span class="kpi-tag tag-mint">Primary SLA</span>
-            </div>
-            <div class="kpi-main-stat">
-              <span class="kpi-num" id="kpi_time_saved">—</span>
-              <span class="kpi-pill tag-mint" id="kpi_time_badge">— Faster</span>
-            </div>
-            <div class="kpi-desc" id="kpi_time_sub">Evaluating routes across vehicles…</div>
-          </div>
-          <div class="kpi-split-footer">
-            <div class="split-box">
-              <span>Before (Naive)</span>
-              <b id="kpi_time_before">—</b>
-            </div>
-            <div class="split-box">
-              <span>After (QPSO)</span>
-              <b id="kpi_time_after" class="highlight">—</b>
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. Congestion Delay Avoided -->
-        <div class="kpi-card">
-          <div>
-            <div class="kpi-card-header">
-              <span class="kpi-title">🚦 Traffic Jam Delay</span>
-              <span class="kpi-tag tag-yellow">Congestion Cut</span>
-            </div>
-            <div class="kpi-main-stat">
-              <span class="kpi-num" id="kpi_delay_saved">—</span>
-              <span class="kpi-pill tag-yellow" id="kpi_delay_badge">— Avoided</span>
-            </div>
-            <div class="kpi-desc" id="kpi_delay_sub">Minutes lost to traffic removed from schedule</div>
-          </div>
-          <div class="kpi-split-footer">
-            <div class="split-box">
-              <span>Before Delay</span>
-              <b id="kpi_delay_before" style="color:var(--neo-amber);">—</b>
-            </div>
-            <div class="split-box">
-              <span>After Delay</span>
-              <b id="kpi_delay_after" class="highlight">—</b>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. Distance & Fuel -->
-        <div class="kpi-card">
-          <div>
-            <div class="kpi-card-header">
-              <span class="kpi-title">🛣️ Total Mileage & Fuel</span>
-              <span class="kpi-tag tag-purple">Carbon Cut</span>
-            </div>
-            <div class="kpi-main-stat">
-              <span class="kpi-num" id="kpi_dist_saved">—</span>
-              <span class="kpi-pill tag-purple" id="kpi_dist_badge">— Less Dist</span>
-            </div>
-            <div class="kpi-desc" id="kpi_dist_sub">Estimated CO₂ emissions reduced by ~15%</div>
-          </div>
-          <div class="kpi-split-footer">
-            <div class="split-box">
-              <span>Before Distance</span>
-              <b id="kpi_dist_before">—</b>
-            </div>
-            <div class="split-box">
-              <span>After Distance</span>
-              <b id="kpi_dist_after" class="highlight">—</b>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. Punctuality -->
-        <div class="kpi-card">
-          <div>
-            <div class="kpi-card-header">
-              <span class="kpi-title">🎯 Time-Window SLA</span>
-              <span class="kpi-tag tag-mint">Punctuality</span>
-            </div>
-            <div class="kpi-main-stat">
-              <span class="kpi-num" id="kpi_feas_val">100%</span>
-              <span class="kpi-pill tag-mint" id="kpi_feas_badge">0 Late</span>
-            </div>
-            <div class="kpi-desc" id="kpi_feas_sub">Zero customer time-window violations</div>
-          </div>
-          <div class="kpi-split-footer">
-            <div class="split-box">
-              <span>Before Violations</span>
-              <b id="kpi_late_before" class="feas-no">—</b>
-            </div>
-            <div class="split-box">
-              <span>After Violations</span>
-              <b id="kpi_late_after" class="feas-yes">0.0m (Feasible)</b>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Before / After Route Comparison Section -->
       <div class="comparison-section">
         <div class="comparison-header">
           <div class="comparison-title">
-            <h3><span>🗺️</span> Before & After Route Comparison</h3>
-            <span>Direct visual proof of vehicle bypass around arterial congestion hotspots</span>
+            <h3><span>🗺️</span> Start here: the same city, planned two ways</h3>
+            <span>Same vans, same customers, same traffic — only the plan is different.
+                  <b>Red roads are jammed.</b> On the left the usual method drives straight through them.
+                  On the right, ours goes around. Everything below this simply measures that difference.</span>
           </div>
           <div class="comp-mode-pills">
-            <button class="comp-pill active" id="pill_split" onclick="setCompareMode('split')">◫ Side-by-Side Dual View</button>
-            <button class="comp-pill" id="pill_before" onclick="setCompareMode('before')">◀ Before (Baseline)</button>
-            <button class="comp-pill" id="pill_after" onclick="setCompareMode('after')">After (QPSO) ▶</button>
-            <button class="comp-pill" id="pill_overlay" onclick="setCompareMode('overlay')">⊕ Difference Overlay</button>
+            <button class="comp-pill active" id="pill_split" onclick="setCompareMode('split')">◫ Show both</button>
+            <button class="comp-pill" id="pill_before" onclick="setCompareMode('before')">◀ Usual method only</button>
+            <button class="comp-pill" id="pill_after" onclick="setCompareMode('after')">Our method only ▶</button>
+            <button class="comp-pill" id="pill_overlay" onclick="setCompareMode('overlay')">⊕ Overlay them</button>
           </div>
         </div>
 
@@ -967,7 +931,7 @@
               <div class="titlebar-left">
                 <div class="window-dots"><span class="w-dot w-red"></span><span class="w-dot w-yellow"></span><span class="w-dot w-green"></span></div>
                 <span class="map-badge-tag before">BEFORE</span>
-                <span class="titlebar-desc">Naive Dispatch (Greedy Nearest-Neighbor)</span>
+                <span class="titlebar-desc">Usual method — always head to the nearest stop</span>
               </div>
               <span class="tag-badge" style="background:#0F172A; color:var(--neo-amber); border-color:var(--neo-amber);">Congested</span>
             </div>
@@ -989,7 +953,7 @@
               <div class="titlebar-left">
                 <div class="window-dots"><span class="w-dot w-green"></span><span class="w-dot w-yellow"></span><span class="w-dot w-green"></span></div>
                 <span class="map-badge-tag after">AFTER</span>
-                <span class="titlebar-desc">Quantum-Optimized Route (QPSO Memetic Hybrid)</span>
+                <span class="titlebar-desc">Our method — planned around the traffic</span>
               </div>
               <span class="tag-badge" style="background:var(--neo-mint); color:#000000;">Optimal Decongested</span>
             </div>
@@ -1007,10 +971,174 @@
         </div>
       </div>
 
+      <!-- Executive KPI Cards Grid (4 High-Impact Neo-Brutalist Blocks) -->
+      <div class="kpi-grid">
+        <!-- 1. Travel Time -->
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-card-header">
+              <span class="kpi-title">⏱️ Time on the road</span>
+              <span class="kpi-tag tag-mint">Main goal</span>
+            </div>
+            <div class="kpi-main-stat">
+              <span class="kpi-num" id="kpi_time_saved">—</span>
+              <span class="kpi-pill tag-mint" id="kpi_time_badge">— Faster</span>
+            </div>
+            <div class="kpi-desc" id="kpi_time_sub">How long every van is driving, added together</div>
+          </div>
+          <div class="kpi-split-footer">
+            <div class="split-box">
+              <span>Usual method</span>
+              <b id="kpi_time_before">—</b>
+            </div>
+            <div class="split-box">
+              <span>Our method</span>
+              <b id="kpi_time_after" class="highlight">—</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Congestion Delay Avoided -->
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-card-header">
+              <span class="kpi-title">🚦 Stuck in traffic</span>
+              <span class="kpi-tag tag-yellow">Jams avoided</span>
+            </div>
+            <div class="kpi-main-stat">
+              <span class="kpi-num" id="kpi_delay_saved">—</span>
+              <span class="kpi-pill tag-yellow" id="kpi_delay_badge">— Avoided</span>
+            </div>
+            <div class="kpi-desc" id="kpi_delay_sub">Minutes lost purely to congestion, not to distance</div>
+          </div>
+          <div class="kpi-split-footer">
+            <div class="split-box">
+              <span>Usual method</span>
+              <b id="kpi_delay_before" style="color:var(--neo-amber);">—</b>
+            </div>
+            <div class="split-box">
+              <span>Our method</span>
+              <b id="kpi_delay_after" class="highlight">—</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Distance & Fuel -->
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-card-header">
+              <span class="kpi-title">🛣️ Total Mileage & Fuel</span>
+              <span class="kpi-tag tag-purple">Carbon Cut</span>
+            </div>
+            <div class="kpi-main-stat">
+              <span class="kpi-num" id="kpi_dist_saved">—</span>
+              <span class="kpi-pill tag-purple" id="kpi_dist_badge">— Less Dist</span>
+            </div>
+            <div class="kpi-desc" id="kpi_dist_sub">Total distance the fleet covers</div>
+          </div>
+          <div class="kpi-split-footer">
+            <div class="split-box">
+              <span>Before Distance</span>
+              <b id="kpi_dist_before">—</b>
+            </div>
+            <div class="split-box">
+              <span>After Distance</span>
+              <b id="kpi_dist_after" class="highlight">—</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Punctuality -->
+        <div class="kpi-card">
+          <div>
+            <div class="kpi-card-header">
+              <span class="kpi-title">🎯 Delivered on time</span>
+              <span class="kpi-tag tag-mint">Punctuality</span>
+            </div>
+            <div class="kpi-main-stat">
+              <span class="kpi-num" id="kpi_feas_val">100%</span>
+              <span class="kpi-pill tag-mint" id="kpi_feas_badge">0 Late</span>
+            </div>
+            <div class="kpi-desc" id="kpi_feas_sub">Deliveries made inside the slot the customer was promised</div>
+          </div>
+          <div class="kpi-split-footer">
+            <div class="split-box">
+              <span>Before Violations</span>
+              <b id="kpi_late_before" class="feas-no">—</b>
+            </div>
+            <div class="split-box">
+              <span>After Violations</span>
+              <b id="kpi_late_after" class="feas-yes">0.0m (Feasible)</b>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- What this means in the real world -->
+      <div class="impact-section" id="impactSection">
+        <div class="impact-header">
+          <h3><span>🌍</span> What this actually means</h3>
+          <span>The percentages above, translated into things you can picture. Every figure below is
+                calculated from the run you just watched — nothing is pre-baked.</span>
+        </div>
+
+        <div class="impact-grid">
+          <!-- Operational -->
+          <div class="impact-card">
+            <div class="impact-card-head">
+              <span class="impact-icon">🚚</span>
+              <div>
+                <h4>For the delivery team</h4>
+                <span class="impact-basis">measured, one fleet, one day</span>
+              </div>
+            </div>
+            <ul class="impact-list" id="impactOps">
+              <li class="impact-empty">Run the comparison to see this.</li>
+            </ul>
+          </div>
+
+          <!-- Environmental -->
+          <div class="impact-card">
+            <div class="impact-card-head">
+              <span class="impact-icon">🌱</span>
+              <div>
+                <h4>For the environment</h4>
+                <span class="impact-basis">from distance saved</span>
+              </div>
+            </div>
+            <ul class="impact-list" id="impactEnv">
+              <li class="impact-empty">Run the comparison to see this.</li>
+            </ul>
+            <div class="impact-assumption" id="impactEnvAssumption"></div>
+          </div>
+
+          <!-- Scale-up -->
+          <div class="impact-card impact-card-scale">
+            <div class="impact-card-head">
+              <span class="impact-icon">🏙️</span>
+              <div>
+                <h4>If a city ran this</h4>
+                <span class="impact-basis impact-basis-warn">extrapolation, not measured</span>
+              </div>
+            </div>
+            <div class="impact-scale-control">
+              <label for="scaleFleet">City fleet size</label>
+              <input type="number" id="scaleFleet" value="100" min="1" max="10000"
+                     oninput="renderImpact()" />
+              <span>vehicles</span>
+            </div>
+            <ul class="impact-list" id="impactScale">
+              <li class="impact-empty">Run the comparison to see this.</li>
+            </ul>
+            <div class="impact-assumption" id="impactScaleAssumption"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Side-by-Side Detailed Breakdown Table -->
       <div class="table-card">
         <div class="table-card-header">
-          <h3>Algorithm Performance Breakdown (Baseline vs Quantum QPSO)</h3>
+          <h3>The numbers behind it, line by line</h3>
           <span class="mono" style="font-size:11px; color:var(--text-muted);">EVALUATED ACROSS ALL ACTIVE ROUTES</span>
         </div>
         <table class="comp-table">
@@ -1031,31 +1159,46 @@
 
       <!-- Why Quantum-Inspired Wins Explainer -->
       <div class="why-card">
-        <h3><span>💡</span> Why Quantum-Inspired (QPSO) Beats Classical Metaheuristics</h3>
+        <h3><span>💡</span> Why our approach finds better routes</h3>
         <div class="why-grid">
           <div class="why-item">
             <div class="why-num">[ 01 ]</div>
-            <h4>Combinatorial Complexity Barrier</h4>
-            <p>CVRPTW under dynamic urban traffic contains billions of route permutations. Classical greedy and standard PSO fall into local minima (taking an edge that looks free now, but leads into a dead-end gridlock).</p>
+            <h4>There are too many possible routes to simply try them all</h4>
+            <p>Fifteen stops across a city can be ordered in more ways than there are seconds
+               in the age of the universe. No computer can check every option, so every delivery
+               system has to make smart guesses instead.</p>
+            <span class="term-note">The formal name for this problem is a capacitated vehicle
+              routing problem with time windows (CVRPTW).</span>
           </div>
           <div class="why-item">
             <div class="why-num">[ 02 ]</div>
-            <h4>Quantum Tunneling Behavior</h4>
-            <p>QPSO samples particle states from a quantum wave function in a delta-potential-well. This allows search particles to escape classical local minima traps by exploring non-adjacent topological regions.</p>
+            <h4>The usual guess gets stuck in traffic</h4>
+            <p>Ordinary routing software sends each van to whichever stop is nearest right now.
+               That looks sensible, and it walks straight into the jam — like always taking the
+               first turning that looks clear and ending up in a dead end you can't back out of.</p>
+            <span class="term-note">In optimisation terms, the search gets trapped in a local
+              minimum — a choice that looks good nearby but is poor overall.</span>
           </div>
           <div class="why-item">
             <div class="why-num">[ 03 ]</div>
-            <h4>Lamarckian Memetic Refinement</h4>
-            <p>Our hybrid couples global quantum exploration with 2-opt and or-opt local search operators. Once quantum swarms detect promising corridors, local search polishes delivery order to guarantee 100% on-time arrival.</p>
+            <h4>Ours can jump out of a dead end</h4>
+            <p>Our method borrows an idea from quantum physics: instead of only stepping to
+               the next-best option, it can jump straight to a completely different plan on the
+               other side of the map. That lets it escape the dead end the ordinary method is
+               stuck in, and find the route that goes around the traffic. It then tidies the
+               result up — checking its own plan for stops visited in a silly order and
+               straightening them out.</p>
+            <span class="term-note">Technique: quantum-behaved particle swarm optimisation
+              (QPSO), with a 2-opt / or-opt local search refinement step.</span>
           </div>
         </div>
       </div>
 
       <!-- Quick Switch to Engineering Control Room -->
       <div class="hood-banner">
-        <span>Need to inspect the raw convergence curves, swarm parameters, or run the 5-algorithm benchmark suite?</span>
+        <span>Want the technical detail — convergence curves, algorithm settings, and the full five-algorithm benchmark?</span>
         <button class="btn-neo-secondary" onclick="switchView('control')">
-          Pop the Hood: Open Engineering Console ↗
+          Open the technical console ↗
         </button>
       </div>
 
@@ -1233,7 +1376,7 @@
       <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why did Quantum QPSO win?')">⚛️ Why QPSO Won</button>
       <button class="ai-chip" onclick="handleChipClick('explain_map', '🗺️ Explain the map & traffic colors')">🗺️ Map & Traffic</button>
       <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does convergence chart show?')">📈 Convergence</button>
-      <button class="ai-chip" onclick="handleChipClick('explain_tw', '🎯 Are time windows respected?')">🎯 Time-Windows & SLA</button>
+      <button class="ai-chip" onclick="handleChipClick('explain_tw', '🎯 Are time windows respected?')">🎯 Did deliveries arrive on time?</button>
     </div>
   </div>
 
@@ -1701,8 +1844,14 @@ function computeAndDisplayComparison(baseline, optimized) {
   const lateBefore = baseline.time_window_violation || 0;
   const lateAfter = optimized.time_window_violation || 0;
   document.getElementById('kpi_late_before').textContent = lateBefore > 0 ? `${lateBefore.toFixed(1)}m late` : `Feasible`;
-  document.getElementById('kpi_late_after').textContent = `0.0m (100% On-Time)`;
-  document.getElementById('kpi_feas_badge').textContent = optimized.feasible ? '0 Late' : 'Near-optimal';
+  // Report what the solver returned. Printing "100% On-Time" unconditionally
+  // would state a result the run may not have achieved.
+  document.getElementById('kpi_late_after').textContent =
+    lateAfter > 0.001 ? `${lateAfter.toFixed(1)}m late` : `0.0m (all on time)`;
+  document.getElementById('kpi_feas_badge').textContent =
+    optimized.feasible ? 'All on time' : 'Some stops late';
+  document.getElementById('kpi_feas_val').textContent =
+    optimized.feasible ? '100%' : (lateAfter > 0 ? 'Partial' : '—');
 
   // Map Bar Stats
   document.getElementById('labelStatsBefore').textContent = `Dist: ${distBefore.toFixed(1)} km | Time: ${timeBefore.toFixed(1)} min | Friction: ${(baseline.avg_congestion || 2.2).toFixed(2)}x`;
@@ -1711,60 +1860,66 @@ function computeAndDisplayComparison(baseline, optimized) {
   // Breakdown Table Rows
   const rows = [
     {
-      metric: "Total Fleet Travel Time",
+      metric: "Time the whole fleet spends driving",
       before: `${timeBefore.toFixed(1)} min`,
       after: `${timeAfter.toFixed(1)} min`,
       delta: `-${timeSavedPct.toFixed(1)}% (-${timeSavedMin.toFixed(1)}m)`,
-      good: true,
-      impact: "Rapid delivery, lower driver overtime"
+      good: timeAfter <= timeBefore,
+      impact: "Drivers finish earlier; less overtime to pay"
     },
     {
-      metric: "Traffic Congestion Delay Avoided",
+      metric: "Time lost sitting in traffic",
       before: `${delayBefore.toFixed(1)} min`,
       after: `${delayAfter.toFixed(1)} min`,
       delta: `-${delaySavedPct.toFixed(1)}% (-${delaySavedMin.toFixed(1)}m)`,
-      good: true,
-      impact: "Fleet actively avoids gridlocked choke points"
+      good: delayAfter <= delayBefore,
+      impact: "The fleet goes around the jams instead of queueing in them"
     },
     {
-      metric: "Traversed Congestion Friction",
-      before: `${(baseline.avg_congestion || 2.2).toFixed(2)}x (Severe)`,
-      after: `${(optimized.avg_congestion || 1.15).toFixed(2)}x (Free Flow)`,
-      delta: `-${(((baseline.avg_congestion || 2.2) - (optimized.avg_congestion || 1.15)) / (baseline.avg_congestion || 2.2) * 100).toFixed(1)}%`,
-      good: true,
-      impact: "Vehicles bypass high-friction urban links"
+      metric: "How congested the chosen roads are",
+      before: `${(baseline.avg_congestion || 0).toFixed(2)}x slower than clear`,
+      after: `${(optimized.avg_congestion || 0).toFixed(2)}x slower than clear`,
+      delta: (baseline.avg_congestion && optimized.avg_congestion)
+        ? `${(((optimized.avg_congestion - baseline.avg_congestion) / baseline.avg_congestion) * 100).toFixed(1)}%`
+        : '—',
+      good: (optimized.avg_congestion || 0) <= (baseline.avg_congestion || 0),
+      impact: "1.0x means a clear road; 3.0x means it takes three times as long"
     },
     {
-      metric: "Total Fleet Mileage & Fuel",
+      metric: "Distance driven",
       before: `${distBefore.toFixed(1)} km`,
       after: `${distAfter.toFixed(1)} km`,
       delta: `-${distSavedPct.toFixed(1)}% (-${distSavedKm.toFixed(1)} km)`,
-      good: true,
-      impact: "Direct diesel/fuel expenditure reduction"
+      good: distAfter <= distBefore,
+      impact: "Less fuel burned and less wear on the vans"
     },
     {
-      metric: "Customer Time-Window Violations",
-      before: lateBefore > 0 ? `${lateBefore.toFixed(1)} min penalty` : `0.0 min`,
-      after: `0.0 min (100% On-Time)`,
-      delta: lateBefore > 0 ? `-100% Breaches` : `0 Breaches`,
-      good: true,
-      impact: "Strict adherence to agreed customer time slots"
+      metric: "Deliveries arriving late",
+      before: lateBefore > 0 ? `${lateBefore.toFixed(1)} min late` : `none late`,
+      after: lateAfter > 0.001 ? `${lateAfter.toFixed(1)} min late` : `none late`,
+      delta: lateBefore > lateAfter
+        ? `-${(lateBefore - lateAfter).toFixed(1)} min late`
+        : lateAfter > lateBefore ? `+${(lateAfter - lateBefore).toFixed(1)} min late` : `no change`,
+      good: lateAfter <= lateBefore,
+      impact: "Customers get their delivery inside the slot they were promised"
     },
     {
-      metric: "Capacity Constraint Violations",
-      before: `${(baseline.capacity_violation || 0).toFixed(1)} units`,
-      after: `0.0 units (Feasible)`,
-      delta: `0 Overload`,
-      good: true,
-      impact: "Vehicles never exceed legal payload thresholds"
+      metric: "Vans loaded beyond capacity",
+      before: `${(baseline.capacity_violation || 0).toFixed(1)} units over`,
+      after: `${(optimized.capacity_violation || 0).toFixed(1)} units over`,
+      delta: (optimized.capacity_violation || 0) <= (baseline.capacity_violation || 0)
+        ? `within limits` : `over limit`,
+      good: (optimized.capacity_violation || 0) <= (baseline.capacity_violation || 0),
+      impact: "No van is asked to carry more than it legally can"
     },
     {
-      metric: "Solution Quality (Fitness Score)",
-      before: `${baseline.fitness.toFixed(1)} (Suboptimal)`,
-      after: `${optimized.fitness.toFixed(1)} (Global Minimum)`,
-      delta: `-${((baseline.fitness - optimized.fitness) / baseline.fitness * 100).toFixed(1)}%`,
-      good: true,
-      impact: "Superior combinatorial optimization quality"
+      metric: "Overall plan score",
+      before: `${baseline.fitness.toFixed(1)}`,
+      after: `${optimized.fitness.toFixed(1)}`,
+      delta: `${baseline.fitness > 0
+        ? ((optimized.fitness - baseline.fitness) / baseline.fitness * 100).toFixed(1) : '0.0'}%`,
+      good: optimized.fitness <= baseline.fitness,
+      impact: "One combined score for travel time plus any broken promises — lower is better"
     }
   ];
 
@@ -1789,7 +1944,137 @@ function computeAndDisplayComparison(baseline, optimized) {
     baselineAlgo: baseline.algorithm || 'Greedy Baseline',
     optimizedAlgo: optimized.algorithm || 'QPSO (Quantum-Inspired PSO)'
   };
+  renderImpact();
   if (typeof syncAssistantContext === 'function') syncAssistantContext();
+}
+
+// ---------------------------------------------------------------------------
+// "What this actually means" — plain-language impact translation
+//
+// Turns the measured percentages into units a non-technical judge can picture.
+// Two rules this section must keep:
+//   1. Every figure is derived from the run that actually happened. If no run
+//      has happened, it says so rather than showing a plausible number.
+//   2. Anything resting on an outside assumption (fuel economy, working days,
+//      city fleet size) states that assumption on screen, and projections are
+//      labelled as projections rather than presented as measurements.
+// ---------------------------------------------------------------------------
+
+// Stated openly in the UI so a judge can challenge or adjust them.
+const IMPACT_ASSUMPTIONS = {
+  kmPerLitre: 8,          // diesel light commercial vehicle, urban duty cycle
+  kgCO2PerLitre: 2.68,    // DEFRA factor for diesel
+  workingDaysPerYear: 250,
+};
+
+function renderImpact() {
+  const m = state.comparisonMetrics;
+  const opsEl = document.getElementById('impactOps');
+  const envEl = document.getElementById('impactEnv');
+  const scaleEl = document.getElementById('impactScale');
+  if (!opsEl || !envEl || !scaleEl) return;
+
+  const empty = '<li class="impact-empty">Run the comparison to see this.</li>';
+  if (!m || m.timeSavedMin === undefined) {
+    opsEl.innerHTML = empty;
+    envEl.innerHTML = empty;
+    scaleEl.innerHTML = empty;
+    document.getElementById('impactEnvAssumption').textContent = '';
+    document.getElementById('impactScaleAssumption').textContent = '';
+    return;
+  }
+
+  const row = (figure, label) =>
+    `<li><span class="impact-figure">${figure}</span><span class="impact-label">${label}</span></li>`;
+
+  // ---- Operational (measured) ----------------------------------------
+  const minsSaved = m.timeSavedMin;
+  const hoursSaved = minsSaved / 60;
+  const nStops = (state.vrp && state.vrp.customers) ? state.vrp.customers.length : null;
+
+  const ops = [];
+  ops.push(row(
+    hoursSaved >= 1 ? `${hoursSaved.toFixed(1)} hours` : `${minsSaved.toFixed(0)} minutes`,
+    'of driver time freed up across the fleet, every single day'
+  ));
+
+  // Time saved expressed in the currency the team understands: more stops.
+  if (nStops && m.timeAfter > 0) {
+    const minsPerStop = m.timeAfter / nStops;
+    const extraStops = minsSaved / minsPerStop;
+    if (extraStops >= 0.5) {
+      ops.push(row(
+        `~${Math.round(extraStops)} more stop${Math.round(extraStops) === 1 ? '' : 's'}`,
+        `could be served in the time saved, at the same pace (about ${minsPerStop.toFixed(0)} min per stop on this run)`
+      ));
+    }
+  }
+
+  // On-time performance, reported from what the solver actually returned.
+  const lateAfter = m.lateAfter || 0;
+  const lateBefore = m.lateBefore || 0;
+  if (lateAfter <= 0.001 && nStops) {
+    ops.push(row(`all ${nStops} stops on time`,
+      lateBefore > 0
+        ? `the ordinary method ran ${lateBefore.toFixed(0)} min late in total`
+        : 'every delivery inside its promised time slot'));
+  } else if (lateAfter > 0) {
+    ops.push(row(`${lateAfter.toFixed(0)} min late`,
+      `still outside the promised window — down from ${lateBefore.toFixed(0)} min, but not yet all on time`));
+  }
+  opsEl.innerHTML = ops.join('');
+
+  // ---- Environmental (measured distance + stated assumption) ----------
+  const kmSaved = m.distSavedKm || 0;
+  const litres = kmSaved / IMPACT_ASSUMPTIONS.kmPerLitre;
+  const co2 = litres * IMPACT_ASSUMPTIONS.kgCO2PerLitre;
+
+  envEl.innerHTML = [
+    row(`${kmSaved.toFixed(1)} km`, 'of driving avoided per day — roads the fleet simply never has to cover'),
+    row(`${litres.toFixed(1)} litres`, 'of fuel not burned'),
+    row(`${co2.toFixed(1)} kg CO₂`, 'kept out of the air, daily'),
+  ].join('');
+
+  document.getElementById('impactEnvAssumption').textContent =
+    `Assumes ${IMPACT_ASSUMPTIONS.kmPerLitre} km per litre (diesel delivery van, urban driving) `
+    + `and ${IMPACT_ASSUMPTIONS.kgCO2PerLitre} kg CO₂ per litre. Distance saved is measured; the conversion is not.`;
+
+  // ---- Scale-up (explicit projection) ---------------------------------
+  const fleetInput = document.getElementById('scaleFleet');
+  const cityFleet = Math.max(1, Math.min(10000, parseInt(fleetInput && fleetInput.value, 10) || 100));
+  const ourVehicles = (state.vrp && state.vrp.n_vehicles) ? state.vrp.n_vehicles : null;
+
+  // Without the real vehicle count the scaling factor is unknown, and guessing
+  // one (e.g. 1) silently multiplies the projection several times over. Say so
+  // instead of printing a confident wrong number.
+  if (!ourVehicles) {
+    scaleEl.innerHTML =
+      '<li class="impact-empty">Fleet size for this run isn\'t known, so this can\'t be scaled up honestly. '
+      + 'Re-run the comparison to populate it.</li>';
+    document.getElementById('impactScaleAssumption').textContent = '';
+    return;
+  }
+
+  const perVehicleFactor = cityFleet / ourVehicles;
+  const days = IMPACT_ASSUMPTIONS.workingDaysPerYear;
+
+  const yearHours = hoursSaved * perVehicleFactor * days;
+  const yearCO2 = co2 * perVehicleFactor * days;
+  const yearKm = kmSaved * perVehicleFactor * days;
+
+  const fmt = (n) => n >= 1000 ? n.toLocaleString(undefined, {maximumFractionDigits: 0})
+                               : n.toFixed(n < 10 ? 1 : 0);
+
+  scaleEl.innerHTML = [
+    row(`${fmt(yearHours)} hours`, `of driver time per year across ${cityFleet.toLocaleString()} vehicles`),
+    row(`${fmt(yearCO2 / 1000)} tonnes CO₂`, 'avoided per year'),
+    row(`${fmt(yearKm)} km`, 'of city driving removed per year'),
+  ].join('');
+
+  document.getElementById('impactScaleAssumption').textContent =
+    `Projection, not a measurement: this run used ${ourVehicles} vehicle${ourVehicles === 1 ? '' : 's'}, `
+    + `scaled to ${cityFleet.toLocaleString()} over ${days} working days. It assumes every vehicle sees `
+    + `similar traffic and a similar workload, which real cities will not match exactly.`;
 }
 
 // ---------------------------------------------------------------------------
