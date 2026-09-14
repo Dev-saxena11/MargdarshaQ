@@ -99,6 +99,24 @@ Copy [`.env.example`](.env.example) to `.env` and set `OPENROUTER_API_KEY`.
 Architecture and the no-fabrication rule are documented in
 [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
 
+## Real-world impact numbers
+
+Benchmark percentages don't tell a non-technical reader whether the result
+matters. [`scripts/impact_report.py`](scripts/impact_report.py) converts measured
+results into fuel, CO2 and driver hours, and writes a citable report:
+
+```bash
+python scripts/impact_report.py                 # synthetic sizes
+python scripts/impact_report.py --real-city     # cached Delhi road network
+```
+
+Output goes to [`data/impact_report.md`](data/impact_report.md). Every
+conversion factor lives in [`app/core/impact.py`](app/core/impact.py) — change
+it there and re-run, and the dashboard, the report and the tests all follow.
+
+Figures are signed: where the optimiser drives further to arrive sooner, the
+report says so rather than showing a zero.
+
 ## Deploying
 
 Backend and frontend deploy to **different platforms** (Render for the backend,

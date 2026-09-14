@@ -2031,7 +2031,7 @@ function computeAndDisplayComparison(baseline, optimized) {
   // Only call the extra distance a deliberate detour when it actually bought
   // something — if congestion got worse too, this plan is simply worse.
   document.getElementById('kpi_dist_sub').textContent =
-    distSavedKm >= 0 ? `Est. ~${(distSavedKm * 0.22).toFixed(1)} kg CO₂ less carbon`
+    distSavedKm >= 0 ? `Est. ~${(distSavedKm * kgCo2PerKm()).toFixed(1)} kg CO₂ less carbon`
     : delaySavedMin > 0 ? `Drives further on purpose — the detour that avoids the jams`
     : `Drives further AND sits in more traffic — this plan is worse on both`;
   setKpiTone('kpi_dist_badge', distSavedKm >= 0, 'tag-purple');
@@ -2159,11 +2159,20 @@ function computeAndDisplayComparison(baseline, optimized) {
 // ---------------------------------------------------------------------------
 
 // Stated openly in the UI so a judge can challenge or adjust them.
+// MIRRORS app/core/impact.py — keep the two in step; test_impact.py fails if
+// they drift. Before this was centralised the page carried two different CO2
+// factors (a KPI card used 0.22 kg/km while this panel used 0.335 kg/km), so
+// one run displayed two emissions numbers 52% apart.
 const IMPACT_ASSUMPTIONS = {
   kmPerLitre: 8,          // diesel light commercial vehicle, urban duty cycle
-  kgCO2PerLitre: 2.68,    // DEFRA factor for diesel
+  kgCO2PerLitre: 2.68,    // DEFRA combustion factor for diesel
   workingDaysPerYear: 250,
 };
+
+// The one place kg CO2 per km is derived. Nothing may hardcode it.
+function kgCo2PerKm() {
+  return IMPACT_ASSUMPTIONS.kgCO2PerLitre / IMPACT_ASSUMPTIONS.kmPerLitre;
+}
 
 function renderImpact() {
   const m = state.comparisonMetrics;
