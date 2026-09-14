@@ -171,6 +171,7 @@ def generate_vrp(req: VRPGenerateRequest):
             horizon=req.horizon,
             window_length_range=(req.window_length_min, req.window_length_max),
             service_time=req.service_time, seed=req.seed,
+            time_dependent=req.time_dependent, bucket_minutes=req.bucket_minutes,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

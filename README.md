@@ -99,6 +99,30 @@ Copy [`.env.example`](.env.example) to `.env` and set `OPENROUTER_API_KEY`.
 Architecture and the no-fabrication rule are documented in
 [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
 
+## Time-dependent traffic
+
+Routes can be priced by **when** a vehicle departs, not by a single snapshot of
+the network. Pass `time_dependent: true` to `/api/vrp/generate` (or
+`generate_synthetic_vrp(..., time_dependent=True)`).
+
+With it off — the default — a road costs the same at 09:00 and 14:00. With it
+on, a travel-time matrix is precomputed per 30-minute bucket from the weekday
+demand curve in [`app/core/traffic_profile.py`](app/core/traffic_profile.py),
+and the solver routes around rush hour instead of averaging over it.
+
+Measured on a 12-customer instance: the same leg costs **35 min off-peak and
+63 min in the morning peak**. The optimiser picks different routes, and a plan
+built without the clock is **27 min (5.8%) worse** once time-varying traffic is
+applied to both.
+
+It is opt-in because switching it on changes every travel time, and therefore
+every previously published benchmark figure. Note the default operating day is
+480 minutes from 06:00 (so 06:00-14:00): the morning peak falls inside it, the
+evening peak does not. Widen `horizon` to include the evening peak.
+
+The curve's shape is the standard commuter pattern; its amplitudes are a stated,
+adjustable urban calibration rather than measured Delhi counts.
+
 ## Real-world impact numbers
 
 Benchmark percentages don't tell a non-technical reader whether the result

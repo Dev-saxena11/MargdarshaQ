@@ -84,6 +84,8 @@ class VRPGenerateRequest(BaseModel):
     window_length_max: float = Field(180.0)
     service_time: float = Field(10.0)
     seed: int = Field(1)
+    time_dependent: bool = Field(False, description="Price each leg by the time of day the vehicle departs, so routes account for rush hour")
+    bucket_minutes: float = Field(30.0, ge=5.0, le=120.0, description="Width of each time bucket when time_dependent is on")
 
 
 class CustomerOut(BaseModel):

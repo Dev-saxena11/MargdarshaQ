@@ -29,6 +29,7 @@ Decoding:
 """
 
 from __future__ import annotations
+import math
 import random
 import numpy as np
 import networkx as nx
@@ -61,10 +62,26 @@ class VRPProblem:
     # vehicle has the uniform `vehicle_capacity`.
     vehicle_capacities: Optional[List[float]] = None
 
+    # Time-dependent travel times. When False (the default) the problem behaves
+    # exactly as it always has: one travel-time matrix, no clock, so a road
+    # costs the same at 09:00 and at 14:00. When True, a matrix is precomputed
+    # per time bucket and the cost of a leg depends on when the vehicle leaves,
+    # which is what makes rush hour something the optimiser routes around rather
+    # than a label on a chart.
+    #
+    # Off by default on purpose: switching it on changes every travel time, and
+    # therefore every previously published benchmark figure. It is opted into
+    # explicitly so results are never silently redefined.
+    time_dependent: bool = False
+    bucket_minutes: float = 30.0
+    horizon_minutes: float = 720.0
+
     # precomputed after __post_init__
     time_matrix: Dict[Tuple[int, int], float] = field(default_factory=dict)
     dist_matrix: Dict[Tuple[int, int], float] = field(default_factory=dict)
     path_matrix: Dict[Tuple[int, int], List[int]] = field(default_factory=dict)
+    # bucket index -> travel-time matrix for departures inside that bucket
+    time_matrices: Dict[int, Dict[Tuple[int, int], float]] = field(default_factory=dict)
     node_index: Dict[int, int] = field(default_factory=dict)  # node_id -> position (0=depot,1..n=customers)
     all_nodes: List[int] = field(default_factory=list)
 
@@ -72,6 +89,46 @@ class VRPProblem:
         self.all_nodes = [self.depot] + [c.node_id for c in self.customers]
         self.node_index = {n: i for i, n in enumerate(self.all_nodes)}
         self._precompute_matrices()
+        if self.time_dependent:
+            self._precompute_time_buckets()
+
+    # ---- time-dependent travel times ----------------------------------
+
+    def _bucket_count(self) -> int:
+        return max(1, int(math.ceil(self.horizon_minutes / self.bucket_minutes)))
+
+    def bucket_for(self, depart_at: float) -> int:
+        """
+        Which time bucket a departure falls in.
+
+        Departures past the horizon are clamped to the last bucket rather than
+        wrapping: a vehicle running late is still in evening traffic, not back
+        in the morning.
+        """
+        if depart_at <= 0:
+            return 0
+        return min(int(depart_at // self.bucket_minutes), self._bucket_count() - 1)
+
+    def _precompute_time_buckets(self):
+        """
+        One travel-time matrix per bucket, each priced at that bucket's midpoint.
+
+        Bucketing rather than recomputing per departure keeps this tractable:
+        the alternative is a Dijkstra per (source, departure time) pair, which
+        the solver would pay for on every fitness evaluation.
+        """
+        G = self.net.graph
+        for b in range(self._bucket_count()):
+            mid = (b + 0.5) * self.bucket_minutes
+            matrix: Dict[Tuple[int, int], float] = {}
+            for src in self.all_nodes:
+                times, _ = nx.single_source_dijkstra(
+                    G, src,
+                    weight=lambda u, v, d, _t=mid: self.net.travel_time(u, v, current_time=_t),
+                )
+                for dst in self.all_nodes:
+                    matrix[(src, dst)] = 0.0 if dst == src else times.get(dst, float("inf"))
+            self.time_matrices[b] = matrix
 
     def _precompute_matrices(self, current_time: Optional[float] = None):
         """
@@ -113,7 +170,16 @@ class VRPProblem:
             return [a]
         return self.path_matrix.get((a, b), [a, b])
 
-    def travel_time(self, a: int, b: int) -> float:
+    def travel_time(self, a: int, b: int, depart_at: Optional[float] = None) -> float:
+        """
+        Travel time from a to b, optionally for a vehicle leaving at `depart_at`
+        minutes into the operating day.
+
+        With time-dependence off, or no departure time supplied, this is the
+        static matrix lookup it always was.
+        """
+        if self.time_dependent and depart_at is not None and self.time_matrices:
+            return self.time_matrices[self.bucket_for(depart_at)][(a, b)]
         return self.time_matrix[(a, b)]
 
     def travel_distance(self, a: int, b: int) -> float:
@@ -150,6 +216,8 @@ def generate_synthetic_vrp(
     window_length_range: Tuple[float, float] = (60, 180),
     service_time: float = 10.0,
     seed: int = 1,
+    time_dependent: bool = False,
+    bucket_minutes: float = 30.0,
 ) -> VRPProblem:
     rng = random.Random(seed)
     all_graph_nodes = list(net.graph.nodes())
@@ -182,6 +250,9 @@ def generate_synthetic_vrp(
     return VRPProblem(
         net=net, depot=depot, customers=customers,
         vehicle_capacity=vehicle_capacity, n_vehicles=n_vehicles,
+        time_dependent=time_dependent,
+        bucket_minutes=bucket_minutes,
+        horizon_minutes=horizon,
     )
 
 
@@ -249,7 +320,9 @@ def evaluate_solution(
         current_node = problem.depot
         current_time = 0.0
         for node_id in route:
-            travel_t = problem.travel_time(current_node, node_id)
+            # Priced at the moment the vehicle actually leaves, so a leg driven
+            # through rush hour costs more than the same leg at midday.
+            travel_t = problem.travel_time(current_node, node_id, depart_at=current_time)
             travel_d = problem.travel_distance(current_node, node_id)
 
             if not np.isfinite(travel_t):
@@ -278,7 +351,7 @@ def evaluate_solution(
             current_node = node_id
 
         # return to depot
-        back_t = problem.travel_time(current_node, problem.depot)
+        back_t = problem.travel_time(current_node, problem.depot, depart_at=current_time)
         back_d = problem.travel_distance(current_node, problem.depot)
         if np.isfinite(back_t):
             total_distance += back_d
