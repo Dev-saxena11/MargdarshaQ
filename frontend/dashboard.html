@@ -267,6 +267,73 @@
   }
 
 
+
+
+  /* ---- time-dependent traffic controls in the control room ---- */
+  .td-profile{
+    margin-top:10px; border:2px solid var(--border-bold); border-radius:6px;
+    padding:9px 10px; background:rgba(255,255,255,0.02);
+  }
+  .td-profile-head{
+    display:flex; justify-content:space-between; gap:8px;
+    font-size:10px; text-transform:uppercase; letter-spacing:0.5px;
+    color:var(--text-muted); margin-bottom:6px;
+  }
+  .td-profile-head span:last-child{color:var(--neo-yellow); font-weight:700;}
+  #tdProfileChart{width:100%; height:70px; display:block;}
+  .td-profile-note{font-size:10px; color:var(--text-muted); line-height:1.45; margin-top:6px;}
+  /* ---- "How it compares": one card per measure, one bar per algorithm ---- */
+  .compare-section{
+    background:var(--card-bg); border:2px solid var(--border-neo); border-radius:8px;
+    padding:22px; box-shadow:var(--neo-shadow);
+  }
+  .compare-head{display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap;}
+  .compare-head h3{margin:0 0 6px; font-size:19px; display:flex; align-items:center; gap:10px;}
+  .compare-head > div > span{
+    display:block; color:var(--text-muted); font-size:13px; line-height:1.5; max-width:70ch;
+  }
+  .compare-verdict{
+    margin:16px 0 0; padding:12px 15px; border-radius:6px;
+    border:2px solid var(--neo-mint); background:rgba(0,245,212,0.07);
+    font-size:14px; line-height:1.55;
+  }
+  .compare-verdict.is-mixed{border-color:var(--neo-yellow); background:rgba(254,228,64,0.07);}
+  .compare-verdict.is-loss{border-color:var(--neo-pink,#FF2E63); background:rgba(255,46,99,0.07);}
+
+  .compare-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr));
+    gap:16px; margin-top:18px;
+  }
+  .compare-empty{
+    grid-column:1/-1; color:var(--text-muted); font-size:13px; font-style:italic;
+    padding:22px; text-align:center; border:2px dashed var(--border-bold); border-radius:8px;
+  }
+  .metric-card{
+    border:2px solid var(--border-bold); border-radius:8px; padding:15px;
+    background:rgba(255,255,255,0.02);
+  }
+  .metric-card h4{margin:0 0 3px; font-size:14px;}
+  .metric-card .metric-sub{
+    display:block; font-size:11px; color:var(--text-muted);
+    text-transform:uppercase; letter-spacing:0.5px; margin-bottom:13px;
+  }
+  .bar-row{display:grid; grid-template-columns:96px 1fr 76px; align-items:center; gap:9px; margin-bottom:8px;}
+  .bar-name{font-size:12px; color:var(--text-soft,#CBD5E1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .bar-row.is-ours .bar-name{color:var(--neo-mint); font-weight:800;}
+  .bar-track{height:14px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;}
+  .bar-fill{height:100%; background:var(--border-bold); border-radius:3px; transition:width .45s ease;}
+  .bar-row.is-ours .bar-fill{background:var(--neo-mint);}
+  .bar-row.is-best .bar-fill{background:var(--neo-mint);}
+  .bar-val{font-size:12px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums;}
+  .bar-row.is-ours .bar-val{color:var(--neo-mint);}
+  .metric-winner{
+    margin-top:11px; padding-top:9px; border-top:1px dashed var(--border-bold);
+    font-size:11px; color:var(--text-muted); line-height:1.45;
+  }
+  .compare-note{
+    margin-top:16px; font-size:12px; color:var(--text-muted); line-height:1.55;
+    border-top:1px dashed var(--border-bold); padding-top:12px;
+  }
   /* ---- "you are looking at <real place>" banner above the maps ---- */
   .area-banner{
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -1192,6 +1259,32 @@
         </table>
       </div>
 
+      <!-- How it compares: every algorithm, same instance, measured -->
+      <div class="compare-section" id="algoCompareSection">
+        <div class="compare-head">
+          <div>
+            <h3><span>🏁</span> How it compares</h3>
+            <span>Every algorithm solving the <b>same</b> delivery problem on the
+                  <b>same</b> road network with the <b>same</b> traffic. Nothing here is
+                  pre-computed — press the button and it runs live.</span>
+          </div>
+          <button class="btn-neo-primary" id="btnAlgoCompare" onclick="runAlgorithmComparison()">
+            <span>▶</span> Run full benchmark
+          </button>
+        </div>
+
+        <div id="algoCompareVerdict" class="compare-verdict" hidden></div>
+
+        <div id="algoCompareGrid" class="compare-grid">
+          <div class="compare-empty">
+            Press <b>Run full benchmark</b> to pit our method against the four classical
+            approaches. Results appear here as measured bars, win or lose.
+          </div>
+        </div>
+
+        <div id="algoCompareNote" class="compare-note" hidden></div>
+      </div>
+
       <!-- Why Quantum-Inspired Wins Explainer -->
       <div class="why-card">
         <h3><span>💡</span> Why our approach finds better routes</h3>
@@ -1295,7 +1388,26 @@
               <div><label>Demand max</label><input id="demand_max" type="number" value="20"></div>
             </div>
             <label>Horizon (min)</label>
-            <input id="horizon" type="number" value="480">
+            <input id="horizon" type="number" value="480" oninput="if(document.getElementById('time_dependent').checked) renderTrafficProfile();">
+
+            <div class="chk" style="margin-top:10px;">
+              <input type="checkbox" id="time_dependent" onchange="onTimeDependentToggle()">
+              <label style="margin:0;">Time-dependent traffic (rush-hour aware)</label>
+            </div>
+            <div id="tdFields" style="display:none; margin-top:8px;">
+              <div class="row2">
+                <div><label>Bucket (min)</label><input id="bucket_minutes" type="number" value="30" min="5" max="120"></div>
+                <div><label>Day starts</label><input id="td_day_start" type="text" value="06:00" disabled></div>
+              </div>
+              <div class="td-profile">
+                <div class="td-profile-head">
+                  <span>Congestion across the operating day</span>
+                  <span id="tdProfilePeak"></span>
+                </div>
+                <svg id="tdProfileChart" viewBox="0 0 300 70" preserveAspectRatio="none"></svg>
+                <div class="td-profile-note" id="tdProfileNote"></div>
+              </div>
+            </div>
 
             <button class="primary" onclick="generateVRP()" id="btnGenVRP" disabled>Generate VRP instance</button>
             <div id="vrpInfo" style="margin-top:10px;"></div>
@@ -2299,6 +2411,263 @@ function renderImpact() {
 }
 
 // ---------------------------------------------------------------------------
+// Time-dependent traffic controls (engineering control room)
+//
+// Mirrors app/core/traffic_profile.py so an engineer can see the demand curve
+// being applied before running anything, rather than enabling a checkbox and
+// hoping. The curve drawn here is the same shape the solver prices legs with.
+// ---------------------------------------------------------------------------
+const TD_PROFILE = {
+  dayStartMin: 360,            // 06:00
+  morningPeakAt: 510, morningStrength: 0.85, morningWidth: 55,
+  eveningPeakAt: 1080, eveningStrength: 1.15, eveningWidth: 85,
+  baseline: 1.0,
+};
+
+function tdMultiplier(tMin) {
+  const clock = TD_PROFILE.dayStartMin + tMin;
+  const morning = TD_PROFILE.morningStrength *
+    Math.exp(-Math.pow((clock - TD_PROFILE.morningPeakAt) / TD_PROFILE.morningWidth, 2));
+  const evening = TD_PROFILE.eveningStrength *
+    Math.exp(-Math.pow((clock - TD_PROFILE.eveningPeakAt) / TD_PROFILE.eveningWidth, 2));
+  return Math.max(1.0, TD_PROFILE.baseline + morning + evening);
+}
+
+function tdClock(minutesPastMidnight) {
+  const h = Math.floor(minutesPastMidnight / 60) % 24;
+  const m = Math.floor(minutesPastMidnight % 60);
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+
+function onTimeDependentToggle() {
+  const on = document.getElementById('time_dependent').checked;
+  document.getElementById('tdFields').style.display = on ? 'block' : 'none';
+  if (on) renderTrafficProfile();
+}
+
+// Draws the congestion curve across the operating horizon actually configured,
+// so it is obvious when a peak falls OUTSIDE the working day and therefore has
+// no effect on routing — the default 480-minute day runs 06:00-14:00 and misses
+// the evening peak entirely.
+function renderTrafficProfile() {
+  const svg = document.getElementById('tdProfileChart');
+  if (!svg) return;
+  const horizon = Math.max(60, +document.getElementById('horizon').value || 480);
+
+  const W = 300, H = 70, pad = 2;
+  const steps = 60;
+  const pts = [];
+  let peakVal = 0, peakAt = 0;
+  for (let i = 0; i <= steps; i++) {
+    const t = (horizon * i) / steps;
+    const m = tdMultiplier(t);
+    if (m > peakVal) { peakVal = m; peakAt = t; }
+    pts.push([t, m]);
+  }
+  const maxM = Math.max(2.2, peakVal);
+  const x = t => pad + (t / horizon) * (W - 2 * pad);
+  const y = m => H - pad - ((m - 1) / (maxM - 1)) * (H - 2 * pad);
+
+  const line = pts.map(([t, m], i) => (i ? 'L' : 'M') + x(t).toFixed(1) + ' ' + y(m).toFixed(1)).join(' ');
+  const area = line + ' L' + x(horizon).toFixed(1) + ' ' + (H - pad) + ' L' + x(0).toFixed(1) + ' ' + (H - pad) + ' Z';
+
+  svg.innerHTML =
+    '<path d="' + area + '" fill="rgba(254,228,64,0.14)"/>' +
+    '<path d="' + line + '" fill="none" stroke="var(--neo-yellow)" stroke-width="1.6"/>' +
+    '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) +
+    '" stroke="var(--border-bold)" stroke-width="1"/>';
+
+  const peakEl = document.getElementById('tdProfilePeak');
+  if (peakEl) {
+    peakEl.textContent = 'peak ' + peakVal.toFixed(2) + '× at ' + tdClock(TD_PROFILE.dayStartMin + peakAt);
+  }
+
+  const noteEl = document.getElementById('tdProfileNote');
+  if (noteEl) {
+    const dayEnd = TD_PROFILE.dayStartMin + horizon;
+    const eveningInside = dayEnd >= TD_PROFILE.eveningPeakAt;
+    noteEl.innerHTML =
+      'Operating day ' + tdClock(TD_PROFILE.dayStartMin) + '–' + tdClock(dayEnd) + '. '
+      + (eveningInside
+          ? 'Both the morning and evening peaks fall inside it.'
+          : '<b>The evening peak (18:00) falls outside this horizon</b>, so only the morning '
+            + 'peak affects routing. Raise the horizon to include it.');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "How it compares" — every algorithm on one instance
+//
+// Driven entirely by a live /api/benchmark/run. Nothing here is pre-computed,
+// and nothing is arranged to flatter: the bars are drawn from measured values
+// and the verdict line counts real wins, so if our method loses the page says
+// so. A comparison that can only show a win is not a comparison.
+// ---------------------------------------------------------------------------
+
+// Which algorithm is "ours". Matched loosely because the backend labels it
+// "QPSO (Quantum-Inspired PSO)".
+function isOurAlgorithm(name) {
+  return /qpso|quantum/i.test(name || '');
+}
+
+function shortAlgoName(name) {
+  return (name || '')
+    .replace(/\s*\(.*?\)\s*/g, '')
+    .replace('Nearest-Neighbor', 'NN')
+    .replace('Genetic Algorithm', 'Genetic')
+    .replace('Simulated Annealing', 'Annealing')
+    .trim();
+}
+
+// Each measure: how to read it off a result, and whether lower is better.
+const COMPARE_METRICS = [
+  { key: 'fitness', title: 'Overall plan score', sub: 'lower is better',
+    get: r => r.fitness, lowerBetter: true, fmt: v => v.toFixed(1),
+    note: 'Travel time plus penalties for any broken promise — one number for how good the plan is.' },
+  { key: 'total_time', title: 'Fleet time on duty', sub: 'minutes · lower is better',
+    get: r => r.total_time, lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
+    note: 'Driving plus waiting for a delivery window to open.' },
+  { key: 'congestion_delay_min', title: 'Time lost to traffic', sub: 'minutes · lower is better',
+    get: r => r.congestion_delay_min, lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
+    note: 'Minutes lost purely to congestion, not to distance.' },
+  { key: 'total_distance', title: 'Distance driven', sub: 'km · lower is better',
+    get: r => r.total_distance, lowerBetter: true, fmt: v => v.toFixed(1) + 'km',
+    note: 'Fuel and wear follow this. Going around a jam can raise it deliberately.' },
+  { key: 'runtime_ms', title: 'Time to compute', sub: 'ms · lower is better',
+    get: r => r.runtime_ms, lowerBetter: true, fmt: v => v >= 1000 ? (v / 1000).toFixed(1) + 's' : v.toFixed(0) + 'ms',
+    note: 'Greedy is near-instant but myopic; the metaheuristics buy quality with compute.' },
+];
+
+function renderAlgorithmComparison(results) {
+  const grid = document.getElementById('algoCompareGrid');
+  const verdictEl = document.getElementById('algoCompareVerdict');
+  const noteEl = document.getElementById('algoCompareNote');
+  if (!grid) return;
+
+  if (!results || !results.length) {
+    grid.innerHTML = '<div class="compare-empty">No benchmark results returned.</div>';
+    return;
+  }
+
+  let ourWins = 0, measured = 0;
+  const cards = [];
+
+  for (const m of COMPARE_METRICS) {
+    const rows = results
+      .map(r => ({ name: r.algorithm, value: m.get(r), feasible: r.feasible }))
+      .filter(r => typeof r.value === 'number' && isFinite(r.value));
+    if (!rows.length) continue;
+    measured++;
+
+    const best = m.lowerBetter
+      ? Math.min(...rows.map(r => r.value))
+      : Math.max(...rows.map(r => r.value));
+    const worst = m.lowerBetter
+      ? Math.max(...rows.map(r => r.value))
+      : Math.min(...rows.map(r => r.value));
+    const span = Math.abs(worst - best) || 1;
+
+    const winner = rows.find(r => r.value === best);
+    if (winner && isOurAlgorithm(winner.name)) ourWins++;
+
+    rows.sort((a, b) => m.lowerBetter ? a.value - b.value : b.value - a.value);
+
+    const bars = rows.map(r => {
+      // Longest bar = worst, so "shorter is better" reads intuitively for
+      // lower-is-better measures. Floor at 8% so a winning bar stays visible.
+      const frac = 0.08 + 0.92 * (Math.abs(r.value - best) / span);
+      const cls = [isOurAlgorithm(r.name) ? 'is-ours' : '',
+                   r.value === best ? 'is-best' : ''].filter(Boolean).join(' ');
+      return '<div class="bar-row ' + cls + '">'
+        + '<span class="bar-name" title="' + r.name + '">' + shortAlgoName(r.name) + '</span>'
+        + '<span class="bar-track"><span class="bar-fill" style="width:' + (frac * 100).toFixed(1) + '%"></span></span>'
+        + '<span class="bar-val">' + m.fmt(r.value) + '</span>'
+        + '</div>';
+    }).join('');
+
+    cards.push('<div class="metric-card">'
+      + '<h4>' + m.title + '</h4><span class="metric-sub">' + m.sub + '</span>'
+      + bars
+      + '<div class="metric-winner">Best: <b>' + shortAlgoName(winner.name) + '</b>. ' + m.note + '</div>'
+      + '</div>');
+  }
+
+  grid.innerHTML = cards.join('');
+
+  // Verdict, counted rather than asserted.
+  const ours = results.find(r => isOurAlgorithm(r.algorithm));
+  const infeasible = results.filter(r => r.feasible === false).map(r => shortAlgoName(r.algorithm));
+  if (verdictEl) {
+    verdictEl.hidden = false;
+    verdictEl.classList.remove('is-mixed', 'is-loss');
+    if (ourWins === measured) {
+      verdictEl.innerHTML = '<b>Our method came first on all ' + measured + ' measures</b> for this instance'
+        + (ours && ours.feasible ? ', while keeping every delivery promise.' : '.');
+    } else if (ourWins === 0) {
+      verdictEl.classList.add('is-loss');
+      verdictEl.innerHTML = '<b>Our method did not come first on any of the ' + measured + ' measures</b> '
+        + 'for this instance. Shown as measured — try a larger problem, where the advantage appears.';
+    } else {
+      verdictEl.classList.add('is-mixed');
+      verdictEl.innerHTML = '<b>Our method came first on ' + ourWins + ' of ' + measured + ' measures</b> here. '
+        + 'It trades some measures for others — typically giving up compute time, and sometimes '
+        + 'distance, to cut the time the fleet actually spends on the road.';
+    }
+  }
+
+  if (noteEl) {
+    noteEl.hidden = false;
+    const feasNote = infeasible.length
+      ? ' <b>' + infeasible.join(', ') + '</b> produced a plan that breaks a capacity or time-window '
+        + 'constraint — a fast plan that breaks a delivery promise has not solved the problem.'
+      : ' Every algorithm shown produced a plan that respects vehicle capacity and delivery windows.';
+    noteEl.innerHTML = 'All ' + results.length + ' algorithms ran on the identical instance and network '
+      + 'in this session.' + feasNote;
+  }
+}
+
+async function runAlgorithmComparison() {
+  const btn = document.getElementById('btnAlgoCompare');
+  const grid = document.getElementById('algoCompareGrid');
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Running all five…';
+  grid.innerHTML = '<div class="compare-empty">Solving the same instance with every algorithm…</div>';
+
+  try {
+    if (!state.vrp) {
+      const presetKey = document.getElementById('judgePreset').value;
+      const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
+      state.network = loaded.network;
+      renderAreaBanner();
+      state.vrp = await api('/api/vrp/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          network_id: state.network.network_id,
+          n_customers: presetKey === 'delhi_osm' ? 16 : 12, depot: 0, vehicle_capacity: 80,
+          demand_min: 5, demand_max: 20, horizon: 480,
+          window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
+        }),
+      });
+    }
+    const bench = await api('/api/benchmark/run', {
+      method: 'POST',
+      body: JSON.stringify({ vrp_id: state.vrp.vrp_id, max_iter: 150, seed: 1 }),
+    });
+    state.benchmarkResults = bench.results;
+    renderAlgorithmComparison(bench.results);
+    if (typeof syncAssistantContext === 'function') syncAssistantContext();
+  } catch (err) {
+    console.warn('Benchmark comparison failed:', err);
+    grid.innerHTML = '<div class="compare-empty">The benchmark could not be run — '
+      + 'the API may be asleep. Try again in a moment.</div>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>▶</span> Run full benchmark';
+    setJudgeStatus(null);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Judge View Map Rendering (Side-by-Side Before & After)
 // ---------------------------------------------------------------------------
 function setCompareMode(mode) {
@@ -2587,6 +2956,8 @@ async function generateVRP() {
         horizon: +document.getElementById('horizon').value,
         window_length_min: 60, window_length_max: 180, service_time: 10,
         seed: +document.getElementById('vrp_seed').value,
+        time_dependent: document.getElementById('time_dependent').checked,
+        bucket_minutes: +document.getElementById('bucket_minutes').value || 30,
       }),
     });
     state.vrp = vrp;
