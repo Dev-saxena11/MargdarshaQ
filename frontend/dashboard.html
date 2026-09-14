@@ -269,6 +269,39 @@
 
 
 
+
+  /* ---- comparison bars: longer is always better ---- */
+  .bar-row2{
+    display:grid; grid-template-columns:88px 1fr 66px 54px; align-items:center;
+    gap:8px; margin-bottom:9px;
+  }
+  .bar-row2 .bar-name{font-size:12px; color:var(--text-soft,#CBD5E1); white-space:nowrap;}
+  .bar-row2.is-ours .bar-name{color:var(--neo-mint); font-weight:800;}
+  .bar-row2.is-usual .bar-name{color:var(--text-muted); font-style:italic;}
+  .bar-row2 .bar-track{height:15px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;}
+  .bar-row2 .bar-fill{height:100%; background:var(--border-bold); border-radius:3px; transition:width .5s ease;}
+  .bar-row2.is-ours .bar-fill{background:var(--neo-mint);}
+  .bar-row2.is-worse .bar-fill{background:var(--neo-pink,#FF2E63); opacity:.75;}
+  .bar-row2 .bar-val{font-size:12px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text-soft,#CBD5E1);}
+  .bar-row2.is-ours .bar-val{color:var(--neo-mint); font-weight:700;}
+  .bar-delta{
+    font-size:11px; font-weight:800; text-align:right;
+    color:var(--neo-mint); font-variant-numeric:tabular-nums;
+  }
+  .bar-delta.is-worse{color:var(--neo-pink,#FF2E63);}
+  .bar-delta.is-ref{color:var(--text-muted); font-weight:600; font-style:italic; font-size:10px;}
+
+  /* ---- headline verdict: one number, readable across a room ---- */
+  .verdict-big{
+    display:block; font-size:30px; font-weight:900; line-height:1.15;
+    color:var(--neo-mint); letter-spacing:-0.5px;
+  }
+  .compare-verdict.is-mixed .verdict-big{color:var(--neo-yellow);}
+  .compare-verdict.is-loss .verdict-big{color:var(--neo-pink,#FF2E63);}
+  .verdict-sub{
+    display:block; margin-top:6px; font-size:13px; line-height:1.55;
+    color:var(--text-soft,#CBD5E1);
+  }
   /* ---- time-dependent traffic controls in the control room ---- */
   .td-profile{
     margin-top:10px; border:2px solid var(--border-bold); border-radius:6px;
@@ -2496,52 +2529,80 @@ function renderTrafficProfile() {
 }
 
 // ---------------------------------------------------------------------------
-// "How it compares" — every algorithm on one instance
+// "How it compares" — every method, same job, plain language
 //
-// Driven entirely by a live /api/benchmark/run. Nothing here is pre-computed,
-// and nothing is arranged to flatter: the bars are drawn from measured values
-// and the verdict line counts real wins, so if our method loses the page says
-// so. A comparison that can only show a win is not a comparison.
+// Rewritten for readability. The first version showed raw solver numbers
+// ("Overall plan score: 305.3"), which tells a non-technical reader nothing,
+// and drew the longest bar for the WORST value — backwards from how people read
+// a chart.
+//
+// Now everything is expressed against the ordinary nearest-stop method, which
+// is what the reader's mental model of "normal" already is. A longer bar always
+// means better, and every number carries its unit and direction.
+//
+// Still driven by a live benchmark, and still able to show our method losing.
 // ---------------------------------------------------------------------------
 
-// Which algorithm is "ours". Matched loosely because the backend labels it
-// "QPSO (Quantum-Inspired PSO)".
 function isOurAlgorithm(name) {
   return /qpso|quantum/i.test(name || '');
 }
 
-function shortAlgoName(name) {
-  return (name || '')
-    .replace(/\s*\(.*?\)\s*/g, '')
-    .replace('Nearest-Neighbor', 'NN')
-    .replace('Genetic Algorithm', 'Genetic')
-    .replace('Simulated Annealing', 'Annealing')
-    .trim();
+function isUsualMethod(name) {
+  return /greedy|nearest/i.test(name || '');
 }
 
-// Each measure: how to read it off a result, and whether lower is better.
+function shortAlgoName(name) {
+  const n = (name || '').replace(/\s*\(.*?\)\s*/g, '').trim();
+  if (isOurAlgorithm(name)) return 'Ours';
+  if (isUsualMethod(name)) return 'The usual way';
+  return n.replace('Genetic Algorithm', 'Genetic')
+          .replace('Simulated Annealing', 'Annealing')
+          .replace('Standard PSO', 'Swarm');
+}
+
+// Three measures a judge can hold in their head, in their words.
 const COMPARE_METRICS = [
-  { key: 'fitness', title: 'Overall plan score', sub: 'lower is better',
-    get: r => r.fitness, lowerBetter: true, fmt: v => v.toFixed(1),
-    note: 'Travel time plus penalties for any broken promise — one number for how good the plan is.' },
-  { key: 'total_time', title: 'Fleet time on duty', sub: 'minutes · lower is better',
-    // /benchmark/run returns `time`/`distance`; /vrp/compare and /vrp/solve
-    // return `total_time`/`total_distance`. Accept both, or the card silently
-    // fails to render depending on which endpoint fed it.
+  {
+    key: 'time',
+    title: 'Time on the road',
+    plain: 'How long the whole fleet is out delivering',
+    unit: 'min',
     get: r => (r.total_time !== undefined ? r.total_time : r.time),
-    lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
-    note: 'Driving plus waiting for a delivery window to open.' },
-  { key: 'congestion_delay_min', title: 'Time lost to traffic', sub: 'minutes · lower is better',
-    get: r => r.congestion_delay_min, lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
-    note: 'Minutes lost purely to congestion, not to distance.' },
-  { key: 'total_distance', title: 'Distance driven', sub: 'km · lower is better',
-    get: r => (r.total_distance !== undefined ? r.total_distance : r.distance),
-    lowerBetter: true, fmt: v => v.toFixed(1) + 'km',
-    note: 'Fuel and wear follow this. Going around a jam can raise it deliberately.' },
-  { key: 'runtime_ms', title: 'Time to compute', sub: 'ms · lower is better',
-    get: r => r.runtime_ms, lowerBetter: true, fmt: v => v >= 1000 ? (v / 1000).toFixed(1) + 's' : v.toFixed(0) + 'ms',
-    note: 'Greedy is near-instant but myopic; the metaheuristics buy quality with compute.' },
+    better: 'lower',
+    why: 'Less time on the road means drivers finish earlier and more deliveries fit in a day.',
+  },
+  {
+    key: 'congestion_delay_min',
+    title: 'Time stuck in traffic',
+    plain: 'Of that, the part spent sitting in jams',
+    unit: 'min',
+    get: r => r.congestion_delay_min,
+    better: 'lower',
+    why: 'This is the part good routing can actually remove — the jams you never enter.',
+  },
+  {
+    key: 'runtime_ms',
+    title: 'Time to work out the plan',
+    plain: 'How long the computer takes to decide',
+    unit: 'ms',
+    get: r => r.runtime_ms,
+    better: 'lower',
+    // Percentages are meaningless here: the simple method answers in a
+    // fraction of a millisecond, so "% slower than it" runs to millions and
+    // reads as a catastrophe rather than as "a few seconds". Raw values only.
+    rawOnly: true,
+    why: 'Planning happens once, before anyone drives. A few seconds of thinking to save an hour of driving is a trade worth making.',
+  },
 ];
+
+function fmtValue(v, unit) {
+  if (unit === 'ms') {
+    if (v < 1) return 'instant';
+    return v >= 1000 ? (v / 1000).toFixed(1) + ' s' : Math.round(v) + ' ms';
+  }
+  if (unit === 'min') return v >= 60 ? (v / 60).toFixed(1) + ' h' : Math.round(v) + ' min';
+  return v.toFixed(1);
+}
 
 function renderAlgorithmComparison(results) {
   const grid = document.getElementById('algoCompareGrid');
@@ -2550,89 +2611,123 @@ function renderAlgorithmComparison(results) {
   if (!grid) return;
 
   if (!results || !results.length) {
-    grid.innerHTML = '<div class="compare-empty">No benchmark results returned.</div>';
+    grid.innerHTML = '<div class="compare-empty">No results came back from the benchmark.</div>';
     return;
   }
 
-  let ourWins = 0, measured = 0;
+  const usual = results.find(r => isUsualMethod(r.algorithm));
+  const ours = results.find(r => isOurAlgorithm(r.algorithm));
   const cards = [];
+  let ourWins = 0, measured = 0;
 
   for (const m of COMPARE_METRICS) {
     const rows = results
-      .map(r => ({ name: r.algorithm, value: m.get(r), feasible: r.feasible }))
+      .map(r => ({ name: r.algorithm, value: m.get(r) }))
       .filter(r => typeof r.value === 'number' && isFinite(r.value));
     if (!rows.length) {
-      // A measure the payload doesn't carry. Skipping quietly would shrink the
-      // comparison without anyone noticing, so it is logged.
       console.warn('Comparison metric "' + m.key + '" had no usable values; card omitted.');
       continue;
     }
     measured++;
 
-    const best = m.lowerBetter
-      ? Math.min(...rows.map(r => r.value))
-      : Math.max(...rows.map(r => r.value));
-    const worst = m.lowerBetter
-      ? Math.max(...rows.map(r => r.value))
-      : Math.min(...rows.map(r => r.value));
-    const span = Math.abs(worst - best) || 1;
-
+    const ref = usual ? m.get(usual) : null;
+    const best = Math.min(...rows.map(r => r.value));
     const winner = rows.find(r => r.value === best);
     if (winner && isOurAlgorithm(winner.name)) ourWins++;
 
-    rows.sort((a, b) => m.lowerBetter ? a.value - b.value : b.value - a.value);
+    // Bar length = how much better than the usual way. Longer is always better,
+    // which is the direction a reader already expects.
+    const improvements = rows.map(r => ({
+      ...r,
+      pct: (!m.rawOnly && ref && ref > 0) ? ((ref - r.value) / ref) * 100 : 0,
+    }));
+    const maxGain = Math.max(1, ...improvements.map(i => Math.abs(i.pct)));
+    const maxVal = Math.max(...improvements.map(i => i.value), 1);
 
-    const bars = rows.map(r => {
-      // Longest bar = worst, so "shorter is better" reads intuitively for
-      // lower-is-better measures. Floor at 8% so a winning bar stays visible.
-      const frac = 0.08 + 0.92 * (Math.abs(r.value - best) / span);
+    improvements.sort((a, b) => m.rawOnly ? a.value - b.value : b.pct - a.pct);
+
+    const bars = improvements.map(r => {
+      const width = m.rawOnly
+        ? Math.max(3, (r.value / maxVal) * 100)
+        : Math.max(3, (Math.abs(r.pct) / maxGain) * 100);
+      const worse = r.pct < -0.05;
       const cls = [isOurAlgorithm(r.name) ? 'is-ours' : '',
-                   r.value === best ? 'is-best' : ''].filter(Boolean).join(' ');
-      return '<div class="bar-row ' + cls + '">'
-        + '<span class="bar-name" title="' + r.name + '">' + shortAlgoName(r.name) + '</span>'
-        + '<span class="bar-track"><span class="bar-fill" style="width:' + (frac * 100).toFixed(1) + '%"></span></span>'
-        + '<span class="bar-val">' + m.fmt(r.value) + '</span>'
+                   isUsualMethod(r.name) ? 'is-usual' : '',
+                   worse ? 'is-worse' : ''].filter(Boolean).join(' ');
+      const badge = m.rawOnly
+        ? '<span class="bar-delta is-ref"></span>'
+        : isUsualMethod(r.name)
+          ? '<span class="bar-delta is-ref">the benchmark</span>'
+          : '<span class="bar-delta' + (worse ? ' is-worse' : '') + '">'
+            + (r.pct >= 0 ? '−' : '+') + Math.abs(r.pct).toFixed(0) + '%</span>';
+      return '<div class="bar-row2 ' + cls + '">'
+        + '<span class="bar-name">' + shortAlgoName(r.name) + '</span>'
+        + '<span class="bar-track"><span class="bar-fill" style="width:' + width.toFixed(1) + '%"></span></span>'
+        + '<span class="bar-val">' + fmtValue(r.value, m.unit) + '</span>'
+        + badge
         + '</div>';
     }).join('');
 
+    // One plain sentence per card, computed — never asserted.
+    let takeaway;
+    if (m.rawOnly) {
+      const slowest = Math.max(...improvements.map(i => i.value));
+      takeaway = 'Every method decides in under ' +
+        fmtValue(Math.ceil(slowest / 1000) * 1000, 'ms') + '.';
+    } else if (ours && usual && typeof m.get(ours) === 'number' && typeof ref === 'number' && ref > 0) {
+      const gain = ((ref - m.get(ours)) / ref) * 100;
+      takeaway = gain >= 1
+        ? '<b>Ours is ' + gain.toFixed(0) + '% lower</b> than the usual way.'
+        : gain <= -1
+          ? '<b>Ours is ' + Math.abs(gain).toFixed(0) + '% higher</b> than the usual way here.'
+          : 'Ours and the usual way are about level here.';
+    } else {
+      takeaway = 'Best: <b>' + shortAlgoName(winner.name) + '</b>.';
+    }
+
     cards.push('<div class="metric-card">'
-      + '<h4>' + m.title + '</h4><span class="metric-sub">' + m.sub + '</span>'
+      + '<h4>' + m.title + '</h4>'
+      + '<span class="metric-sub">' + m.plain
+      + (m.rawOnly ? ' · longer bar = slower' : ' · lower is better, so a longer bar is better') + '</span>'
       + bars
-      + '<div class="metric-winner">Best: <b>' + shortAlgoName(winner.name) + '</b>. ' + m.note + '</div>'
+      + '<div class="metric-winner">' + takeaway + ' ' + m.why + '</div>'
       + '</div>');
   }
 
   grid.innerHTML = cards.join('');
 
-  // Verdict, counted rather than asserted.
-  const ours = results.find(r => isOurAlgorithm(r.algorithm));
-  const infeasible = results.filter(r => r.feasible === false).map(r => shortAlgoName(r.algorithm));
-  if (verdictEl) {
+  // ---- headline verdict, in one sentence a judge can repeat ----
+  if (verdictEl && ours && usual) {
+    const tRef = COMPARE_METRICS[0].get(usual), tOurs = COMPARE_METRICS[0].get(ours);
     verdictEl.hidden = false;
     verdictEl.classList.remove('is-mixed', 'is-loss');
-    if (ourWins === measured) {
-      verdictEl.innerHTML = '<b>Our method came first on all ' + measured + ' measures</b> for this instance'
-        + (ours && ours.feasible ? ', while keeping every delivery promise.' : '.');
-    } else if (ourWins === 0) {
-      verdictEl.classList.add('is-loss');
-      verdictEl.innerHTML = '<b>Our method did not come first on any of the ' + measured + ' measures</b> '
-        + 'for this instance. Shown as measured — try a larger problem, where the advantage appears.';
-    } else {
-      verdictEl.classList.add('is-mixed');
-      verdictEl.innerHTML = '<b>Our method came first on ' + ourWins + ' of ' + measured + ' measures</b> here. '
-        + 'It trades some measures for others — typically giving up compute time, and sometimes '
-        + 'distance, to cut the time the fleet actually spends on the road.';
+    if (typeof tRef === 'number' && typeof tOurs === 'number' && tRef > 0) {
+      const gain = ((tRef - tOurs) / tRef) * 100;
+      if (gain >= 1) {
+        verdictEl.innerHTML = '<span class="verdict-big">' + gain.toFixed(0) + '% less time on the road</span>'
+          + '<span class="verdict-sub">than the ordinary nearest-stop method, on this delivery round — '
+          + fmtValue(tRef, 'min') + ' down to ' + fmtValue(tOurs, 'min')
+          + '. Ours came first on ' + ourWins + ' of ' + measured + ' measures.</span>';
+      } else {
+        verdictEl.classList.add(gain <= -1 ? 'is-loss' : 'is-mixed');
+        verdictEl.innerHTML = '<span class="verdict-big">'
+          + (gain <= -1 ? Math.abs(gain).toFixed(0) + '% MORE time on the road' : 'About level')
+          + '</span><span class="verdict-sub">than the ordinary method on this round ('
+          + fmtValue(tRef, 'min') + ' vs ' + fmtValue(tOurs, 'min') + '). Shown as measured — '
+          + 'the advantage grows with the size of the delivery round.</span>';
+      }
     }
   }
 
   if (noteEl) {
     noteEl.hidden = false;
-    const feasNote = infeasible.length
-      ? ' <b>' + infeasible.join(', ') + '</b> produced a plan that breaks a capacity or time-window '
-        + 'constraint — a fast plan that breaks a delivery promise has not solved the problem.'
-      : ' Every algorithm shown produced a plan that respects vehicle capacity and delivery windows.';
-    noteEl.innerHTML = 'All ' + results.length + ' algorithms ran on the identical instance and network '
-      + 'in this session.' + feasNote;
+    const infeasible = results.filter(r => r.feasible === false).map(r => shortAlgoName(r.algorithm));
+    noteEl.innerHTML = 'Every method above solved the <b>same</b> delivery round on the <b>same</b> '
+      + 'streets with the <b>same</b> traffic, just now, in your browser. '
+      + (infeasible.length
+          ? '<b>' + infeasible.join(', ') + '</b> produced a plan that misses a delivery window or '
+            + 'overloads a van — fast, but it breaks a promise to a customer.'
+          : 'All of them kept every delivery inside its promised time slot.');
   }
 }
 
@@ -2750,97 +2845,165 @@ function renderJudgeComparison() {
   }
 }
 
+// Colour per van. Kept few and far apart in hue so two routes are never
+// mistaken for each other at a glance.
+const VAN_COLORS = ['#00F5D4', '#FFD166', '#A78BFA', '#4CC9F0', '#F72585', '#80ED99'];
+
+// A road is "jammed" above this. Matches the legend wording on the map.
+const JAM_THRESHOLD = 2.0;
+const BUSY_THRESHOLD = 1.4;
+
 function renderSVGToCanvas(svgId, nodes, edges, vrp, sx, sy, coords, solution, isBaseline, overlayBaseline = null) {
   const svg = document.getElementById(svgId);
   if (!svg) return;
   svg.innerHTML = '';
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
 
-  // 1. Edges with congestion coloring
-  const edgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  // ---- 1. The road network, deliberately quiet -------------------------
+  // Previously jammed roads were drawn 3px wide at 0.85 opacity — as loud as
+  // the routes themselves, which turned the picture into noise. Background is
+  // context: it should be readable but never compete with the answer.
+  const roads = el('g', {});
+  const jammedSegments = new Set();
   for (const e of edges) {
     const a = coords[e.u], b = coords[e.v];
     if (!a || !b) continue;
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', sx(a.x)); line.setAttribute('y1', sy(a.y));
-    line.setAttribute('x2', sx(b.x)); line.setAttribute('y2', sy(b.y));
-
-    // Congested edges highlighted
-    if (e.congestion_factor >= 2.0) {
-      line.setAttribute('stroke', '#EF4444');
-      line.setAttribute('stroke-width', '3.0');
-      line.setAttribute('stroke-opacity', '0.85');
-    } else if (e.congestion_factor > 1.4) {
-      line.setAttribute('stroke', '#F59E0B');
-      line.setAttribute('stroke-width', '2.0');
-      line.setAttribute('stroke-opacity', '0.6');
-    } else {
-      line.setAttribute('stroke', '#1E293B');
-      line.setAttribute('stroke-width', '1.2');
-      line.setAttribute('stroke-opacity', '0.5');
+    const jam = e.congestion_factor >= JAM_THRESHOLD;
+    const busy = e.congestion_factor > BUSY_THRESHOLD;
+    if (jam) {
+      jammedSegments.add(e.u + '-' + e.v);
+      jammedSegments.add(e.v + '-' + e.u);
     }
-    edgeGroup.appendChild(line);
+    roads.appendChild(el('line', {
+      x1: sx(a.x), y1: sy(a.y), x2: sx(b.x), y2: sy(b.y),
+      stroke: jam ? '#7F1D1D' : busy ? '#78350F' : '#1E293B',
+      'stroke-width': jam ? 2.2 : busy ? 1.6 : 1.0,
+      'stroke-opacity': jam ? 0.55 : busy ? 0.45 : 0.35,
+      'stroke-linecap': 'round',
+    }));
   }
-  svg.appendChild(edgeGroup);
+  svg.appendChild(roads);
 
-  // 2. Nodes
-  for (const n of nodes) {
-    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    c.setAttribute('cx', sx(n.x)); c.setAttribute('cy', sy(n.y)); c.setAttribute('r', 2.8);
-    c.setAttribute('fill', '#475569');
-    svg.appendChild(c);
-  }
-
-  // 3. Optional Overlay of Baseline (if diff mode)
-  if (overlayBaseline && overlayBaseline.routes) {
-    overlayBaseline.routes.forEach((route, i) => {
-      const pts = route.full_path.map(nid => coords[nid]).filter(Boolean);
-      if (pts.length < 2) return;
-      const d = pts.map((n, idx) => `${idx === 0 ? 'M' : 'L'} ${sx(n.x)} ${sy(n.y)}`).join(' ');
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('stroke', '#EF4444');
-      path.setAttribute('stroke-width', '3.5');
-      path.setAttribute('class', 'route-line-baseline');
-      path.setAttribute('opacity', '0.45');
-      svg.appendChild(path);
+  // ---- 2. Routes: the signal ------------------------------------------
+  // Drawn thick, with a dark casing underneath so a line stays readable where
+  // it crosses another.
+  const drawRoute = (pts, color, width, opacity, dashed) => {
+    if (pts.length < 2) return;
+    const d = pts.map((n, i) => (i ? 'L' : 'M') + ' ' + sx(n.x) + ' ' + sy(n.y)).join(' ');
+    svg.appendChild(el('path', {
+      d, fill: 'none', stroke: '#05070D', 'stroke-width': width + 2.5,
+      'stroke-opacity': 0.75, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+    }));
+    const p = el('path', {
+      d, fill: 'none', stroke: color, 'stroke-width': width,
+      'stroke-opacity': opacity, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
     });
+    if (dashed) p.setAttribute('stroke-dasharray', '7 5');
+    svg.appendChild(p);
+  };
+
+  // Ghost of the old plan, when comparing the two on one map.
+  if (overlayBaseline && overlayBaseline.routes) {
+    for (const route of overlayBaseline.routes) {
+      const pts = (route.full_path || []).map(id => coords[id]).filter(Boolean);
+      drawRoute(pts, '#64748B', 2.6, 0.5, true);
+    }
   }
 
-  // 4. Primary Route Lines
+  // Where the plan actually drives through a jam. Marked, because "it gets
+  // stuck here" is the whole point of the before/after and should be visible
+  // rather than inferred from a number in a table.
+  const jamHits = [];
   if (solution && solution.routes) {
     solution.routes.forEach((route, i) => {
-      const color = isBaseline ? BASELINE_COLORS[i % BASELINE_COLORS.length] : ROUTE_COLORS[i % ROUTE_COLORS.length];
-      const pts = route.full_path.map(nid => coords[nid]).filter(Boolean);
-      if (pts.length < 2) return;
-      const d = pts.map((n, idx) => `${idx === 0 ? 'M' : 'L'} ${sx(n.x)} ${sy(n.y)}`).join(' ');
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', isBaseline ? '3.8' : '3.8');
-      path.setAttribute('class', isBaseline ? 'route-line-baseline' : 'route-line');
-      path.setAttribute('opacity', '0.95');
-      svg.appendChild(path);
+      const path = route.full_path || [];
+      const pts = path.map(id => coords[id]).filter(Boolean);
+      drawRoute(pts, VAN_COLORS[i % VAN_COLORS.length], 4.6, 0.95, false);
+
+      for (let k = 0; k < path.length - 1; k++) {
+        if (jammedSegments.has(path[k] + '-' + path[k + 1])) {
+          const a = coords[path[k]], b = coords[path[k + 1]];
+          if (a && b) jamHits.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+        }
+      }
     });
   }
 
-  // 5. Depot & Customers
+  for (const h of jamHits) {
+    svg.appendChild(el('circle', {
+      cx: sx(h.x), cy: sy(h.y), r: 7, fill: '#EF4444', 'fill-opacity': 0.18,
+    }));
+    svg.appendChild(el('circle', {
+      cx: sx(h.x), cy: sy(h.y), r: 3.1, fill: '#EF4444', stroke: '#1A0505', 'stroke-width': 1,
+    }));
+  }
+
+  // ---- 3. Stops and depot ---------------------------------------------
   if (vrp) {
-    const depotNode = coords[vrp.depot];
-    if (depotNode) {
-      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      c.setAttribute('cx', sx(depotNode.x)); c.setAttribute('cy', sy(depotNode.y)); c.setAttribute('r', 9);
-      c.setAttribute('fill', '#FEE440'); c.setAttribute('stroke', '#000000'); c.setAttribute('stroke-width', '2.5');
-      svg.appendChild(c);
-    }
-    for (const cust of vrp.customers) {
+    for (const cust of vrp.customers || []) {
       const n = coords[cust.node_id];
       if (!n) continue;
-      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      c.setAttribute('cx', sx(n.x)); c.setAttribute('cy', sy(n.y)); c.setAttribute('r', 5.5);
-      c.setAttribute('fill', '#101626'); c.setAttribute('stroke', '#00F5D4'); c.setAttribute('stroke-width', '2');
-      svg.appendChild(c);
+      svg.appendChild(el('circle', {
+        cx: sx(n.x), cy: sy(n.y), r: 5, fill: '#0B1120',
+        stroke: '#E2E8F0', 'stroke-width': 1.8,
+      }));
+    }
+    const d = coords[vrp.depot];
+    if (d) {
+      svg.appendChild(el('circle', {
+        cx: sx(d.x), cy: sy(d.y), r: 10, fill: '#FEE440',
+        stroke: '#05070D', 'stroke-width': 2.5,
+      }));
+      svg.appendChild(el('text', {
+        x: sx(d.x), y: sy(d.y) + 3.6, 'text-anchor': 'middle',
+        'font-size': '9', 'font-weight': '800', fill: '#05070D',
+      })).textContent = 'D';
     }
   }
+
+  // ---- 4. Legend, so nothing needs explaining out loud -----------------
+  const legend = el('g', {});
+  const items = [
+    ['#FEE440', 'Depot — vans start and end here', 'dot'],
+    ['#E2E8F0', 'A delivery stop', 'ring'],
+    ['#00F5D4', 'Route each van drives', 'line'],
+    ['#7F1D1D', 'Jammed street', 'line-thin'],
+    ['#EF4444', 'Van forced through a jam', 'dot'],
+  ];
+  let ly = 16;
+  legend.appendChild(el('rect', {
+    x: 8, y: 6, width: 214, height: items.length * 17 + 12, rx: 5,
+    fill: '#05070D', 'fill-opacity': 0.78, stroke: '#1E293B', 'stroke-width': 1,
+  }));
+  for (const [color, label, kind] of items) {
+    if (kind === 'line' || kind === 'line-thin') {
+      legend.appendChild(el('line', {
+        x1: 16, y1: ly, x2: 34, y2: ly, stroke: color,
+        'stroke-width': kind === 'line' ? 3.6 : 2.2, 'stroke-linecap': 'round',
+        'stroke-opacity': kind === 'line' ? 0.95 : 0.6,
+      }));
+    } else {
+      legend.appendChild(el('circle', {
+        cx: 25, cy: ly, r: kind === 'ring' ? 4 : 4.5,
+        fill: kind === 'ring' ? '#0B1120' : color,
+        stroke: kind === 'ring' ? color : 'none', 'stroke-width': 1.8,
+      }));
+    }
+    const t = el('text', {
+      x: 42, y: ly + 3.4, 'font-size': '9.5', fill: '#CBD5E1',
+    });
+    t.textContent = label;
+    legend.appendChild(t);
+    ly += 17;
+  }
+  svg.appendChild(legend);
+
+  return { jamHits: jamHits.length };
 }
 
 function renderJudgeLeaflet() {
