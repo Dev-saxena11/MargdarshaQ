@@ -19,6 +19,8 @@ import networkx as nx
 from dataclasses import dataclass, field
 from typing import Dict, Tuple, List, Optional
 
+from app.core.traffic_profile import TrafficProfile, DEFAULT_PROFILE
+
 
 
 @dataclass
@@ -53,6 +55,11 @@ class TrafficNetwork:
     # letting the OSM loader keep real road directions.
     graph: nx.DiGraph = field(default_factory=nx.DiGraph)
     incidents: List[TrafficIncident] = field(default_factory=list)
+
+    # Time-of-day demand curve. Only consulted when a caller passes a clock to
+    # get_edge_congestion / travel_time; without one the network behaves
+    # statically, exactly as before.
+    profile: TrafficProfile = field(default_factory=lambda: DEFAULT_PROFILE)
 
     # ---------- construction helpers ----------
 
@@ -122,11 +129,12 @@ class TrafficNetwork:
                 if current_time is None or inc.is_active(current_time):
                     cong = max(cong, inc.factor)
 
-        # Time-varying rush-hour modulation (if current_time is provided)
+        # Time-of-day modulation, when the caller supplies a clock.
+        # Multiplicative rather than additive: rush hour hits an already-busy
+        # arterial harder than a quiet side street, which is how congestion
+        # actually behaves. See app/core/traffic_profile.py.
         if current_time is not None:
-            # Gaussian rush hour peak at t=120 min with std=30 min
-            rush_surge = 0.5 * np.exp(-((current_time - 120.0) / 30.0) ** 2)
-            cong += rush_surge
+            cong *= self.profile.multiplier(current_time)
 
         return max(1.0, float(cong))
 
