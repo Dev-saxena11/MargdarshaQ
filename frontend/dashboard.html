@@ -2525,13 +2525,18 @@ const COMPARE_METRICS = [
     get: r => r.fitness, lowerBetter: true, fmt: v => v.toFixed(1),
     note: 'Travel time plus penalties for any broken promise — one number for how good the plan is.' },
   { key: 'total_time', title: 'Fleet time on duty', sub: 'minutes · lower is better',
-    get: r => r.total_time, lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
+    // /benchmark/run returns `time`/`distance`; /vrp/compare and /vrp/solve
+    // return `total_time`/`total_distance`. Accept both, or the card silently
+    // fails to render depending on which endpoint fed it.
+    get: r => (r.total_time !== undefined ? r.total_time : r.time),
+    lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
     note: 'Driving plus waiting for a delivery window to open.' },
   { key: 'congestion_delay_min', title: 'Time lost to traffic', sub: 'minutes · lower is better',
     get: r => r.congestion_delay_min, lowerBetter: true, fmt: v => v.toFixed(0) + 'm',
     note: 'Minutes lost purely to congestion, not to distance.' },
   { key: 'total_distance', title: 'Distance driven', sub: 'km · lower is better',
-    get: r => r.total_distance, lowerBetter: true, fmt: v => v.toFixed(1) + 'km',
+    get: r => (r.total_distance !== undefined ? r.total_distance : r.distance),
+    lowerBetter: true, fmt: v => v.toFixed(1) + 'km',
     note: 'Fuel and wear follow this. Going around a jam can raise it deliberately.' },
   { key: 'runtime_ms', title: 'Time to compute', sub: 'ms · lower is better',
     get: r => r.runtime_ms, lowerBetter: true, fmt: v => v >= 1000 ? (v / 1000).toFixed(1) + 's' : v.toFixed(0) + 'ms',
@@ -2556,7 +2561,12 @@ function renderAlgorithmComparison(results) {
     const rows = results
       .map(r => ({ name: r.algorithm, value: m.get(r), feasible: r.feasible }))
       .filter(r => typeof r.value === 'number' && isFinite(r.value));
-    if (!rows.length) continue;
+    if (!rows.length) {
+      // A measure the payload doesn't carry. Skipping quietly would shrink the
+      // comparison without anyone noticing, so it is logged.
+      console.warn('Comparison metric "' + m.key + '" had no usable values; card omitted.');
+      continue;
+    }
     measured++;
 
     const best = m.lowerBetter
