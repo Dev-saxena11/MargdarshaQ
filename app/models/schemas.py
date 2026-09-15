@@ -86,6 +86,12 @@ class VRPGenerateRequest(BaseModel):
     seed: int = Field(1)
     time_dependent: bool = Field(False, description="Price each leg by the time of day the vehicle departs, so routes account for rush hour")
     bucket_minutes: float = Field(30.0, ge=5.0, le=120.0, description="Width of each time bucket when time_dependent is on")
+    customer_nodes: Optional[List[int]] = Field(
+        None,
+        description="Explicit stop node ids, in place of random sampling. Used by the "
+                    "map-driven builder where the engineer clicks the stops on the network; "
+                    "when given, n_customers is ignored.",
+    )
 
 
 class CustomerOut(BaseModel):

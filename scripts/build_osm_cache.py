@@ -42,7 +42,14 @@ import urllib.request
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# Overpass mirrors, tried in order. The main endpoint rate-limits by IP and
+# returns 504s under load, which is exactly when a cache build is wanted, so a
+# failure on one host falls through to the next rather than aborting the run.
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.osm.ch/api/interpreter",
+]
 
 # Road classes worth routing a delivery van over. Ordered fastest first; the
 # speeds are typical urban free-flow values in km/h and are only used when the
@@ -71,25 +78,50 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def fetch_overpass(south: float, west: float, north: float, east: float,
-                   timeout: int = 180) -> dict:
-    """Download drivable ways (and their nodes) inside the bounding box."""
+                   timeout: int = 180, mirrors: List[str] = None,
+                   attempts: int = 2) -> dict:
+    """
+    Download drivable ways (and their nodes) inside the bounding box.
+
+    Tries each mirror in turn, twice over, backing off between rounds. Overpass
+    answers a busy request with a 504 rather than a queue position, so a retry
+    a few seconds later on another host is usually all that is needed.
+    """
     classes = "|".join(ROAD_SPEEDS)
     query = (
         f"[out:json][timeout:{timeout}];"
         f'way["highway"~"^({classes})$"]({south},{west},{north},{east});'
         f"(._;>;);out body;"
     )
-    req = urllib.request.Request(
-        OVERPASS_URL,
-        data=query.encode("utf-8"),
-        headers={"User-Agent": "SIH26137-cache-builder/1.0 (academic project)"},
-    )
-    started = time.time()
-    with urllib.request.urlopen(req, timeout=timeout + 30) as resp:
-        payload = json.loads(resp.read().decode("utf-8"))
-    print(f"  Overpass responded in {time.time() - started:.1f}s "
-          f"({len(payload.get('elements', []))} elements)")
-    return payload
+    mirrors = mirrors or OVERPASS_MIRRORS
+    last_exc = None
+
+    for round_no in range(attempts):
+        for url in mirrors:
+            req = urllib.request.Request(
+                url,
+                data=query.encode("utf-8"),
+                headers={"User-Agent": "SIH26137-cache-builder/1.0 (academic project)"},
+            )
+            started = time.time()
+            try:
+                with urllib.request.urlopen(req, timeout=timeout + 30) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+            except Exception as exc:
+                last_exc = exc
+                host = url.split("/")[2]
+                print(f"  {host}: {type(exc).__name__}: {exc}")
+                continue
+            print(f"  {url.split('/')[2]} responded in {time.time() - started:.1f}s "
+                  f"({len(payload.get('elements', []))} elements)")
+            return payload
+
+        if round_no + 1 < attempts:
+            wait = 20 * (round_no + 1)
+            print(f"  all mirrors busy — waiting {wait}s before retrying")
+            time.sleep(wait)
+
+    raise last_exc if last_exc else RuntimeError("no Overpass mirror configured")
 
 
 def is_oneway(tags: dict) -> Tuple[bool, bool]:
@@ -288,12 +320,16 @@ def main() -> int:
                     help="anchor the crop here (default: Connaught Place)")
     ap.add_argument("--center-lon", type=float, default=77.2167)
     ap.add_argument("--out-dir", default="data/networks")
+    ap.add_argument("--overpass-url", default=None,
+                    help="use only this Overpass endpoint instead of the built-in mirrors")
     args = ap.parse_args()
 
     print(f"Fetching {args.label} "
           f"({args.south},{args.west}) -> ({args.north},{args.east}) …")
     try:
-        payload = fetch_overpass(args.south, args.west, args.north, args.east)
+        mirrors = [args.overpass_url] if args.overpass_url else None
+        payload = fetch_overpass(args.south, args.west, args.north, args.east,
+                                 mirrors=mirrors)
     except Exception as exc:
         print(f"  Overpass request failed: {type(exc).__name__}: {exc}")
         print("  OSM rate-limits by IP; wait a few minutes and try again.")

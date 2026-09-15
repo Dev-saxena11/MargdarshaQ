@@ -473,6 +473,172 @@
       outline: none;
     }
 
+    /* ---------- Curated area picker (landing page) ---------- */
+    .area-picker {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 4px;
+      max-width: 940px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .area-chip {
+      background: var(--raised);
+      border: 2px solid var(--border-neo);
+      border-radius: 6px;
+      padding: 10px 14px;
+      cursor: pointer;
+      box-shadow: var(--neo-shadow-sm);
+      text-align: left;
+      min-width: 172px;
+      max-width: 216px;
+      flex: 1 1 172px;
+      font-family: 'Space Grotesk', sans-serif;
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+
+    .area-chip:hover {
+      background: var(--card-hover);
+      transform: translate(-1px, -1px);
+      box-shadow: var(--neo-shadow);
+    }
+
+    .area-chip.active {
+      border-color: var(--neo-mint);
+      box-shadow: var(--neo-shadow-mint);
+    }
+
+    .area-chip b {
+      display: block;
+      font-size: 12.5px;
+      color: var(--text-main);
+      font-weight: 700;
+    }
+
+    .area-chip.active b {
+      color: var(--neo-mint);
+    }
+
+    .area-chip span {
+      display: block;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.45;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* ---------- Benchmark results table + convergence curve ---------- */
+    .bench-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 1100px) {
+      .bench-split {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bench-panel {
+      border: 2px solid var(--border-bold);
+      border-radius: 8px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .bench-panel h4 {
+      margin: 0 0 3px;
+      font-size: 14px;
+    }
+
+    .bench-panel .bench-sub {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 13px;
+    }
+
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .bench-table th {
+      text-align: left;
+      padding: 7px 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border-bold);
+      white-space: nowrap;
+    }
+
+    .bench-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--border-dark);
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bench-table td:first-child {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+    }
+
+    .bench-table tr.is-ours td {
+      background: rgba(0, 245, 212, 0.07);
+      color: var(--neo-mint);
+      font-weight: 700;
+    }
+
+    .bench-table tr.is-ours td:first-child {
+      border-left: 3px solid var(--neo-mint);
+    }
+
+    .bench-table .win-tag {
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--neo-mint);
+      color: #000000;
+      border: 1.5px solid var(--border-neo);
+      margin-left: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .bench-table .infeasible {
+      color: var(--neo-pink);
+    }
+
+    .conv-wrap {
+      height: 268px;
+      position: relative;
+    }
+
+    .conv-note {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-top: 12px;
+    }
+
+    .conv-note b {
+      color: var(--text-main);
+    }
+
     /* KPI Cards Grid (Impactful, Perfectly Aligned Blocks) */
     .kpi-grid {
       display: grid;
@@ -1569,7 +1735,9 @@
       position: absolute;
       inset: 0;
       display: grid;
-      grid-template-rows: 1fr 240px;
+      /* One row. The layout used to reserve a second 240px row for a panel that
+         is not there, which left a dead black band under the workspace. */
+      grid-template-rows: 1fr;
       background: var(--border-neo);
       overflow: hidden;
     }
@@ -1815,12 +1983,103 @@
       text-align: center;
       flex-direction: column;
       gap: 8px;
+      /* Purely a caption. It covers the whole map, so without this it eats every
+         click and drag meant for the map underneath it. */
+      pointer-events: none;
     }
 
     .empty-hint .glyph {
       font-size: 36px;
       opacity: 0.3;
       color: var(--neo-mint);
+    }
+
+    /* A disabled control must look disabled even where an inline colour is set
+       on it, or the panel invites clicks that do nothing. */
+    button.primary:disabled,
+    button.secondary:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+
+    /* ---------- Map-driven instance builder (control room) ---------- */
+    .step-hint {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin: 0 0 10px;
+    }
+
+    .pick-summary {
+      margin-top: 10px;
+      border: 1.5px solid var(--border-bold);
+      border-radius: 6px;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .seg button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* While a boundary is being drawn the map is a drawing surface, not a
+       panning one, and the cursor has to say so. */
+    #mapWrap.drawing {
+      cursor: crosshair;
+    }
+
+    #mapWrap.drawing .leaflet-container {
+      cursor: crosshair;
+    }
+
+    #mapWrap.picking .leaflet-interactive {
+      cursor: pointer;
+    }
+
+    /* Floating instruction strip over the map, so the next action is visible
+       where the user is actually looking. */
+    .map-prompt {
+      position: absolute;
+      left: 50%;
+      top: 14px;
+      transform: translateX(-50%);
+      z-index: 500;
+      background: var(--card-bg);
+      border: 2px solid var(--neo-mint);
+      box-shadow: var(--neo-shadow-sm);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 82%;
+    }
+
+    .map-prompt.is-warn {
+      border-color: var(--neo-amber);
+    }
+
+    .map-prompt button {
+      background: transparent;
+      border: 1.5px solid var(--border-bold);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+    }
+
+    .map-prompt button:hover {
+      color: var(--text-main);
+      border-color: var(--neo-mint);
     }
 
     .route-line {
@@ -2603,29 +2862,82 @@
               A delivery fleet has to reach every customer on time, through city traffic.
               Ordinary routing software sends each van to its nearest stop — and drives it
               straight into the jam. <b>We plan the whole day's routes around the traffic
-                instead.</b> Press the button below to watch both methods run on the same city,
-              side by side, and see the difference for yourself.
+                instead.</b> Pick one of the congested districts below, then run every
+              algorithm on it at once and read the result for yourself.
               <span class="term-note">Under the hood: a quantum-inspired optimisation algorithm
                 (QPSO) solving a capacitated vehicle routing problem with time windows.</span>
             </p>
+
+            <!-- Curated districts. Each one is real OpenStreetMap road data shipped
+               with the app, chosen because its traffic pattern is the kind our
+               method is built for: dense, congested, and full of one-way turns. -->
+            <div class="area-picker" id="areaPicker"></div>
+
             <div class="judge-hero-actions">
-              <select id="judgePreset" class="preset-select" onchange="loadPresetScenario()">
-                <option value="delhi_osm" selected>Scenario: Delhi Urban Corridor (OSM Real City)</option>
-                <option value="rush_hour">Scenario: Rush-Hour Gridlock (Synthetic 30)</option>
-                <option value="dense_fleet">Scenario: Dense Fleet Express (50 Nodes)</option>
-              </select>
-              <button class="btn-neo-primary" id="btnJudgeRun" onclick="runJudgeDemoComparison()">
-                <span>▶</span> Run Live Comparison
-              </button>
-              <button class="btn-neo-secondary" id="btnDynamicRun" onclick="runDynamicTrafficDemo()"
-                style="border-color:var(--neo-pink); color:var(--neo-pink);">
-                <span>🚨</span> Simulate Dynamic Bottleneck
+              <button class="btn-neo-primary" id="btnBenchmarkAll" onclick="runLandingBenchmark()">
+                <span>▶</span> Run all five algorithms on this district
               </button>
             </div>
             <!-- Progress line. The real-city network is downloaded live from
                OpenStreetMap and can take a couple of minutes, so the wait must
                not be a silent one in front of an audience. -->
             <div id="judgeStatus" class="judge-status" hidden></div>
+          </div>
+        </div>
+
+        <!-- =================================================================
+           Problem & Approach (Executive Overview)
+           Sits above the maps deliberately: a reader who has never heard of
+           vehicle routing needs the problem in plain words before the
+           before/after picture means anything.
+           ================================================================= -->
+        <div class="why-card" id="problemApproach">
+          <h3><span>🧭</span> Problem &amp; Approach</h3>
+          <div class="why-grid">
+            <div class="why-item">
+              <div class="why-num">[ 01 ]</div>
+              <h4>The problem: getting a fleet through real traffic — not just finding short routes</h4>
+              <p>A delivery company has one depot, a handful of vans, and a list of customers who
+                have each been promised a time slot. Every van has a load limit and has to be back
+                by the end of the shift. The job is to decide <b>which van visits which customers,
+                  in which order</b>.</p>
+              <p>The trap is treating this as a shortest-distance puzzle. The shortest route through
+                a city at 9am is often the slowest one to drive, because the short way is the way
+                everyone else is also taking. What matters is time on the road through
+                <b>actual traffic</b>, and whether the customer was reached inside the slot they
+                were promised.</p>
+              <span class="term-note">Formally: a capacitated vehicle routing problem with time
+                windows (CVRPTW), priced on a congested, one-way-aware road network.</span>
+            </div>
+            <div class="why-item">
+              <div class="why-num">[ 02 ]</div>
+              <h4>Why classical and greedy routing fails: it gets stuck in a dead end</h4>
+              <p>There are too many possible plans to simply try them all — fifteen stops can be
+                ordered more ways than there are seconds in the age of the universe. So ordinary
+                routing software guesses: send each van to whichever stop is <b>nearest right
+                  now</b>. That looks sensible and it walks straight into the jam.</p>
+              <p>Worse, once it has committed to that shape of route, every small change it can
+                try makes things look briefly worse, so it stops improving and calls it done —
+                like always taking the first turning that looks clear, then finding yourself in a
+                dead end you cannot back out of.</p>
+              <span class="term-note">This is a <b>local minimum</b>: a plan that beats everything
+                near it, while a far better plan exists somewhere the search never looked.</span>
+            </div>
+            <div class="why-item">
+              <div class="why-num">[ 03 ]</div>
+              <h4>Our approach: a search that can jump out, then tidy up</h4>
+              <p>Our method borrows an idea from quantum physics. Instead of only ever stepping to
+                the next-best option, a plan can <b>jump straight to a completely different
+                  arrangement</b> on the other side of the search space — so it escapes the dead
+                end the greedy method is stuck in and keeps finding better plans long after the
+                greedy one has given up.</p>
+              <p>Once it has a good plan, a second pass tidies it: it re-reads its own routes for
+                stops visited in a silly order — a crossing, a doubling back — and straightens
+                them out.</p>
+              <span class="term-note">Technique: quantum-behaved particle swarm optimisation
+                (QPSO), refined by 2-opt / or-opt local search. The convergence curve further down
+                shows this happening iteration by iteration.</span>
+            </div>
           </div>
         </div>
 
@@ -2887,21 +3199,52 @@
           </table>
         </div>
 
-        <!-- How it compares: every algorithm, same instance, measured -->
+        <!-- Five-algorithm benchmark: table, bars, convergence, explanation -->
         <div class="compare-section" id="algoCompareSection">
           <div class="compare-head">
             <div>
-              <h3><span>🏁</span> How it compares</h3>
-              <span>Every algorithm solving the <b>same</b> delivery problem on the
-                <b>same</b> road network with the <b>same</b> traffic. Nothing here is
-                pre-computed — press the button and it runs live.</span>
+              <h3><span>🏁</span> Five algorithms, one delivery round</h3>
+              <span>QPSO against GA, Simulated Annealing, standard PSO and the greedy
+                nearest-stop method. All five solve the <b>same</b> delivery problem on the
+                <b>same</b> road network with the <b>same</b> traffic and the same iteration
+                budget — that fairness is the point. Nothing here is pre-computed.</span>
             </div>
-            <button class="btn-neo-primary" id="btnAlgoCompare" onclick="runAlgorithmComparison()">
+            <button class="btn-neo-primary" id="btnAlgoCompare" onclick="runLandingBenchmark()">
               <span>▶</span> Run full benchmark
             </button>
           </div>
 
           <div id="algoCompareVerdict" class="compare-verdict" hidden></div>
+
+          <!-- Results table + convergence curve, side by side -->
+          <div class="bench-split" id="benchSplit" hidden>
+            <div class="bench-panel">
+              <h4>Results table</h4>
+              <span class="bench-sub">same instance · same iteration budget · measured just now</span>
+              <div style="overflow-x:auto;">
+                <table class="bench-table">
+                  <thead>
+                    <tr>
+                      <th>Algorithm</th>
+                      <th>Time on road</th>
+                      <th>Distance</th>
+                      <th>Traffic delay</th>
+                      <th>On time?</th>
+                      <th>Solve time</th>
+                    </tr>
+                  </thead>
+                  <tbody id="benchResultsBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="bench-panel">
+              <h4>Convergence curve</h4>
+              <span class="bench-sub">plan cost vs iteration — lower is better</span>
+              <div class="conv-wrap"><canvas id="landingConvChart"></canvas></div>
+              <div class="conv-note" id="convNote"></div>
+            </div>
+          </div>
 
           <div id="algoCompareGrid" class="compare-grid">
             <div class="compare-empty">
@@ -2911,49 +3254,19 @@
           </div>
 
           <div id="algoCompareNote" class="compare-note" hidden></div>
-        </div>
 
-        <!-- Why Quantum-Inspired Wins Explainer -->
-        <div class="why-card">
-          <h3><span>💡</span> Why our approach finds better routes</h3>
-          <div class="why-grid">
-            <div class="why-item">
-              <div class="why-num">[ 01 ]</div>
-              <h4>There are too many possible routes to simply try them all</h4>
-              <p>Fifteen stops across a city can be ordered in more ways than there are seconds
-                in the age of the universe. No computer can check every option, so every delivery
-                system has to make smart guesses instead.</p>
-              <span class="term-note">The formal name for this problem is a capacitated vehicle
-                routing problem with time windows (CVRPTW).</span>
-            </div>
-            <div class="why-item">
-              <div class="why-num">[ 02 ]</div>
-              <h4>The usual guess gets stuck in traffic</h4>
-              <p>Ordinary routing software sends each van to whichever stop is nearest right now.
-                That looks sensible, and it walks straight into the jam — like always taking the
-                first turning that looks clear and ending up in a dead end you can't back out of.</p>
-              <span class="term-note">In optimisation terms, the search gets trapped in a local
-                minimum — a choice that looks good nearby but is poor overall.</span>
-            </div>
-            <div class="why-item">
-              <div class="why-num">[ 03 ]</div>
-              <h4>Ours can jump out of a dead end</h4>
-              <p>Our method borrows an idea from quantum physics: instead of only stepping to
-                the next-best option, it can jump straight to a completely different plan on the
-                other side of the map. That lets it escape the dead end the ordinary method is
-                stuck in, and find the route that goes around the traffic. It then tidies the
-                result up — checking its own plan for stops visited in a silly order and
-                straightening them out.</p>
-              <span class="term-note">Technique: quantum-behaved particle swarm optimisation
-                (QPSO), with a 2-opt / or-opt local search refinement step.</span>
-            </div>
+          <!-- Why QPSO wins — written against the curve above, not asserted -->
+          <div class="why-card" id="whyQpsoWins" hidden
+            style="margin-top:20px; box-shadow:none; border-color:var(--border-bold);">
+            <h3><span>💡</span> Why QPSO wins here</h3>
+            <div id="whyQpsoBody"></div>
           </div>
         </div>
 
         <!-- Quick Switch to Engineering Control Room -->
         <div class="hood-banner">
-          <span>Want the technical detail — convergence curves, algorithm settings, and the full five-algorithm
-            benchmark?</span>
+          <span>Want to try your own area? The control room lets you draw a boundary anywhere on the
+            map, pick the depot and stops by hand, and simulate a bottleneck mid-route.</span>
           <button class="btn-neo-secondary" onclick="switchView('control')">
             Open the technical console ↗
           </button>
@@ -2971,49 +3284,56 @@
           <!-- LEFT: network + VRP generation -->
           <div class="col">
             <section>
-              <h2>1. Network Topology</h2>
-              <div class="seg">
-                <button id="segSynthetic" class="active" onclick="setNetworkMode('synthetic')">Synthetic</button>
-                <button id="segOsm" onclick="setNetworkMode('osm')">OSM (real city)</button>
+              <h2>1. Draw Your Study Area</h2>
+              <p class="step-hint">
+                Pan the map to anywhere in the world, then drag a box around the district you
+                want to route through. The real road network inside that box is pulled from
+                OpenStreetMap — one-way streets included.
+              </p>
+
+              <button class="primary" id="btnDrawBoundary" onclick="startBoundaryDraw()">
+                ✏️ Draw boundary on map
+              </button>
+              <button class="secondary" id="btnClearBoundary" onclick="clearBoundary()" disabled>
+                Clear boundary
+              </button>
+
+              <div class="row2" style="margin-top:10px;">
+                <div><label>Max nodes</label><input id="osm_max_nodes" type="number" value="400"></div>
+                <div><label>Congestion seed</label><input id="net_seed" type="number" value="42"></div>
               </div>
 
-              <div id="synFields">
-                <div class="row2">
-                  <div><label>Nodes</label><input id="n_nodes" type="number" value="30"></div>
-                  <div><label>Seed</label><input id="net_seed" type="number" value="42"></div>
-                </div>
-                <label>Connectivity Fraction</label>
-                <input id="connectivity" type="number" step="0.01" value="0.15">
-              </div>
-
-              <div id="osmFields" style="display:none;">
-                <label>Place name</label>
-                <input id="osm_place" type="text" placeholder="Connaught Place, New Delhi, India">
-                <div class="row2">
-                  <div><label>Network type</label>
-                    <select id="osm_type">
-                      <option value="drive">drive</option>
-                      <option value="walk">walk</option>
-                      <option value="bike">bike</option>
-                    </select>
-                  </div>
-                  <div><label>Max nodes</label><input id="osm_max_nodes" type="number" value="1500"></div>
-                </div>
-                <p style="font-size:11px; color:var(--text-muted); margin-top:8px;">Requires internet + <span
-                    class="mono">osmnx</span> installed.</p>
-              </div>
-
-              <button class="primary" onclick="generateNetwork()">Generate network</button>
+              <button class="primary" id="btnLoadArea" onclick="loadDrawnArea()" disabled>
+                Load roads in this boundary
+              </button>
               <div id="netInfo" style="margin-top:10px;"></div>
             </section>
 
             <section>
-              <h2>2. VRP Fleet Instance</h2>
-              <div class="row2">
-                <div><label>Customers</label><input id="n_customers" type="number" value="12"></div>
-                <div><label>Depot node</label><input id="depot" type="number" value="0"></div>
+              <h2>2. Pick Depot &amp; Stops</h2>
+              <p class="step-hint">
+                Click a junction on the map to place the depot, then click the stops the fleet has
+                to serve. Click a chosen stop again to drop it.
+              </p>
+
+              <div class="seg">
+                <button id="segPickDepot" onclick="setPickMode('depot')" disabled>🏁 Set depot</button>
+                <button id="segPickStops" onclick="setPickMode('stops')" disabled>📍 Add stops</button>
               </div>
-              <div class="row2">
+
+              <div class="pick-summary" id="pickSummary">
+                <div class="stat-line"><span>Depot</span><span id="pickDepotLabel">— not set —</span></div>
+                <div class="stat-line"><span>Stops selected</span><span id="pickStopCount">0</span></div>
+              </div>
+
+              <button class="secondary" id="btnRandomStops" onclick="pickRandomStops()" disabled>
+                🎲 Scatter 12 stops for me
+              </button>
+              <button class="secondary" id="btnClearPicks" onclick="clearPicks()" disabled>
+                Clear selection
+              </button>
+
+              <div class="row2" style="margin-top:12px;">
                 <div><label>Vehicle capacity</label><input id="capacity" type="number" value="80"></div>
                 <div><label>Seed</label><input id="vrp_seed" type="number" value="1"></div>
               </div>
@@ -3045,20 +3365,20 @@
                 </div>
               </div>
 
-              <button class="primary" onclick="generateVRP()" id="btnGenVRP" disabled>Generate VRP instance</button>
+              <button class="primary" onclick="generateVRP()" id="btnGenVRP" disabled>Build instance from selection</button>
               <div id="vrpInfo" style="margin-top:10px;"></div>
             </section>
           </div>
 
-          <!-- CENTER: map -->
+          <!-- CENTER: map — this is the workspace, not just a picture -->
           <div id="mapWrap">
-            <div id="leafletMap" style="display:none;"></div>
-            <div id="svgWrap"><svg id="svgCanvas" viewBox="0 0 1000 1000"></svg></div>
-            <div class="empty-hint" id="emptyHint">
+            <div id="leafletMap"></div>
+            <div id="svgWrap" style="display:none;"><svg id="svgCanvas" viewBox="0 0 1000 1000"></svg></div>
+            <div class="empty-hint" id="emptyHint" style="display:none;">
               <div class="glyph">◈</div>
-              <div>Generate a network to begin<br><span style="font-size:11px;">synthetic city or a real OSM
-                  place</span></div>
+              <div>Drag a box around a district to begin</div>
             </div>
+            <div class="map-prompt" id="mapPrompt" hidden></div>
           </div>
 
           <!-- RIGHT: solve + results -->
@@ -3082,10 +3402,25 @@
 
               <button class="primary" onclick="solveVRP()" id="btnSolve" disabled>Solve</button>
               <button class="secondary" onclick="runBenchmark()" id="btnBench" disabled>Run full benchmark</button>
-              <button class="secondary" style="border-color:var(--neo-mint); color:var(--neo-mint); margin-top:8px;"
-                onclick="syncAndShowJudgeView()">
-                📊 View Executive Summary
+            </section>
+
+            <section>
+              <h2>4. Dynamic Bottleneck</h2>
+              <p class="step-hint">
+                Close a road the fleet is already driving through, mid-shift, and re-plan the
+                vans that have not finished yet. This is the case static routing cannot answer
+                at all.
+              </p>
+              <div class="row2">
+                <div><label>Severity (× slower)</label><input id="incident_severity" type="number" step="0.5"
+                    value="4"></div>
+                <div><label>Happens at (min)</label><input id="incident_at" type="number" value="90"></div>
+              </div>
+              <button class="secondary" id="btnDynamicRun" onclick="runDynamicTrafficDemo()"
+                style="border-color:var(--neo-pink); color:var(--neo-pink);" disabled>
+                🚨 Inject bottleneck &amp; re-optimise
               </button>
+              <div id="dynamicInfo" style="margin-top:10px;"></div>
             </section>
 
             <section id="resultSection" style="display:none;">
@@ -3120,6 +3455,8 @@
                   <tbody id="benchmarkBody"></tbody>
                 </table>
               </div>
+              <h2 style="margin-top:16px;">Convergence</h2>
+              <div style="height:190px; position:relative;"><canvas id="convChart"></canvas></div>
             </section>
 
           </div>
@@ -3199,22 +3536,44 @@
     // ---------------------------------------------------------------------------
     // Global Application State
     // ---------------------------------------------------------------------------
+    // The two screens used to share a single `state`, which meant generating a
+    // network in the control room silently rewrote what the landing page was
+    // showing, and vice versa. They now own their data separately: `state` is
+    // the engineer's workspace, `execState` is the landing page. Only the
+    // drawing helpers are shared, and those take whichever one they are given.
     let state = {
-      viewMode: 'judge',     // 'judge' or 'control'
-      networkMode: 'synthetic',
+      viewMode: 'judge',     // 'judge' (landing page) or 'control' (control room)
       network: null,
       vrp: null,
       map: null,
       routeLayer: null,
       convChart: null,
+      // Map-driven instance builder (veroviz-style): draw a boundary, then
+      // click the stops you want inside it.
+      drawMode: null,        // null | 'boundary' | 'depot' | 'stops'
+      bounds: null,          // {north, south, east, west} of the drawn boundary
+      boundaryLayer: null,   // rectangle drawn on the map
+      nodeLayer: null,       // clickable node markers
+      selectedDepot: null,
+      selectedStops: [],
+      baselineSolution: null,
+      optimizedSolution: null,
+      dynamicResult: null,
+    };
+
+    // Landing page. Same shape where it overlaps, so the shared drawing helpers
+    // accept either object.
+    let execState = {
+      areaKey: null,
+      network: null,
+      vrp: null,
       compareMode: 'split',  // 'split', 'before', 'after', 'overlay'
       baselineSolution: null,
       optimizedSolution: null,
       comparisonMetrics: null,
+      benchmarkResults: null,
       judgeMapBefore: null,
       judgeMapAfter: null,
-      judgeLayerBefore: null,
-      judgeLayerAfter: null,
       // 3-Layer architecture: separate groups per map
       judgeGraphBefore: null,   // Layer 2: Directed road graph
       judgeRouteBefore: null,   // Layer 3: Vehicle route highlights
@@ -3284,22 +3643,20 @@
       document.getElementById('judgeView').style.display = mode === 'judge' ? 'flex' : 'none';
       document.getElementById('controlRoomView').style.display = mode === 'control' ? 'grid' : 'none';
 
+      // Each screen owns its own data, so switching only ever redraws — it never
+      // copies one screen's run onto the other.
       if (mode === 'judge') {
         renderJudgeComparison();
       } else if (mode === 'control') {
-        if (state.network) {
-          setTimeout(() => {
-            renderNetwork();
-            if (state.optimizedSolution) {
-              drawRoutes(state.optimizedSolution.routes);
-            }
-          }, 60);
-        }
+        setTimeout(() => {
+          ensureControlMap();
+          state.map.invalidateSize();
+          if (state.network) {
+            renderControlNetwork();
+            if (state.optimizedSolution) drawRoutes(state.optimizedSolution.routes);
+          }
+        }, 60);
       }
-    }
-
-    function syncAndShowJudgeView() {
-      switchView('judge');
     }
 
     // ---------------------------------------------------------------------------
@@ -3489,186 +3846,431 @@
       };
     }
 
-    function loadPresetScenario() {
-      const key = document.getElementById('judgePreset').value;
-      const scen = DEMO_SCENARIOS[key];
-      if (!scen) return;
+    // -------------------------------------------------------------------------
+    // Landing page: curated districts
+    //
+    // Each area is a real OpenStreetMap road network shipped in data/networks/,
+    // so it loads in milliseconds and cannot be rate-limited halfway through a
+    // demo. They were picked because their traffic is the kind this method is
+    // built for: dense, heavily congested, and full of one-way turns that a
+    // shortest-distance planner walks straight into.
+    // -------------------------------------------------------------------------
+    const CURATED_AREAS = [
+      {
+        key: 'delhi_central',
+        name: 'Connaught Place, Delhi',
+        lat: 28.6315, lon: 77.2167,
+        why: 'Concentric ring roads on a near-total one-way system — the short way round is often the wrong way round.',
+        stops: 14,
+      },
+      {
+        key: 'mumbai_bkc',
+        name: 'Bandra Kurla Complex, Mumbai',
+        lat: 19.0700, lon: 72.8700,
+        why: 'The densest office district in the country, fed by a handful of access roads. Everything peaks at once.',
+        stops: 14,
+      },
+      {
+        key: 'bengaluru_koramangala',
+        name: 'Koramangala – Silk Board, Bengaluru',
+        lat: 12.9345, lon: 77.6220,
+        why: 'Famously the most congested corridor in India. Delay dominates distance completely here.',
+        stops: 16,
+      },
+      {
+        key: 'hyderabad_hitec',
+        name: 'HITEC City, Hyderabad',
+        lat: 17.4480, lon: 78.3800,
+        why: 'IT-park grid with tight one-way loops and heavy shift-change surges twice a day.',
+        stops: 14,
+      },
+    ];
 
-      const demo = ensureDemoNetwork(key);
-      state.network = demo.network;
-      state.vrp = demo.vrp;
-      state.baselineSolution = scen.baseline;
-      state.optimizedSolution = scen.optimized;
+    function areaByKey(key) {
+      return CURATED_AREAS.find(a => a.key === key) || CURATED_AREAS[0];
+    }
 
-      computeAndDisplayComparison(state.baselineSolution, state.optimizedSolution);
+    function renderAreaPicker() {
+      const host = document.getElementById('areaPicker');
+      if (!host) return;
+      host.innerHTML = CURATED_AREAS.map(a =>
+        '<button class="area-chip' + (execState.areaKey === a.key ? ' active' : '') + '"'
+        + ' id="areaChip_' + a.key + '" onclick="selectArea(&quot;' + a.key + '&quot;)">'
+        + '<b>' + a.name + '</b><span>' + a.why + '</span></button>'
+      ).join('');
+    }
+
+    // Loads one district and builds a delivery round on it. Deliberately small —
+    // 14-16 stops — because the whole point of the map is that a reader can
+    // follow individual vans through it.
+    async function selectArea(key, opts = {}) {
+      const area = areaByKey(key);
+      execState.areaKey = key;
+      renderAreaPicker();
+
+      if (!opts.quiet) setJudgeStatus('Loading the real road network for ' + area.name + '…');
+
+      const network = await api('/api/network/from_cache', {
+        method: 'POST',
+        body: JSON.stringify({ name: area.key, seed: 42 }),
+      });
+      execState.network = network;
+      execState.areaLabel = network.area_label || area.name;
+      execState.areaAttribution = network.attribution || '© OpenStreetMap contributors (ODbL)';
+
+      execState.vrp = await api('/api/vrp/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          network_id: network.network_id,
+          n_customers: area.stops, depot: 0, vehicle_capacity: 80,
+          demand_min: 5, demand_max: 20, horizon: 480,
+          window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
+        }),
+      });
+
+      // A new district invalidates every result on the page — never leave the
+      // last district's numbers sitting under this district's map.
+      execState.baselineSolution = null;
+      execState.optimizedSolution = null;
+      execState.benchmarkResults = null;
+      resetBenchmarkPanels();
+
+      renderAreaBanner();
       renderJudgeComparison();
-      if (state.assistantOpen && typeof appendAssistantMessage === 'function') {
-        appendAssistantMessage('assistant', `🔄 <b>Scenario Switched:</b> Now analyzing <code>${scen.name}</code>. Click any quick prompt to explore its metrics.`);
-      }
+      if (!opts.quiet) setJudgeStatus(null);
+      return execState;
     }
 
-    // ---------------------------------------------------------------------------
-    // Run Judge Demo Comparison (Live API or Offline Fallback)
-    // ---------------------------------------------------------------------------
-    async function runJudgeDemoComparison() {
-      const btn = document.getElementById('btnJudgeRun');
-      btn.disabled = true;
-      btn.innerHTML = `<span>⏳</span> Working…`;
+    // Clears every measured panel back to its waiting state.
+    function resetBenchmarkPanels() {
+      const grid = document.getElementById('algoCompareGrid');
+      if (grid) {
+        grid.innerHTML = '<div class="compare-empty">Press <b>Run all five algorithms</b> to pit our '
+          + 'method against the four classical approaches on this district. Results appear here as '
+          + 'measured bars, win or lose.</div>';
+      }
+      for (const id of ['algoCompareVerdict', 'algoCompareNote', 'benchSplit', 'whyQpsoWins']) {
+        const el = document.getElementById(id);
+        if (el) el.hidden = true;
+      }
+      const body = document.getElementById('benchResultsBody');
+      if (body) body.innerHTML = '';
+      if (execState.convChart) { execState.convChart.destroy(); execState.convChart = null; }
+    }
+
+    // Offline path. The API sleeps on free hosting, and a landing page that shows
+    // nothing at all is worse than one showing a clearly-labelled stored run.
+    function loadOfflineFallback() {
+      const scen = DEMO_SCENARIOS.delhi_osm;
+      if (!scen) return;
+      const demo = ensureDemoNetwork('delhi_osm');
+      execState.network = demo.network;
+      execState.vrp = demo.vrp;
+      execState.baselineSolution = scen.baseline;
+      execState.optimizedSolution = scen.optimized;
+      execState.areaLabel = null;
+      execState.areaAttribution = null;
+      computeAndDisplayComparison(scen.baseline, scen.optimized);
+      renderAreaBanner();
+      renderJudgeComparison();
+    }
+
+    // -------------------------------------------------------------------------
+    // One click: every algorithm on the selected district
+    //
+    // Two calls, one instance. /vrp/compare gives the routes the before/after
+    // maps draw; /benchmark/run gives all five algorithms on that same instance
+    // with the same iteration budget, which is what makes the table a fair test
+    // rather than a sales chart.
+    // -------------------------------------------------------------------------
+    async function runLandingBenchmark() {
+      const btns = ['btnBenchmarkAll', 'btnAlgoCompare'].map(id => document.getElementById(id)).filter(Boolean);
+      const labels = btns.map(b => b.innerHTML);
+      btns.forEach(b => { b.disabled = true; b.innerHTML = '<span>⏳</span> Running all five…'; });
+
+      const grid = document.getElementById('algoCompareGrid');
+      if (grid) grid.innerHTML = '<div class="compare-empty">Solving the same delivery round with every algorithm…</div>';
 
       try {
         const isOnline = await checkHealth();
-
-        if (isOnline) {
-          const presetKey = document.getElementById('judgePreset').value;
-          const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
-          state.network = loaded.network;
-          state.usedOsmFallback = loaded.usedFallback;
-          renderAreaBanner();
-          setJudgeStatus(
-            loaded.usedFallback
-              ? 'OpenStreetMap was unavailable, so this run uses the synthetic city network instead of real Delhi roads.'
-              : 'Planning routes…',
-            loaded.usedFallback
-          );
-
-          state.vrp = await api('/api/vrp/generate', {
-            method: 'POST',
-            body: JSON.stringify({
-              network_id: state.network.network_id,
-              n_customers: presetKey === 'delhi_osm' ? 16 : 12, depot: 0, vehicle_capacity: 80,
-              demand_min: 5, demand_max: 20, horizon: 480,
-              window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
-            }),
-          });
-
-          // Call new compare endpoint
-          const comp = await api('/api/vrp/compare', {
-            method: 'POST',
-            body: JSON.stringify({
-              vrp_id: state.vrp.vrp_id,
-              baseline_algo: 'greedy',
-              optimized_algo: 'qpso',
-              n_particles: 50,
-              max_iter: 150,
-              seed: 1,
-              use_local_search: true,
-            }),
-          });
-
-          state.baselineSolution = comp.baseline;
-          state.optimizedSolution = comp.optimized;
-          computeAndDisplayComparison(comp.baseline, comp.optimized);
-        } else {
-          loadPresetScenario();
+        if (!isOnline) {
+          setJudgeStatus('The API is not responding — showing a stored run instead. '
+            + 'Start the backend to benchmark live.', true);
+          loadOfflineFallback();
+          if (grid) grid.innerHTML = '<div class="compare-empty">The benchmark needs the backend running. '
+            + 'The maps and figures above are from a stored run.</div>';
+          return;
         }
 
+        if (!execState.vrp) {
+          await selectArea(execState.areaKey || CURATED_AREAS[0].key, { quiet: true });
+        }
+
+        const area = areaByKey(execState.areaKey);
+        setJudgeStatus('Planning routes across ' + area.name + '…');
+
+        const comp = await api('/api/vrp/compare', {
+          method: 'POST',
+          body: JSON.stringify({
+            vrp_id: execState.vrp.vrp_id,
+            baseline_algo: 'greedy', optimized_algo: 'qpso',
+            n_particles: 50, max_iter: 150, seed: 1, use_local_search: true,
+          }),
+        });
+        execState.baselineSolution = comp.baseline;
+        execState.optimizedSolution = comp.optimized;
+        computeAndDisplayComparison(comp.baseline, comp.optimized);
         renderJudgeComparison();
-      } catch (e) {
-        console.warn("Using preset comparison:", e);
-        loadPresetScenario();
+
+        setJudgeStatus('Running GA, Simulated Annealing, PSO and greedy on the same instance…');
+        const bench = await api('/api/benchmark/run', {
+          method: 'POST',
+          body: JSON.stringify({ vrp_id: execState.vrp.vrp_id, max_iter: 150, seed: 1 }),
+        });
+
+        execState.benchmarkResults = bench.results;
+        renderAlgorithmComparison(bench.results);
+        renderBenchResultsTable(bench.results);
+        drawLandingConvergence(bench.results);
+        renderWhyQpsoWins(bench.results);
+        setJudgeStatus(null);
+        if (typeof syncAssistantContext === 'function') syncAssistantContext();
+      } catch (err) {
+        console.warn('Landing benchmark failed:', err);
+        setJudgeStatus('The benchmark could not be run — the API may be waking up. Try again in a moment.', true);
+        if (grid) grid.innerHTML = '<div class="compare-empty">The benchmark could not be run — '
+          + 'the API may be asleep. Try again in a moment.</div>';
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<span>▶</span> Run Live Comparison`;
-        // Keep a fallback warning on screen; clear ordinary progress text.
-        if (!state.usedOsmFallback) setJudgeStatus(null);
+        btns.forEach((b, i) => { b.disabled = false; b.innerHTML = labels[i]; });
       }
     }
 
-    // ---------------------------------------------------------------------------
-    // Run Dynamic Traffic Simulation & Mid-Route Re-optimization
-    // ---------------------------------------------------------------------------
-    async function runDynamicTrafficDemo() {
-      const btn = document.getElementById('btnDynamicRun');
-      btn.disabled = true;
-      btn.innerHTML = `<span>⏳</span> SIMULATING BOTTLENECK & RE-ROUTING…`;
+    // ---- Results table: the same five rows the bar chart draws, as numbers ----
+    function renderBenchResultsTable(results) {
+      const body = document.getElementById('benchResultsBody');
+      const split = document.getElementById('benchSplit');
+      if (!body || !results || !results.length) return;
 
-      try {
-        const isOnline = await checkHealth();
+      const bestTime = Math.min(...results.map(r => r.time));
 
-        if (isOnline) {
-          const presetKey = document.getElementById('judgePreset').value;
-          const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
-          state.network = loaded.network;
-          state.usedOsmFallback = loaded.usedFallback;
-          renderAreaBanner();
-          setJudgeStatus(
-            loaded.usedFallback
-              ? 'OpenStreetMap was unavailable, so this run uses the synthetic city network instead of real Delhi roads.'
-              : 'Planning routes…',
-            loaded.usedFallback
-          );
+      const rows = [...results].sort((a, b) => a.time - b.time);
+      body.innerHTML = rows.map(r => {
+        const ours = isOurAlgorithm(r.algorithm);
+        const delay = (typeof r.congestion_delay_min === 'number') ? r.congestion_delay_min : null;
+        return '<tr class="' + (ours ? 'is-ours' : '') + '">'
+          + '<td>' + shortAlgoName(r.algorithm)
+          + (r.time === bestTime ? '<span class="win-tag">BEST</span>' : '') + '</td>'
+          + '<td>' + fmtValue(r.time, 'min') + '</td>'
+          + '<td>' + fmtValue(r.distance, 'km') + ' km</td>'
+          + '<td>' + (delay === null ? '—' : fmtValue(delay, 'min')) + '</td>'
+          + '<td class="' + (r.feasible ? '' : 'infeasible') + '">'
+          + (r.feasible ? 'all on time' : 'misses a slot') + '</td>'
+          + '<td>' + fmtValue(r.runtime_ms, 'ms') + '</td>'
+          + '</tr>';
+      }).join('');
 
-          state.vrp = await api('/api/vrp/generate', {
-            method: 'POST',
-            body: JSON.stringify({
-              network_id: state.network.network_id,
-              n_customers: presetKey === 'delhi_osm' ? 16 : 12, depot: 0, vehicle_capacity: 80,
-              demand_min: 5, demand_max: 20, horizon: 480,
-              window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
-            }),
-          });
+      if (split) split.hidden = false;
+    }
 
-          const dynRes = await api('/api/vrp/solve-dynamic', {
-            method: 'POST',
-            body: JSON.stringify({
-              vrp_id: state.vrp.vrp_id,
-              incident_factor: 4.0,
-              trigger_time_min: 60.0,
-              algorithm: 'qpso',
-              n_particles: 50,
-              max_iter: 150,
-              seed: 1,
-            }),
-          });
+    // ---- Convergence curve: why QPSO wins, not merely that it does ----------
+    function drawLandingConvergence(results) {
+      const canvas = document.getElementById('landingConvChart');
+      const note = document.getElementById('convNote');
+      if (!canvas || !results || !results.length) return;
 
-          state.baselineSolution = dynRes.static_affected_solution;
-          state.optimizedSolution = dynRes.dynamic_rerouted_solution;
-          computeAndDisplayComparison(dynRes.static_affected_solution, dynRes.dynamic_rerouted_solution);
-        } else {
-          // Offline dynamic preset fallback
-          loadPresetScenario();
+      const series = results
+        .filter(r => Array.isArray(r.convergence_curve) && r.convergence_curve.length > 1)
+        .map(r => ({ label: shortAlgoName(r.algorithm), data: r.convergence_curve, ours: isOurAlgorithm(r.algorithm) }));
+
+      if (!series.length) {
+        if (note) note.innerHTML = 'No algorithm returned a curve for this run.';
+        return;
+      }
+
+      const palette = ['#7B5CFF', '#FEE440', '#FF0054', '#00BBF9', '#94A3B8'];
+      let other = 0;
+
+      // Every algorithm gets the same iteration budget, but they do not all
+      // report the same number of points — simulated annealing logs every
+      // candidate, so its curve is twenty times longer than the rest. Plotting
+      // those against a shared point index would squeeze the other four into the
+      // left edge of the chart and make the comparison unreadable, so each curve
+      // is drawn against how far through its own budget it is.
+      const asProgress = d => d.map((y, i) => ({
+        x: d.length > 1 ? (i / (d.length - 1)) * 100 : 0,
+        y,
+      }));
+
+      // Scale the cost axis to the values actually plotted, and pick a handful
+      // of ticks spread evenly in log space so the labels stay readable.
+      const allY = series.flatMap(sr => sr.data).filter(v => v > 0);
+      const yLo = Math.min(...allY) * 0.94;
+      const yHi = Math.max(...allY) * 1.06;
+      const yTicks = Array.from({ length: 6 }, (_, i) =>
+        Math.pow(10, Math.log10(yLo) + (i / 5) * (Math.log10(yHi) - Math.log10(yLo))));
+
+      if (execState.convChart) execState.convChart.destroy();
+      execState.convChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          datasets: series.map(sr => ({
+            label: sr.label,
+            data: asProgress(sr.data),
+            borderColor: sr.ours ? '#00F5D4' : palette[other++ % palette.length],
+            borderWidth: sr.ours ? 3.2 : 1.8,
+            pointRadius: 0,
+            tension: 0.1,
+          })),
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          parsing: false,
+          interaction: { mode: 'nearest', axis: 'x', intersect: false },
+          scales: {
+            x: {
+              type: 'linear', min: 0, max: 100,
+              title: { display: true, text: 'search progress (% of iteration budget)', color: '#64748B', font: { size: 10 } },
+              ticks: {
+                color: '#94A3B8', maxTicksLimit: 6,
+                callback: v => v + '%',
+              },
+              grid: { color: '#1E293B' },
+            },
+            y: {
+              type: 'logarithmic',
+              // Bound to the data. Left to itself a log axis rounds out to whole
+              // decades, which parks every curve in the bottom sliver of the
+              // panel and hides the gaps between the finishing costs.
+              min: yLo, max: yHi,
+              title: { display: true, text: 'plan cost, log scale (lower is better)', color: '#64748B', font: { size: 10 } },
+              afterBuildTicks: axis => { axis.ticks = yTicks.map(v => ({ value: v })); },
+              ticks: { color: '#94A3B8', callback: v => Math.round(v).toLocaleString() },
+              grid: { color: '#1E293B' },
+            },
+          },
+          plugins: {
+            legend: {
+              labels: { color: '#F8FAFC', boxWidth: 14, font: { family: 'Space Grotesk', size: 10, weight: 'bold' } },
+            },
+            tooltip: {
+              callbacks: {
+                title: items => items.length ? Math.round(items[0].parsed.x) + '% through the search' : '',
+              },
+            },
+          },
+        },
+      });
+
+      if (note) {
+        const ours = series.find(sr => sr.ours);
+        const missing = results
+          .filter(r => !Array.isArray(r.convergence_curve) || r.convergence_curve.length <= 1)
+          .map(r => shortAlgoName(r.algorithm));
+
+        if (ours) {
+          const first = ours.data[0], last = ours.data[ours.data.length - 1];
+          const drop = first > 0 ? ((first - last) / first) * 100 : 0;
+          // Where the other searches stop moving is the local minimum made visible.
+          const flatOthers = series.filter(sr => !sr.ours).map(sr => {
+            const d = sr.data;
+            let stalled = d.length - 1;
+            for (let k = d.length - 1; k > 0; k--) {
+              if (Math.abs(d[k] - d[k - 1]) > Math.abs(d[0]) * 1e-4) { stalled = k; break; }
+            }
+            // As a share of that algorithm's own budget, to match the x-axis.
+            return { label: sr.label, pct: d.length > 1 ? (stalled / (d.length - 1)) * 100 : 100 };
+          }).sort((a, b) => a.pct - b.pct);
+
+          note.innerHTML = '<b>Read it left to right.</b> Our search improves its plan by '
+            + drop.toFixed(0) + '% across the run'
+            + (flatOthers.length
+              ? ', while ' + flatOthers[0].label + ' flattens out about '
+              + flatOthers[0].pct.toFixed(0) + '% of the way through and stops finding anything better.'
+              : '.')
+            + ' A flat line is a search that has run out of moves it can see — the '
+            + '<b>local minimum</b> described above. QPSO keeps descending because it can jump to a '
+            + 'different plan entirely instead of only stepping to a neighbouring one.'
+            + (missing.length
+              ? ' ' + missing.join(' and ') + ' draws no line at all: it makes a single pass and stops.'
+              : '');
         }
-
-        renderJudgeComparison();
-      } catch (e) {
-        console.warn("Dynamic simulation fallback:", e);
-        loadPresetScenario();
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<span>🚨</span> Simulate Dynamic Bottleneck`;
-        // Keep a fallback warning on screen; clear ordinary progress text.
-        if (!state.usedOsmFallback) setJudgeStatus(null);
       }
     }
 
+    // ---- "Why QPSO wins", tied to the numbers actually measured -------------
+    function renderWhyQpsoWins(results) {
+      const card = document.getElementById('whyQpsoWins');
+      const body = document.getElementById('whyQpsoBody');
+      if (!card || !body || !results || !results.length) return;
 
+      const ours = results.find(r => isOurAlgorithm(r.algorithm));
+      const greedy = results.find(r => isUsualMethod(r.algorithm));
+      const area = areaByKey(execState.areaKey);
+      if (!ours) { card.hidden = true; return; }
 
+      const gain = (greedy && greedy.time > 0) ? ((greedy.time - ours.time) / greedy.time) * 100 : null;
+      const beaten = results.filter(r => !isOurAlgorithm(r.algorithm) && r.time > ours.time).length;
+      const rivals = results.length - 1;
 
+      body.innerHTML =
+        '<div class="why-grid">'
+        + '<div class="why-item">'
+        + '<div class="why-num">[ 01 ]</div>'
+        + '<h4>Greedy stops early because every next step looks worse</h4>'
+        + '<p>The nearest-stop method commits to a shape of route and then cannot improve on it: '
+        + 'every small change it can try costs more in the short run, so it halts. On '
+        + area.name + ' that left it '
+        + (gain !== null && gain > 0 ? '<b>' + gain.toFixed(0) + '% slower</b>' : 'behind')
+        + ' than our plan over the same stops. It is not short of computing power — it is '
+        + 'stuck in a <b>local minimum</b>.</p>'
+        + '</div>'
+        + '<div class="why-item">'
+        + '<div class="why-num">[ 02 ]</div>'
+        + '<h4>QPSO can jump instead of only stepping</h4>'
+        + '<p>Each candidate plan in our search is drawn from a probability distribution around the '
+        + 'best plans found so far, rather than nudged one step at a time. That lets it land '
+        + 'somewhere completely different in a single move, cross the ridge the greedy method '
+        + 'cannot climb, and carry on improving — exactly what the curve above shows it doing long '
+        + 'after the others flatten.</p>'
+        + '</div>'
+        + '<div class="why-item">'
+        + '<div class="why-num">[ 03 ]</div>'
+        + '<h4>Then it tidies its own work</h4>'
+        + '<p>A 2-opt / or-opt pass re-reads the finished routes for crossings and doubling back and '
+        + 'straightens them out. Jumping finds the right neighbourhood; this pass extracts the last '
+        + 'few percent from it. Measured here: our plan beat <b>' + beaten + ' of ' + rivals
+        + '</b> rival methods on time on the road'
+        + (ours.feasible ? ', with every delivery inside its promised slot' : '') + '.</p>'
+        + '</div>'
+        + '</div>';
+
+      card.hidden = false;
+    }
 
     // Tells the viewer which real place the map shows, and carries OpenStreetMap's
-    // required attribution. Falls back to naming the synthetic city honestly rather
-    // than implying a real location.
+    // required attribution. Falls back to naming a stored run honestly rather than
+    // implying live data.
     function renderAreaBanner() {
       const el = document.getElementById('areaBanner');
       if (!el) return;
-      const nodes = state.network ? (state.network.num_nodes || 0) : 0;
-      const roads = state.network ? (state.network.num_edges || 0) : 0;
+      const nodes = execState.network ? (execState.network.num_nodes || 0) : 0;
+      const roads = execState.network ? (execState.network.num_edges || 0) : 0;
 
-      if (state.areaLabel) {
+      if (execState.areaLabel) {
         el.hidden = false;
         el.classList.remove('is-synthetic');
         el.innerHTML =
-          `<span class="area-pin">📍</span>`
-          + `<span>Real road network — <span class="area-name">${state.areaLabel}</span></span>`
-          + `<span class="area-meta">${nodes} junctions · ${roads} streets · `
-          + `${state.areaAttribution || '© OpenStreetMap contributors'}</span>`;
-      } else if (state.network) {
+          '<span class="area-pin">📍</span>'
+          + '<span>Real road network — <span class="area-name">' + execState.areaLabel + '</span></span>'
+          + '<span class="area-meta">' + nodes + ' junctions · ' + roads + ' streets · '
+          + (execState.areaAttribution || '© OpenStreetMap contributors') + '</span>';
+      } else if (execState.network) {
         el.hidden = false;
         el.classList.add('is-synthetic');
         el.innerHTML =
-          `<span class="area-pin">🧪</span>`
-          + `<span><span class="area-name">Synthetic test city</span> — not a real place</span>`
-          + `<span class="area-meta">${nodes} junctions · ${roads} streets</span>`;
+          '<span class="area-pin">🧪</span>'
+          + '<span><span class="area-name">Stored demo run</span> — not live data</span>'
+          + '<span class="area-meta">' + nodes + ' junctions · ' + roads + ' streets</span>';
       } else {
         el.hidden = true;
       }
@@ -3683,80 +4285,6 @@
       el.classList.toggle('is-warn', !!isWarning);
       el.textContent = message;
     }
-
-    // ---------------------------------------------------------------------------
-    // Real-city (OpenStreetMap) network loading
-    //
-    // A bounding box is used rather than place:"New Delhi, India" on purpose.
-    // A place name has to be geocoded by Nominatim first, which rate-limits by IP
-    // and returns no useful error when it refuses — osmnx then fails with
-    // "cannot access local variable 'response'". On shared hosting (Render's free
-    // tier) that block can be triggered by another tenant entirely. A bbox skips
-    // geocoding, so it only depends on Overpass, and it always covers exactly the
-    // same area instead of whatever the geocoder returns that day.
-    //
-    // Load time is set by Overpass server load, not by how large the area is:
-    // the same backend returned 426 nodes in 44s and 316 nodes in 169s minutes
-    // apart. So it is treated as slow-and-unpredictable, with a fallback, rather
-    // than tuned for speed.
-    // ---------------------------------------------------------------------------
-    const DELHI_BBOX = {
-      north: 28.655, south: 28.615, east: 77.245, west: 77.195,   // central New Delhi
-      max_nodes: 500, network_type: "drive",
-    };
-
-    async function loadRealCityNetwork(onStatus) {
-      // 1. Pre-downloaded real Delhi roads, shipped with the app. Loads in
-      //    milliseconds and cannot be rate-limited, so this is the demo path.
-      try {
-        if (onStatus) onStatus('Loading the real Delhi road network…');
-        const network = await api('/api/network/from_cache', {
-          method: 'POST',
-          body: JSON.stringify({ name: 'delhi_central', seed: 42 }),
-        });
-        state.areaLabel = network.area_label || null;
-        state.areaAttribution = network.attribution || null;
-        return { network, live: false };
-      } catch (err) {
-        console.warn('Cached city network unavailable, trying a live OSM download:', err);
-      }
-
-      // 2. Live download. Kept as a backstop for when no cache has been built,
-      //    but it depends on OpenStreetMap answering, which from shared hosting is
-      //    unreliable — measured at 44s, 169s and outright failure within one hour.
-      if (onStatus) onStatus('Downloading live from OpenStreetMap — this can take a minute or two…');
-      const network = await api('/api/network/from_osm', {
-        method: 'POST',
-        body: JSON.stringify(DELHI_BBOX),
-      });
-      state.areaLabel = network.area_label || 'Central New Delhi';
-      state.areaAttribution = network.attribution || '© OpenStreetMap contributors (ODbL)';
-      return { network, live: true };
-    }
-
-    // Falls back to the synthetic city rather than leaving the demo dead if no real
-    // network can be obtained at all. Returns {network, usedFallback}.
-    async function loadPresetNetwork(presetKey, onStatus) {
-      if (presetKey === 'delhi_osm') {
-        try {
-          const { network } = await loadRealCityNetwork(onStatus);
-          return { network, usedFallback: false };
-        } catch (err) {
-          console.warn('No real city network available, falling back to the synthetic city:', err);
-          if (onStatus) onStatus('OpenStreetMap did not respond — falling back to the synthetic city network.');
-        }
-      }
-      if (onStatus && presetKey !== 'delhi_osm') onStatus('Building the synthetic city network…');
-      const network = await api('/api/network/generate', {
-        method: 'POST',
-        body: JSON.stringify({ n_nodes: 30, connectivity: 0.15, seed: 42, grid_size: 100.0 }),
-      });
-      state.areaLabel = null;
-      state.areaAttribution = null;
-      return { network, usedFallback: presetKey === 'delhi_osm' };
-    }
-
-
 
     // Colours a KPI badge by outcome. A regression must not sit in the same green
     // as an improvement — that is how "0.0% / Save 0m" managed to look like a win.
@@ -3929,7 +4457,7 @@
       document.getElementById('judgeTableBody').innerHTML = tbodyHtml;
 
       // Save metrics to state for AI Copilot context
-      state.comparisonMetrics = {
+      execState.comparisonMetrics = {
         timeBefore, timeAfter, timeSavedMin, timeSavedPct,
         delayBefore, delayAfter, delaySavedMin, delaySavedPct,
         distBefore, distAfter, distSavedKm, distSavedPct,
@@ -3970,7 +4498,7 @@
     }
 
     function renderImpact() {
-      const m = state.comparisonMetrics;
+      const m = execState.comparisonMetrics;
       const opsEl = document.getElementById('impactOps');
       const envEl = document.getElementById('impactEnv');
       const scaleEl = document.getElementById('impactScale');
@@ -3992,7 +4520,7 @@
       // ---- Operational (measured) ----------------------------------------
       const minsSaved = m.timeSavedMin;
       const hoursSaved = minsSaved / 60;
-      const nStops = (state.vrp && state.vrp.customers) ? state.vrp.customers.length : null;
+      const nStops = (execState.vrp && execState.vrp.customers) ? execState.vrp.customers.length : null;
 
       const ops = [];
       ops.push(row(
@@ -4058,7 +4586,7 @@
       // ---- Scale-up (explicit projection) ---------------------------------
       const fleetInput = document.getElementById('scaleFleet');
       const cityFleet = Math.max(1, Math.min(10000, parseInt(fleetInput && fleetInput.value, 10) || 100));
-      const ourVehicles = (state.vrp && state.vrp.n_vehicles) ? state.vrp.n_vehicles : null;
+      const ourVehicles = (execState.vrp && execState.vrp.n_vehicles) ? execState.vrp.n_vehicles : null;
 
       // Without the real vehicle count the scaling factor is unknown, and guessing
       // one (e.g. 1) silently multiplies the projection several times over. Say so
@@ -4381,52 +4909,11 @@
       }
     }
 
-    async function runAlgorithmComparison() {
-      const btn = document.getElementById('btnAlgoCompare');
-      const grid = document.getElementById('algoCompareGrid');
-      btn.disabled = true;
-      btn.innerHTML = '<span>⏳</span> Running all five…';
-      grid.innerHTML = '<div class="compare-empty">Solving the same instance with every algorithm…</div>';
-
-      try {
-        if (!state.vrp) {
-          const presetKey = document.getElementById('judgePreset').value;
-          const loaded = await loadPresetNetwork(presetKey, setJudgeStatus);
-          state.network = loaded.network;
-          renderAreaBanner();
-          state.vrp = await api('/api/vrp/generate', {
-            method: 'POST',
-            body: JSON.stringify({
-              network_id: state.network.network_id,
-              n_customers: presetKey === 'delhi_osm' ? 16 : 12, depot: 0, vehicle_capacity: 80,
-              demand_min: 5, demand_max: 20, horizon: 480,
-              window_length_min: 60, window_length_max: 180, service_time: 10, seed: 1,
-            }),
-          });
-        }
-        const bench = await api('/api/benchmark/run', {
-          method: 'POST',
-          body: JSON.stringify({ vrp_id: state.vrp.vrp_id, max_iter: 150, seed: 1 }),
-        });
-        state.benchmarkResults = bench.results;
-        renderAlgorithmComparison(bench.results);
-        if (typeof syncAssistantContext === 'function') syncAssistantContext();
-      } catch (err) {
-        console.warn('Benchmark comparison failed:', err);
-        grid.innerHTML = '<div class="compare-empty">The benchmark could not be run — '
-          + 'the API may be asleep. Try again in a moment.</div>';
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span>▶</span> Run full benchmark';
-        setJudgeStatus(null);
-      }
-    }
-
     // ---------------------------------------------------------------------------
     // Judge View Map Rendering (Side-by-Side Before & After)
     // ---------------------------------------------------------------------------
     function setCompareMode(mode) {
-      state.compareMode = mode;
+      execState.compareMode = mode;
       document.getElementById('pill_split').classList.toggle('active', mode === 'split');
       document.getElementById('pill_before').classList.toggle('active', mode === 'before');
       document.getElementById('pill_after').classList.toggle('active', mode === 'after');
@@ -4457,14 +4944,14 @@
     }
 
     function renderJudgeComparison() {
-      if (!state.network) {
-        loadPresetScenario();
+      if (!execState.network) {
+        loadOfflineFallback();
         return;
       }
 
-      const nodes = state.network.nodes;
-      const edges = state.network.edges;
-      const isGeo = state.network.is_geo;
+      const nodes = execState.network.nodes;
+      const edges = execState.network.edges;
+      const isGeo = execState.network.is_geo;
 
       if (!isGeo) {
         document.getElementById('leafletJudgeBefore').style.display = 'none';
@@ -4492,11 +4979,11 @@
         const sy = y => offsetY + (y - minY) * scale;
 
         // Draw Before (Baseline)
-        renderSVGToCanvas('svgJudgeBefore', nodes, edges, state.vrp, sx, sy, coords, state.baselineSolution, true);
+        renderSVGToCanvas('svgJudgeBefore', nodes, edges, execState.vrp, sx, sy, coords, execState.baselineSolution, true);
 
         // Draw After (QPSO) or Overlay
-        const overlayBaseline = (state.compareMode === 'overlay') ? state.baselineSolution : null;
-        renderSVGToCanvas('svgJudgeAfter', nodes, edges, state.vrp, sx, sy, coords, state.optimizedSolution, false, overlayBaseline);
+        const overlayBaseline = (execState.compareMode === 'overlay') ? execState.baselineSolution : null;
+        renderSVGToCanvas('svgJudgeAfter', nodes, edges, execState.vrp, sx, sy, coords, execState.optimizedSolution, false, overlayBaseline);
       } else {
         document.getElementById('svgJudgeBefore').style.display = 'none';
         document.getElementById('svgJudgeAfter').style.display = 'none';
@@ -4759,13 +5246,13 @@
     //  Draws every edge of the road network as a visible directed segment:
     //    • White casing halo → colored line → directional arrow → node dots
     // =========================================================================
-    function drawDirectedRoadGraphLeaflet(layerGroup, map, paneName) {
-      if (!state.network || !state.network.edges) return;
-      const coords = nodeCoordMap();
+    function drawDirectedRoadGraphLeaflet(layerGroup, map, paneName, ctx = state) {
+      if (!ctx.network || !ctx.network.edges) return;
+      const coords = nodeCoordMap(ctx);
       const drawnNodes = new Set();
       const pOpts = paneName ? { pane: paneName } : {};
 
-      for (const e of state.network.edges) {
+      for (const e of ctx.network.edges) {
         const a = coords[e.u], b = coords[e.v];
         if (!a || !b) continue;
 
@@ -4829,9 +5316,9 @@
     //  Draws each vehicle's delivery route with white contrast halo, glowing
     //  flowing animated stroke, tooltips, and directional flow arrows.
     // =========================================================================
-    function drawVehicleRoutesLeaflet(layerGroup, solution, coords, isDashed, map, paneName) {
+    function drawVehicleRoutesLeaflet(layerGroup, solution, coords, isDashed, map, paneName, ctx = state) {
       if (!solution || !solution.routes) return;
-      const depotId = (state.vrp && state.vrp.depot !== undefined) ? state.vrp.depot : 0;
+      const depotId = (ctx.vrp && ctx.vrp.depot !== undefined) ? ctx.vrp.depot : 0;
       const pOpts = paneName ? { pane: paneName } : {};
 
       solution.routes.forEach((route, i) => {
@@ -4901,8 +5388,8 @@
     //  Stacks:  Layer 1 (tiles) → Layer 2 (graph) → Layer 3 (routes) → markers
     // =========================================================================
     function renderJudgeLeaflet() {
-      if (!state.network || !state.network.nodes) return;
-      const nodes = state.network.nodes;
+      if (!execState.network || !execState.network.nodes) return;
+      const nodes = execState.network.nodes;
       const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
       const tileUrl = 'https://tile.openstreetmap.de/{z}/{x}/{y}.png';
       const tileOpts = {
@@ -4932,120 +5419,421 @@
       }
 
       // ─── BEFORE MAP ─────────────────────────────────────────────────────
-      state.judgeMapBefore = setupMap('leafletJudgeBefore', state.judgeMapBefore);
-      if (!state.judgeGraphBefore) {
-        state.judgeGraphBefore = L.layerGroup().addTo(state.judgeMapBefore);
-        state.judgeRouteBefore = L.layerGroup().addTo(state.judgeMapBefore);
-        state.judgeMarkerBefore = L.layerGroup().addTo(state.judgeMapBefore);
+      execState.judgeMapBefore = setupMap('leafletJudgeBefore', execState.judgeMapBefore);
+      if (!execState.judgeGraphBefore) {
+        execState.judgeGraphBefore = L.layerGroup().addTo(execState.judgeMapBefore);
+        execState.judgeRouteBefore = L.layerGroup().addTo(execState.judgeMapBefore);
+        execState.judgeMarkerBefore = L.layerGroup().addTo(execState.judgeMapBefore);
 
         L.control.layers(null, {
-          '🗺️ Road Network': state.judgeGraphBefore,
-          '🚛 Vehicle Routes': state.judgeRouteBefore,
-          '📍 Stops & Depot': state.judgeMarkerBefore
-        }, { collapsed: true, position: 'topright' }).addTo(state.judgeMapBefore);
+          '🗺️ Road Network': execState.judgeGraphBefore,
+          '🚛 Vehicle Routes': execState.judgeRouteBefore,
+          '📍 Stops & Depot': execState.judgeMarkerBefore
+        }, { collapsed: true, position: 'topright' }).addTo(execState.judgeMapBefore);
       }
 
       // ─── AFTER MAP ──────────────────────────────────────────────────────
-      state.judgeMapAfter = setupMap('leafletJudgeAfter', state.judgeMapAfter);
-      if (!state.judgeGraphAfter) {
-        state.judgeGraphAfter = L.layerGroup().addTo(state.judgeMapAfter);
-        state.judgeRouteAfter = L.layerGroup().addTo(state.judgeMapAfter);
-        state.judgeMarkerAfter = L.layerGroup().addTo(state.judgeMapAfter);
+      execState.judgeMapAfter = setupMap('leafletJudgeAfter', execState.judgeMapAfter);
+      if (!execState.judgeGraphAfter) {
+        execState.judgeGraphAfter = L.layerGroup().addTo(execState.judgeMapAfter);
+        execState.judgeRouteAfter = L.layerGroup().addTo(execState.judgeMapAfter);
+        execState.judgeMarkerAfter = L.layerGroup().addTo(execState.judgeMapAfter);
 
         L.control.layers(null, {
-          '🗺️ Road Network': state.judgeGraphAfter,
-          '🚛 Vehicle Routes': state.judgeRouteAfter,
-          '📍 Stops & Depot': state.judgeMarkerAfter
-        }, { collapsed: true, position: 'topright' }).addTo(state.judgeMapAfter);
+          '🗺️ Road Network': execState.judgeGraphAfter,
+          '🚛 Vehicle Routes': execState.judgeRouteAfter,
+          '📍 Stops & Depot': execState.judgeMarkerAfter
+        }, { collapsed: true, position: 'topright' }).addTo(execState.judgeMapAfter);
       }
 
       function drawBothJudgeMaps() {
         const curCoords = nodeCoordMap();
 
         // ─── DRAW BEFORE MAP (3 layers) ───────────────────────────────────
-        state.judgeGraphBefore.clearLayers();
-        state.judgeRouteBefore.clearLayers();
-        state.judgeMarkerBefore.clearLayers();
+        execState.judgeGraphBefore.clearLayers();
+        execState.judgeRouteBefore.clearLayers();
+        execState.judgeMarkerBefore.clearLayers();
 
-        drawDirectedRoadGraphLeaflet(state.judgeGraphBefore, state.judgeMapBefore, 'roadGraphPane');                          // Layer 2
-        drawVehicleRoutesLeaflet(state.judgeRouteBefore, state.baselineSolution, curCoords, true, state.judgeMapBefore, 'vehicleRoutePane');  // Layer 3
-        markDepotAndCustomers(state.judgeMarkerBefore, true, state.baselineSolution);  // Top
+        drawDirectedRoadGraphLeaflet(execState.judgeGraphBefore, execState.judgeMapBefore, 'roadGraphPane');                          // Layer 2
+        drawVehicleRoutesLeaflet(execState.judgeRouteBefore, execState.baselineSolution, curCoords, true, execState.judgeMapBefore, 'vehicleRoutePane');  // Layer 3
+        markDepotAndCustomers(execState.judgeMarkerBefore, true, execState.baselineSolution);  // Top
 
         // ─── DRAW AFTER MAP (3 layers) ────────────────────────────────────
-        state.judgeGraphAfter.clearLayers();
-        state.judgeRouteAfter.clearLayers();
-        state.judgeMarkerAfter.clearLayers();
+        execState.judgeGraphAfter.clearLayers();
+        execState.judgeRouteAfter.clearLayers();
+        execState.judgeMarkerAfter.clearLayers();
 
-        drawDirectedRoadGraphLeaflet(state.judgeGraphAfter, state.judgeMapAfter, 'roadGraphPane');                            // Layer 2
-        drawVehicleRoutesLeaflet(state.judgeRouteAfter, state.optimizedSolution, curCoords, false, state.judgeMapAfter, 'vehicleRoutePane');  // Layer 3
-        markDepotAndCustomers(state.judgeMarkerAfter, true, state.optimizedSolution);    // Top
+        drawDirectedRoadGraphLeaflet(execState.judgeGraphAfter, execState.judgeMapAfter, 'roadGraphPane');                            // Layer 2
+        drawVehicleRoutesLeaflet(execState.judgeRouteAfter, execState.optimizedSolution, curCoords, false, execState.judgeMapAfter, 'vehicleRoutePane');  // Layer 3
+        markDepotAndCustomers(execState.judgeMarkerAfter, true, execState.optimizedSolution);    // Top
       }
 
       drawBothJudgeMaps();
 
       // Ensure proper sizing and bounds after layout settles
       setTimeout(() => {
-        state.judgeMapBefore.invalidateSize();
-        state.judgeMapAfter.invalidateSize();
-        state.judgeMapBefore.fitBounds(bounds, { padding: [30, 30] });
-        state.judgeMapAfter.fitBounds(bounds, { padding: [30, 30] });
+        execState.judgeMapBefore.invalidateSize();
+        execState.judgeMapAfter.invalidateSize();
+        execState.judgeMapBefore.fitBounds(bounds, { padding: [30, 30] });
+        execState.judgeMapAfter.fitBounds(bounds, { padding: [30, 30] });
         drawBothJudgeMaps();
       }, 100);
     }
 
     // ---------------------------------------------------------------------------
-    // Network mode toggle
+    // Map-driven instance builder (Engineering Control Room)
+    //
+    // The old flow asked for a node count and a place name and handed back a
+    // network you had no say in. This one works the way a planner actually
+    // thinks: pan to the district, drag a box round it, then click the depot and
+    // the stops you want served. The instance is built from exactly those nodes.
     // ---------------------------------------------------------------------------
-    function setNetworkMode(mode) {
-      state.networkMode = mode;
-      document.getElementById('segSynthetic').classList.toggle('active', mode === 'synthetic');
-      document.getElementById('segOsm').classList.toggle('active', mode === 'osm');
-      document.getElementById('synFields').style.display = mode === 'synthetic' ? 'block' : 'none';
-      document.getElementById('osmFields').style.display = mode === 'osm' ? 'block' : 'none';
+
+    // A prompt floating over the map, so the next action is stated where the
+    // user is looking rather than in a side panel they have already read past.
+    function setMapPrompt(html, opts = {}) {
+      const el = document.getElementById('mapPrompt');
+      if (!el) return;
+      if (!html) { el.hidden = true; el.innerHTML = ''; return; }
+      el.hidden = false;
+      el.classList.toggle('is-warn', !!opts.warn);
+      el.innerHTML = html + (opts.cancel
+        ? ' <button onclick="cancelMapMode()">cancel</button>' : '');
     }
 
-    // ---------------------------------------------------------------------------
-    // Network generation (Control Room)
-    // ---------------------------------------------------------------------------
-    async function generateNetwork() {
-      const btn = event.target;
-      btn.disabled = true; btn.textContent = 'GENERATING…';
-      try {
-        let net;
-        if (state.networkMode === 'synthetic') {
-          net = await api('/api/network/generate', {
-            method: 'POST',
-            body: JSON.stringify({
-              n_nodes: +document.getElementById('n_nodes').value,
-              connectivity: +document.getElementById('connectivity').value,
-              seed: +document.getElementById('net_seed').value,
-              grid_size: 100.0,
-            }),
-          });
+    // The control-room map exists from the start, with no network loaded, because
+    // the first thing to do on it is pan the world and draw a boundary.
+    function ensureControlMap() {
+      if (state.map) return state.map;
+
+      state.map = L.map('leafletMap', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+      L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(state.map);
+
+      if (!state.map.getPane('roadGraphPane')) {
+        state.map.createPane('roadGraphPane').style.zIndex = 410;
+      }
+      if (!state.map.getPane('vehicleRoutePane')) {
+        state.map.createPane('vehicleRoutePane').style.zIndex = 450;
+      }
+
+      state.roadLayer = L.layerGroup().addTo(state.map);
+      state.nodeLayer = L.layerGroup().addTo(state.map);
+      state.routeLayer = L.layerGroup().addTo(state.map);
+
+      attachBoundaryDrawing(state.map);
+      return state.map;
+    }
+
+    // Rubber-band rectangle. Written directly against Leaflet's mouse events
+    // rather than pulling in Leaflet.draw: one rectangle is all this needs, and
+    // a plugin would be a second CDN dependency to fail in front of judges.
+    function attachBoundaryDrawing(map) {
+      let origin = null;
+      let sketch = null;
+
+      map.on('mousedown', (e) => {
+        if (state.drawMode !== 'boundary') return;
+        origin = e.latlng;
+        map.dragging.disable();
+        if (sketch) { map.removeLayer(sketch); sketch = null; }
+      });
+
+      map.on('mousemove', (e) => {
+        if (state.drawMode !== 'boundary' || !origin) return;
+        const bounds = L.latLngBounds(origin, e.latlng);
+        if (sketch) {
+          sketch.setBounds(bounds);
         } else {
-          net = await api('/api/network/from_osm', {
-            method: 'POST',
-            body: JSON.stringify({
-              place: document.getElementById('osm_place').value,
-              network_type: document.getElementById('osm_type').value,
-              max_nodes: +document.getElementById('osm_max_nodes').value,
-              seed: 1,
-            }),
-          });
+          sketch = L.rectangle(bounds, {
+            color: '#00F5D4', weight: 2, fillColor: '#00F5D4', fillOpacity: 0.08, dashArray: '6 4',
+          }).addTo(map);
         }
+      });
+
+      map.on('mouseup', (e) => {
+        if (state.drawMode !== 'boundary' || !origin) return;
+        const bounds = L.latLngBounds(origin, e.latlng);
+        origin = null;
+        map.dragging.enable();
+
+        // A click rather than a drag is not a boundary.
+        const span = bounds.getNorth() - bounds.getSouth();
+        if (!span || span < 0.0004) {
+          if (sketch) { map.removeLayer(sketch); sketch = null; }
+          setMapPrompt('That was a click, not a box — press and <b>drag</b> to draw a boundary.',
+            { warn: true, cancel: true });
+          return;
+        }
+
+        if (state.boundaryLayer) map.removeLayer(state.boundaryLayer);
+        if (sketch) { map.removeLayer(sketch); sketch = null; }
+
+        state.boundaryLayer = L.rectangle(bounds, {
+          color: '#00F5D4', weight: 2.5, fillColor: '#00F5D4', fillOpacity: 0.06,
+        }).addTo(map);
+        state.bounds = {
+          north: bounds.getNorth(), south: bounds.getSouth(),
+          east: bounds.getEast(), west: bounds.getWest(),
+        };
+
+        setDrawMode(null);
+        document.getElementById('btnLoadArea').disabled = false;
+        document.getElementById('btnClearBoundary').disabled = false;
+
+        const km = (bounds.getNorth() - bounds.getSouth()) * 111;
+        setMapPrompt('Boundary set — roughly ' + km.toFixed(1) + ' km across. '
+          + 'Now press <b>Load roads in this boundary</b>.');
+      });
+    }
+
+    function setDrawMode(mode) {
+      state.drawMode = mode;
+      const wrap = document.getElementById('mapWrap');
+      wrap.classList.toggle('drawing', mode === 'boundary');
+      wrap.classList.toggle('picking', mode === 'depot' || mode === 'stops');
+      document.getElementById('segPickDepot').classList.toggle('active', mode === 'depot');
+      document.getElementById('segPickStops').classList.toggle('active', mode === 'stops');
+    }
+
+    function cancelMapMode() {
+      setDrawMode(null);
+      setMapPrompt(null);
+    }
+
+    function startBoundaryDraw() {
+      ensureControlMap();
+      setDrawMode('boundary');
+      setMapPrompt('Drag a box around the district you want to route through.', { cancel: true });
+    }
+
+    function clearBoundary() {
+      if (state.boundaryLayer && state.map) state.map.removeLayer(state.boundaryLayer);
+      state.boundaryLayer = null;
+      state.bounds = null;
+      document.getElementById('btnLoadArea').disabled = true;
+      document.getElementById('btnClearBoundary').disabled = true;
+      setMapPrompt(null);
+    }
+
+    // Pulls the real roads inside the drawn box. A bbox is used rather than a
+    // place name on purpose: a name has to be geocoded first, and Nominatim
+    // rate-limits by IP with no useful error when it refuses.
+    async function loadDrawnArea() {
+      if (!state.bounds) return;
+      const btn = document.getElementById('btnLoadArea');
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = 'DOWNLOADING ROADS…';
+      setMapPrompt('Fetching the road network from OpenStreetMap — this can take a minute.');
+
+      try {
+        const net = await api('/api/network/from_osm', {
+          method: 'POST',
+          body: JSON.stringify({
+            north: state.bounds.north, south: state.bounds.south,
+            east: state.bounds.east, west: state.bounds.west,
+            network_type: 'drive',
+            max_nodes: +document.getElementById('osm_max_nodes').value || 400,
+            seed: +document.getElementById('net_seed').value || 42,
+          }),
+        });
+
         state.network = net;
         state.vrp = null;
+        state.selectedDepot = null;
+        state.selectedStops = [];
+        state.baselineSolution = null;
+        state.optimizedSolution = null;
+
         document.getElementById('netInfo').innerHTML =
-          `<div class="stat-line"><span>Nodes / Edges</span><span>${net.num_nodes} / ${net.num_edges}</span></div>
-       <div class="stat-line"><span>Mode</span><span>${net.is_geo ? 'OSM (real)' : 'synthetic'}</span></div>`;
-        document.getElementById('btnGenVRP').disabled = false;
+          '<div class="stat-line"><span>Junctions / streets</span><span>'
+          + net.num_nodes + ' / ' + net.num_edges + '</span></div>'
+          + '<div class="stat-line"><span>Source</span><span>'
+          + (net.attribution || 'OpenStreetMap') + '</span></div>';
+
+        document.getElementById('emptyHint').style.display = 'none';
+        for (const id of ['segPickDepot', 'segPickStops', 'btnRandomStops', 'btnClearPicks']) {
+          document.getElementById(id).disabled = false;
+        }
+        document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
-        renderNetwork();
+        document.getElementById('btnDynamicRun').disabled = true;
+
+        renderControlNetwork();
+        setPickMode('depot');
       } catch (e) {
-        alert('Failed to generate network: ' + e.message);
+        const near = nearestCuratedArea(state.bounds);
+        setMapPrompt('OpenStreetMap could not serve that box — it rate-limits by IP and is '
+          + 'often busy. You can work on a district shipped with the app instead: '
+          + '<button onclick="loadCuratedIntoControlRoom(&quot;' + near.key + '&quot;)">'
+          + 'load ' + near.name + '</button>', { warn: true });
+        console.warn('Live OSM download failed:', e);
       } finally {
-        btn.disabled = false; btn.textContent = 'Generate network';
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    }
+
+    // Straight-line pick of the shipped district closest to whatever was drawn.
+    function nearestCuratedArea(bounds) {
+      if (!bounds) return CURATED_AREAS[0];
+      const lat = (bounds.north + bounds.south) / 2;
+      const lon = (bounds.east + bounds.west) / 2;
+      return CURATED_AREAS.reduce((best, a) => {
+        const d = Math.pow(a.lat - lat, 2) + Math.pow(a.lon - lon, 2);
+        return (best === null || d < best.d) ? Object.assign({ d }, a) : best;
+      }, null);
+    }
+
+    // Loads a shipped district into the control room's own workspace. Note this
+    // writes to `state`, never `execState` — the landing page keeps its own run.
+    async function loadCuratedIntoControlRoom(key) {
+      const area = areaByKey(key);
+      setMapPrompt('Loading ' + area.name + '…');
+      try {
+        const net = await api('/api/network/from_cache', {
+          method: 'POST',
+          body: JSON.stringify({ name: area.key, seed: +document.getElementById('net_seed').value || 42 }),
+        });
+
+        state.network = net;
+        state.vrp = null;
+        state.selectedDepot = null;
+        state.selectedStops = [];
+        state.baselineSolution = null;
+        state.optimizedSolution = null;
+
+        document.getElementById('netInfo').innerHTML =
+          '<div class="stat-line"><span>Junctions / streets</span><span>'
+          + net.num_nodes + ' / ' + net.num_edges + '</span></div>'
+          + '<div class="stat-line"><span>Area</span><span>' + (net.area_label || area.name) + '</span></div>';
+
+        document.getElementById('emptyHint').style.display = 'none';
+        for (const id of ['segPickDepot', 'segPickStops', 'btnRandomStops', 'btnClearPicks']) {
+          document.getElementById(id).disabled = false;
+        }
+        document.getElementById('btnGenVRP').disabled = true;
+        document.getElementById('btnSolve').disabled = true;
+        document.getElementById('btnBench').disabled = true;
+        document.getElementById('btnDynamicRun').disabled = true;
+
+        renderControlNetwork();
+        setPickMode('depot');
+      } catch (e) {
+        setMapPrompt('Could not load that district either: ' + e.message, { warn: true });
+      }
+    }
+
+    // ---- Picking the depot and the stops ------------------------------------
+    function setPickMode(mode) {
+      if (!state.network) return;
+      setDrawMode(mode);
+      setMapPrompt(mode === 'depot'
+        ? 'Click the junction the vans should start and finish at.'
+        : 'Click the junctions to be served. Click a chosen stop again to drop it.',
+        { cancel: true });
+    }
+
+    function onNodeClick(nodeId) {
+      if (state.drawMode === 'depot') {
+        state.selectedDepot = nodeId;
+        // The depot cannot also be a stop.
+        state.selectedStops = state.selectedStops.filter(n => n !== nodeId);
+        setPickMode('stops');
+      } else if (state.drawMode === 'stops') {
+        if (nodeId === state.selectedDepot) return;
+        const at = state.selectedStops.indexOf(nodeId);
+        if (at >= 0) state.selectedStops.splice(at, 1);
+        else state.selectedStops.push(nodeId);
+      } else {
+        return;
+      }
+      renderPickableNodes();
+      updatePickUI();
+    }
+
+    // Scatters stops for someone who wants a quick run rather than a hand-built
+    // instance. Spread across the network rather than clustered, so the routes
+    // are worth looking at.
+    function pickRandomStops() {
+      if (!state.network) return;
+      const nodes = state.network.nodes;
+      if (!state.selectedDepot) state.selectedDepot = nodes[0].id;
+
+      const pool = nodes.filter(n => n.id !== state.selectedDepot);
+      const step = Math.max(1, Math.floor(pool.length / 12));
+      const picks = [];
+      for (let i = 0; i < pool.length && picks.length < 12; i += step) picks.push(pool[i].id);
+
+      state.selectedStops = picks;
+      renderPickableNodes();
+      updatePickUI();
+      setMapPrompt('Scattered ' + picks.length + ' stops. Adjust them by clicking, or build the instance.');
+    }
+
+    function clearPicks() {
+      state.selectedDepot = null;
+      state.selectedStops = [];
+      state.vrp = null;
+      if (state.routeLayer) state.routeLayer.clearLayers();
+      renderPickableNodes();
+      updatePickUI();
+    }
+
+    function updatePickUI() {
+      const depotEl = document.getElementById('pickDepotLabel');
+      const countEl = document.getElementById('pickStopCount');
+      if (depotEl) depotEl.textContent = state.selectedDepot === null ? '— not set —' : 'node ' + state.selectedDepot;
+      if (countEl) countEl.textContent = String(state.selectedStops.length);
+
+      const ready = state.selectedDepot !== null && state.selectedStops.length > 0;
+      document.getElementById('btnGenVRP').disabled = !ready;
+      document.getElementById('btnClearPicks').disabled = state.selectedDepot === null && !state.selectedStops.length;
+    }
+
+    // ---- Control-room map rendering (3 layers, same as the landing page) -----
+    function renderControlNetwork() {
+      ensureControlMap();
+      if (!state.network) return;
+
+      state.roadLayer.clearLayers();
+      drawDirectedRoadGraphLeaflet(state.roadLayer, state.map, 'roadGraphPane', state);
+
+      const nodes = state.network.nodes;
+      const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
+      setTimeout(() => {
+        state.map.invalidateSize();
+        state.map.fitBounds(bounds, { padding: [24, 24] });
+      }, 60);
+
+      renderPickableNodes();
+    }
+
+    // Every junction is clickable; colour says what it currently is.
+    function renderPickableNodes() {
+      if (!state.nodeLayer || !state.network) return;
+      state.nodeLayer.clearLayers();
+
+      const stopSet = new Set(state.selectedStops);
+      for (const n of state.network.nodes) {
+        const isDepot = n.id === state.selectedDepot;
+        const isStop = stopSet.has(n.id);
+        const marker = L.circleMarker([n.y, n.x], {
+          radius: isDepot ? 8 : isStop ? 6 : 3,
+          color: isDepot ? '#EA580C' : isStop ? '#FFFFFF' : '#475569',
+          weight: isDepot ? 3 : isStop ? 2 : 0,
+          fillColor: isDepot ? '#FFD166' : isStop ? '#00F5D4' : '#64748B',
+          fillOpacity: isDepot || isStop ? 1 : 0.55,
+        });
+        marker.bindTooltip(isDepot ? 'Depot (node ' + n.id + ')'
+          : isStop ? 'Stop ' + (state.selectedStops.indexOf(n.id) + 1) + ' — click to remove'
+            : 'Junction ' + n.id + ' — click to add');
+        marker.on('click', () => onNodeClick(n.id));
+        marker.addTo(state.nodeLayer);
       }
     }
 
@@ -5060,8 +5848,10 @@
           method: 'POST',
           body: JSON.stringify({
             network_id: state.network.network_id,
-            n_customers: +document.getElementById('n_customers').value,
-            depot: +document.getElementById('depot').value,
+            // The stops are the ones clicked on the map, not a random draw.
+            customer_nodes: state.selectedStops,
+            n_customers: state.selectedStops.length,
+            depot: state.selectedDepot,
             vehicle_capacity: +document.getElementById('capacity').value,
             demand_min: +document.getElementById('demand_min').value,
             demand_max: +document.getElementById('demand_max').value,
@@ -5074,15 +5864,20 @@
         });
         state.vrp = vrp;
         document.getElementById('vrpInfo').innerHTML =
-          `<div class="stat-line"><span>Vehicles available</span><span>${vrp.n_vehicles}</span></div>
-       <div class="stat-line"><span>Total demand</span><span>${vrp.total_demand.toFixed(1)}</span></div>`;
+          '<div class="stat-line"><span>Stops</span><span>' + vrp.customers.length + '</span></div>'
+          + '<div class="stat-line"><span>Vehicles available</span><span>' + vrp.n_vehicles + '</span></div>'
+          + '<div class="stat-line"><span>Total demand</span><span>' + vrp.total_demand.toFixed(1) + '</span></div>';
         document.getElementById('btnSolve').disabled = false;
         document.getElementById('btnBench').disabled = false;
-        renderNetwork();
+        document.getElementById('btnDynamicRun').disabled = false;
+        cancelMapMode();
+        setMapPrompt('Instance ready — ' + vrp.customers.length + ' stops, '
+          + vrp.n_vehicles + ' vans. Solve it from the right-hand panel.');
+        renderControlNetwork();
       } catch (e) {
-        alert('Failed to generate VRP instance: ' + e.message);
+        alert('Failed to build the instance: ' + e.message);
       } finally {
-        btn.disabled = false; btn.textContent = 'Generate VRP instance';
+        btn.disabled = false; btn.textContent = 'Build instance from selection';
       }
     }
 
@@ -5109,27 +5904,76 @@
         drawRoutes(result.routes);
         drawConvergence([{ label: result.algorithm, data: result.convergence_curve }]);
 
-        if (algo === 'qpso') {
-          state.optimizedSolution = result;
-          if (!state.baselineSolution) {
-            api('/api/vrp/solve', {
-              method: 'POST',
-              body: JSON.stringify({ vrp_id: state.vrp.vrp_id, algorithm: 'greedy', n_particles: 10, max_iter: 50, seed: 1 }),
-            }).then(b => {
-              state.baselineSolution = b;
-              computeAndDisplayComparison(state.baselineSolution, state.optimizedSolution);
-            });
-          } else {
-            computeAndDisplayComparison(state.baselineSolution, state.optimizedSolution);
-          }
-        } else if (algo === 'greedy') {
-          state.baselineSolution = result;
-          if (state.optimizedSolution) computeAndDisplayComparison(state.baselineSolution, state.optimizedSolution);
-        }
+        // Held for the dynamic re-optimisation below. These stay inside the
+        // control room — the landing page keeps its own run.
+        if (algo === 'greedy') state.baselineSolution = result;
+        else state.optimizedSolution = result;
       } catch (e) {
         alert('Solve failed: ' + e.message);
       } finally {
         btn.disabled = false; btn.textContent = 'Solve';
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Dynamic bottleneck (Control Room)
+    //
+    // Closes a road the fleet is already driving through, part-way into the
+    // shift, and re-plans the vans that have not finished. This is the case a
+    // static plan cannot answer at all, so it belongs next to the map rather
+    // than on a pitch page.
+    // ---------------------------------------------------------------------------
+    async function runDynamicTrafficDemo() {
+      if (!state.vrp) return;
+      const btn = document.getElementById('btnDynamicRun');
+      const label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ RE-OPTIMISING…';
+      setMapPrompt('Blocking a road mid-shift and re-planning the vans still out…');
+
+      try {
+        const dyn = await api('/api/vrp/solve-dynamic', {
+          method: 'POST',
+          body: JSON.stringify({
+            vrp_id: state.vrp.vrp_id,
+            incident_factor: +document.getElementById('incident_severity').value || 4.0,
+            trigger_time_min: +document.getElementById('incident_at').value || 90.0,
+            algorithm: 'qpso',
+            n_particles: +document.getElementById('n_particles').value || 50,
+            max_iter: +document.getElementById('max_iter').value || 150,
+            seed: 1,
+          }),
+        });
+
+        state.dynamicResult = dyn;
+        const stat = dyn.static_affected_solution || {};
+        const rerouted = dyn.dynamic_rerouted_solution || {};
+        const saved = (typeof stat.total_time === 'number' && typeof rerouted.total_time === 'number')
+          ? stat.total_time - rerouted.total_time : null;
+
+        document.getElementById('dynamicInfo').innerHTML =
+          '<div class="stat-line"><span>Kept to the old plan</span><span>'
+          + (typeof stat.total_time === 'number' ? stat.total_time.toFixed(1) + ' min' : '—') + '</span></div>'
+          + '<div class="stat-line"><span>Re-optimised</span><span>'
+          + (typeof rerouted.total_time === 'number' ? rerouted.total_time.toFixed(1) + ' min' : '—') + '</span></div>'
+          + '<div class="stat-line"><span>Time saved</span><span class="'
+          + (saved !== null && saved > 0 ? 'feas-yes' : 'feas-no') + '">'
+          + (saved === null ? '—' : (saved > 0 ? '−' : '+') + Math.abs(saved).toFixed(1) + ' min')
+          + '</span></div>';
+
+        // Show the re-planned routes on the map the engineer is looking at.
+        if (rerouted.routes) {
+          state.optimizedSolution = rerouted;
+          drawRoutes(rerouted.routes);
+        }
+        setMapPrompt(saved !== null && saved > 0
+          ? 'Re-optimised around the blockage — ' + saved.toFixed(1) + ' min saved against keeping the old plan.'
+          : 'Re-optimised around the blockage. Figures are in the panel on the right.');
+      } catch (e) {
+        setMapPrompt('Dynamic re-optimisation failed: ' + e.message, { warn: true });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = label;
       }
     }
 
@@ -5193,7 +6037,6 @@
           body: JSON.stringify({ vrp_id: state.vrp.vrp_id, algorithm: 'greedy', n_particles: 10, max_iter: 50, seed: 1 }),
         });
         state.baselineSolution = greedySolved;
-        computeAndDisplayComparison(state.baselineSolution, state.optimizedSolution);
       } catch (e) {
         alert('Benchmark failed: ' + e.message);
       } finally {
@@ -5204,18 +6047,24 @@
     function renderBenchTable(results) {
       const sorted = [...results].sort((a, b) => a.fitness - b.fitness);
       const bestFit = sorted[0].fitness;
-      let html = '<table><thead><tr><th>Algorithm</th><th>Fitness</th><th>Delay</th><th>Feasible</th><th>Runtime</th></tr></thead><tbody>';
-      for (const r of sorted) {
-        html += `<tr class="${r.fitness === bestFit ? 'best' : ''}">
-      <td><b>${r.algorithm}</b></td>
-      <td class="num">${r.fitness.toFixed(1)}</td>
-      <td class="num">${(r.congestion_delay_min || 0).toFixed(1)}m</td>
-      <td class="num">${r.feasible ? '✓' : '✗'}</td>
-      <td class="num">${r.runtime_ms.toFixed(0)}ms</td>
-    </tr>`;
-      }
-      html += '</tbody></table>';
-      document.getElementById('benchTableWrap').innerHTML = html;
+
+      document.getElementById('benchmarkBody').innerHTML = sorted.map(r =>
+        '<tr class="' + (r.fitness === bestFit ? 'best' : '') + '">'
+        + '<td><b>' + shortAlgoName(r.algorithm) + '</b></td>'
+        + '<td class="num">' + r.fitness.toFixed(1) + '</td>'
+        + '<td class="num">' + r.distance.toFixed(1) + '</td>'
+        + '<td class="num">' + r.time.toFixed(1) + '</td>'
+        + '<td class="num">' + (r.feasible ? '✓' : '✗') + '</td>'
+        + '<td class="num">' + (r.congestion_delay_min || 0).toFixed(1) + '</td>'
+        + '<td class="num">' + r.runtime_ms.toFixed(0) + '</td>'
+        + '</tr>'
+      ).join('');
+
+      const best = sorted[0];
+      document.getElementById('benchmarkSummary').innerHTML =
+        '<span>Best on this instance: <b>' + shortAlgoName(best.algorithm) + '</b>'
+        + ' — ' + best.time.toFixed(1) + ' min, ' + best.distance.toFixed(1) + ' km</span>';
+      document.getElementById('benchmarkSection').style.display = 'block';
     }
 
     // ---------------------------------------------------------------------------
@@ -5223,6 +6072,12 @@
     // ---------------------------------------------------------------------------
     function drawConvergence(series) {
       const ctx = document.getElementById('convChart');
+      if (!ctx) return;
+      series = (series || []).filter(s => Array.isArray(s.data) && s.data.length > 1);
+      if (!series.length) {
+        if (state.convChart) { state.convChart.destroy(); state.convChart = null; }
+        return;
+      }
       const maxLen = Math.max(...series.map(s => s.data.length));
       const labels = Array.from({ length: maxLen }, (_, i) => i);
       const palette = ['#00F5D4', '#7B5CFF', '#FEE440', '#FF0054', '#00BBF9'];
@@ -5252,54 +6107,22 @@
     // Control Room Map rendering (dual mode: Leaflet for OSM geo, SVG for synthetic)
     // ---------------------------------------------------------------------------
     function renderNetwork() {
-      document.getElementById('emptyHint').style.display = 'none';
-      if (state.network.is_geo) {
-        document.getElementById('leafletMap').style.display = 'block';
-        document.getElementById('svgWrap').style.display = 'none';
-        renderLeaflet();
-      } else {
-        document.getElementById('leafletMap').style.display = 'none';
-        document.getElementById('svgWrap').style.display = 'flex';
-        renderSVG();
-      }
+      renderControlNetwork();
     }
 
-    function renderLeaflet() {
-      if (!state.map) {
-        state.map = L.map('leafletMap', { zoomControl: true });
-        L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 19
-        }).addTo(state.map);
-        state.routeLayer = L.layerGroup().addTo(state.map);
-      }
-
-      const nodes = state.network.nodes;
-
-      setTimeout(() => {
-        state.map.invalidateSize();
-        const bounds = L.latLngBounds(nodes.map(n => [n.y, n.x]));
-        state.map.fitBounds(bounds, { padding: [20, 20] });
-      }, 50);
-
-      state.routeLayer.clearLayers();
-      for (const n of nodes) {
-        L.circleMarker([n.y, n.x], { radius: 2.5, color: '#334155', fillOpacity: 0.6, weight: 0 }).addTo(state.routeLayer);
-      }
-      markDepotAndCustomers(state.routeLayer, true);
-    }
-
-    function nodeCoordMap() {
+    // `ctx` is whichever workspace is being drawn — the control room (`state`)
+    // or the landing page (`execState`).
+    function nodeCoordMap(ctx = state) {
       const m = {};
-      if (!state.network || !state.network.nodes) return m;
-      for (const n of state.network.nodes) m[n.id] = n;
+      if (!ctx.network || !ctx.network.nodes) return m;
+      for (const n of ctx.network.nodes) m[n.id] = n;
       return m;
     }
 
-    function markDepotAndCustomers(layerOrGroup, isLeaflet, solution = null) {
-      if (!state.vrp) return;
-      const coords = nodeCoordMap();
-      const depotNode = coords[state.vrp.depot];
+    function markDepotAndCustomers(layerOrGroup, isLeaflet, solution = null, ctx = state) {
+      if (!ctx.vrp) return;
+      const coords = nodeCoordMap(ctx);
+      const depotNode = coords[ctx.vrp.depot];
       if (!depotNode) return;
 
       if (isLeaflet) {
@@ -5310,7 +6133,7 @@
             const color = VAN_COLORS[i % VAN_COLORS.length];
             let seq = 1;
             for (const nid of (route.full_path || [])) {
-              if (nid !== state.vrp.depot && !customerVisitMap[nid]) {
+              if (nid !== ctx.vrp.depot && !customerVisitMap[nid]) {
                 customerVisitMap[nid] = { stopSeq: seq++, color, vehicleId: i + 1 };
               }
             }
@@ -5318,7 +6141,7 @@
         }
 
         // Customer Markers
-        for (const c of state.vrp.customers) {
+        for (const c of ctx.vrp.customers) {
           const n = coords[c.node_id];
           if (!n) continue;
           const visit = customerVisitMap[c.node_id];
@@ -5342,7 +6165,9 @@
           html: `<div style="background:#0F172A; color:#FFD166; font-weight:900; font-family:'Space Grotesk',sans-serif; padding:4px 9px; border-radius:12px; border:2px solid #EA580C; box-shadow:0 3px 8px rgba(0,0,0,0.35); font-size:11px; white-space:nowrap; display:flex; align-items:center; gap:4px;"><span style="color:#EA580C;">🏁</span> START / DEPOT</div>`,
           iconSize: [130, 26], iconAnchor: [65, 13]
         });
-        L.marker([depotNode.y, depotNode.x], { icon: depotIcon }).bindTooltip('Depot — Central Hub (Connaught Place)').addTo(layerOrGroup);
+        const areaName = (ctx.network && ctx.network.area_label) ? ctx.network.area_label : 'this area';
+        L.marker([depotNode.y, depotNode.x], { icon: depotIcon })
+          .bindTooltip('Depot — every van starts and ends here (' + areaName + ')').addTo(layerOrGroup);
       }
     }
 
@@ -5404,14 +6229,13 @@
 
     function drawRoutes(routes) {
       if (!state.network) return;
-      const coords = nodeCoordMap();
+      const coords = nodeCoordMap(state);
 
       if (state.network.is_geo) {
+        // Routes get their own layer so the picked nodes underneath stay visible
+        // and stay clickable.
         state.routeLayer.clearLayers();
-        for (const n of state.network.nodes) {
-          L.circleMarker([n.y, n.x], { radius: 2.5, color: '#334155', fillOpacity: 0.6, weight: 0 }).addTo(state.routeLayer);
-        }
-        markDepotAndCustomers(state.routeLayer, true);
+        markDepotAndCustomers(state.routeLayer, true, null, state);
 
         routes.forEach((route, i) => {
           const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
@@ -5495,11 +6319,12 @@
     }
 
     function buildAssistantContext() {
-      const m = state.comparisonMetrics || {};
-      const base = state.baselineSolution || {};
-      const opt = state.optimizedSolution || {};
-      const scenKey = document.getElementById('judgePreset') ? document.getElementById('judgePreset').value : 'rush_hour';
-      const scenName = (typeof DEMO_SCENARIOS !== 'undefined' && DEMO_SCENARIOS[scenKey] && DEMO_SCENARIOS[scenKey].name) || 'Current Scenario';
+      const m = execState.comparisonMetrics || {};
+      const base = execState.baselineSolution || {};
+      const opt = execState.optimizedSolution || {};
+      const scenName = (execState.areaKey && typeof areaByKey === 'function')
+        ? areaByKey(execState.areaKey).name
+        : 'Current Scenario';
 
       // Every metric below is null unless it was actually measured this session.
       // Do NOT substitute placeholder numbers here: the assistant renders whatever
@@ -5834,7 +6659,17 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // ---------------------------------------------------------------------------
     initApiBase();   // must run before checkHealth() so it probes the right backend
     checkHealth();
-    loadPresetScenario();
+
+    // The landing page opens on a district already loaded, so the first thing a
+    // visitor sees is a real road network rather than an empty frame. If the API
+    // is asleep, the stored run stands in and says so.
+    renderAreaPicker();
+    selectArea(CURATED_AREAS[0].key, { quiet: true })
+      .catch(err => {
+        console.warn('Could not load the opening district, showing the stored run:', err);
+        loadOfflineFallback();
+      });
+
     setTimeout(initAssistantChat, 100);
 
   </script>
