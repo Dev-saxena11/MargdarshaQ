@@ -28,6 +28,7 @@ from app.core.classical_baselines_vrp import (
 from app.core.dynamic_vrp import simulate_dynamic_reroute
 from app.core import store
 from app.core.assistant import assistant_engine
+from app.core.rag import rag_engine
 from app.models.schemas import (
     NetworkGenerateRequest, NetworkResponse, NodeOut, EdgeOut, OSMNetworkRequest,
     CachedNetworkRequest,
@@ -37,6 +38,7 @@ from app.models.schemas import (
     VRPCompareRequest, VRPCompareResponse,
     TrafficIncidentRequest, TrafficIncidentResponse, DynamicSolveRequest, DynamicSolveResponse,
     AssistantChatRequest, AssistantChatResponse,
+    ChatRequest, ChatResponse, RAGStatusResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -533,4 +535,30 @@ def solve_dynamic_vrp(req: DynamicSolveRequest):
 def assistant_chat(req: AssistantChatRequest):
     """Answers judge/user questions about current solve results, QPSO, and map."""
     return assistant_engine.chat(req)
+
+
+# ---------------------------------------------------------------------------
+# Project-Grounded Chatbot / RAG (Issue #33)
+# ---------------------------------------------------------------------------
+
+@router.post("/chat", response_model=ChatResponse)
+def chat_endpoint(req: ChatRequest):
+    """
+    RAG-grounded project chatbot endpoint.
+    Retrieves context from project documents (README, PROJECT_STATUS.md, FORMULATION.md, etc.)
+    and returns an answer citing sources.
+    """
+    query = req.get_query()
+    return rag_engine.ask(query=query, context=req.context, top_k=req.top_k)
+
+
+@router.get("/chat/status", response_model=RAGStatusResponse)
+def chat_status():
+    """Returns RAG knowledge base statistics and indexed documents."""
+    return RAGStatusResponse(
+        total_chunks=len(rag_engine.chunks),
+        indexed_files=rag_engine.indexed_files,
+        status="ready" if rag_engine.chunks else "empty",
+    )
+
 
