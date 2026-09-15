@@ -90,26 +90,37 @@ rather than a broken stub.
 
 ## Document grounding / RAG (issue #33)
 
-Not implemented, and deliberately not designed here.
+Implemented in `app/core/rag.py`.
 
-[Issue #33](https://github.com/Dev-saxena11/SIH26137/issues/33) covers grounding
-the assistant in the project's own documentation (README, PROJECT_STATUS.md, the
-mathematical formulation) so it answers judge questions from project sources
-rather than the model's general knowledge. That issue is assigned and its design
-— retrieval strategy, chunking, ranking, storage, and whether it gets its own
-`/api/chat` endpoint or reuses the existing one — is entirely open.
+The chatbot grounds answers in the project's actual documentation rather than
+allowing the model to free-associate on stage in front of judges.
 
-The only thing to know from this side: `_call_external_llm()` in
-`app/core/assistant.py` builds a `system_parts` list (session context, then
-instructions) and joins it into the system prompt. Retrieved passages would go
-in that list. Nothing in this module constrains how they get there.
+### Indexed Sources
+1. `README.md` — project overview, API workflow, key design notes, design tradeoffs.
+2. `PROJECT_STATUS.md` — PS deliverable mapping, bottlenecks, algorithm status.
+3. `docs/FORMULATION.md` — formal CVRPTW mathematical model, objective function, penalty formulation, QPSO delta-potential equations, jump-cap, and quantum hardware roadmap.
+4. `docs/AI_ASSISTANT.md` — assistant architecture, provider priority, no-fabrication rule.
+5. `DEPLOYMENT.md` — Render backend / Vercel frontend split deployment.
+6. `data/impact_report.md` — fuel, CO2, and driver hour impact metrics.
+
+### Retrieval & Generation Architecture
+- **Chunking**: Hierarchical markdown parser splitting on headings (`#`, `##`, `###`), preserving section breadcrumbs and clean paragraph text.
+- **Retriever**: Pure-Python Okapi BM25 index with heading boosting and multi-word phrase matching. Sub-millisecond execution, deterministic, zero external vector-DB dependencies (safe for Render's 512MB RAM tier).
+- **Generation**:
+  - If an LLM provider is configured (`OpenRouter`, `Gemini`, `OpenAI`), retrieved passages are injected into the prompt with strict anti-hallucination instructions.
+  - If offline or unconfigured, the local engine synthesizes structured answers directly from the top passages, citing document and section titles.
+  - Out-of-scope domain guardrails decline queries unrelated to the platform.
+- **Endpoints**:
+  - `POST /api/chat` — takes `ChatRequest(message, context, top_k)`, returns `ChatResponse(reply, sources, suggested_chips)`.
+  - `GET /api/chat/status` — returns total chunk count and indexed document list.
+  - `POST /api/assistant/chat` — existing in-dashboard assistant also queries the RAG index for free-text conceptual questions.
 
 ## Testing
 
 ```bash
 python test_assistant_providers.py     # offline: providers + no-fabrication
+python test_rag_chatbot.py             # offline: RAG indexing + FAQ retrieval + /api/chat
 ```
 
 No API key or network required. Live provider behaviour is best
-checked by setting `OPENROUTER_API_KEY` and asking the dashboard a free-text
-question.
+checked by setting `OPENROUTER_API_KEY` and asking free-text questions.
