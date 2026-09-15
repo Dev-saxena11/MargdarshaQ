@@ -298,3 +298,36 @@ class AssistantChatResponse(BaseModel):
     suggested_chips: List[str] = Field(default_factory=list, description="Follow-up quick action prompts")
     metrics_summary: Optional[Dict[str, Any]] = Field(None, description="Key extracted quantitative metrics for UI badges")
 
+
+# ---------------------------------------------------------------------------
+# Project-Grounded Chatbot / RAG (Issue #33)
+# ---------------------------------------------------------------------------
+
+class ChatSource(BaseModel):
+    document: str = Field(..., description="Path or name of the source documentation file")
+    section: str = Field(..., description="Section or heading title within the document")
+    snippet: str = Field(..., description="Exemplar text excerpt from the passage")
+    relevance_score: float = Field(..., description="BM25 relevance score")
+
+
+class ChatRequest(BaseModel):
+    message: Optional[str] = Field(None, description="User question or query text")
+    query: Optional[str] = Field(None, description="Alternative alias for message")
+    context: Optional[AssistantContext] = Field(None, description="Active session state and metrics snapshot")
+    top_k: int = Field(3, ge=1, le=10, description="Number of retrieved context passages")
+
+    def get_query(self) -> str:
+        return (self.message or self.query or "").strip()
+
+
+class ChatResponse(BaseModel):
+    reply: str = Field(..., description="Grounded markdown response")
+    sources: List[ChatSource] = Field(default_factory=list, description="Retrieved documentation sources and citations")
+    suggested_chips: List[str] = Field(default_factory=list, description="Suggested follow-up judge queries")
+
+
+class RAGStatusResponse(BaseModel):
+    total_chunks: int
+    indexed_files: List[str]
+    status: str
+
