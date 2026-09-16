@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
+from app.core.overpass_network import load_overpass_network
 from app.core.cached_network import (
     load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
 )
@@ -28,6 +29,7 @@ from app.core.classical_baselines_vrp import (
 from app.core.dynamic_vrp import simulate_dynamic_reroute
 from app.core import store
 from app.core.assistant import assistant_engine
+from app.core.rag import rag_engine
 from app.models.schemas import (
     NetworkGenerateRequest, NetworkResponse, NodeOut, EdgeOut, OSMNetworkRequest,
     CachedNetworkRequest,
@@ -37,6 +39,7 @@ from app.models.schemas import (
     VRPCompareRequest, VRPCompareResponse,
     TrafficIncidentRequest, TrafficIncidentResponse, DynamicSolveRequest, DynamicSolveResponse,
     AssistantChatRequest, AssistantChatResponse,
+    ChatRequest, ChatResponse, RAGStatusResponse,
 )
 
 router = APIRouter(prefix="/api")
@@ -82,15 +85,48 @@ def generate_network(req: NetworkGenerateRequest):
 
 @router.post("/network/from_osm", response_model=NetworkResponse)
 def generate_network_from_osm(req: OSMNetworkRequest):
-    bbox = None
-    if req.north is not None and req.south is not None and req.east is not None and req.west is not None:
-        bbox = (req.north, req.south, req.east, req.west)
-    elif not req.place:
+    """
+    Build a network from live OpenStreetMap data.
+
+    A bounding box goes straight to Overpass over plain HTTP. osmnx is used only
+    for a `place` name, which needs geocoding. That split is deliberate: osmnx
+    failed for every bounding box on the deployed backend with "cannot access
+    local variable 'response'" — its downloader referencing a variable it never
+    assigned — which took the draw-a-boundary feature down in production while
+    hiding the real HTTP error. The direct path is also the one that built the
+    cached networks in data/networks/, so it is known to work.
+    """
+    has_bbox = None not in (req.north, req.south, req.east, req.west)
+    if not has_bbox and not req.place:
         raise HTTPException(status_code=400, detail="Provide either `place` or all four bbox bounds (north/south/east/west).")
+
+    if has_bbox:
+        try:
+            net, meta = load_overpass_network(
+                north=req.north, south=req.south, east=req.east, west=req.west,
+                max_nodes=req.max_nodes, congestion_seed=req.seed,
+            )
+        except ValueError as e:
+            # The box itself is the problem — too small, or over open country.
+            # That is a 400: retrying will not help, drawing elsewhere will.
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"OpenStreetMap did not answer: {type(e).__name__}: {e}",
+            )
+
+        network_id = store.put_network(net, is_geo=True)
+        nodes, edges = _network_payload(net)
+        return NetworkResponse(
+            network_id=network_id, num_nodes=net.num_nodes(),
+            num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+            attribution=meta.get("attribution"),
+        )
 
     try:
         net = load_osm_network(
-            place=req.place, bbox=bbox, network_type=req.network_type,
+            place=req.place, network_type=req.network_type,
             max_nodes=req.max_nodes, congestion_seed=req.seed,
         )
     except ImportError as e:
@@ -105,6 +141,7 @@ def generate_network_from_osm(req: OSMNetworkRequest):
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
         num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+        area_label=req.place,
     )
 
 
@@ -172,6 +209,7 @@ def generate_vrp(req: VRPGenerateRequest):
             window_length_range=(req.window_length_min, req.window_length_max),
             service_time=req.service_time, seed=req.seed,
             time_dependent=req.time_dependent, bucket_minutes=req.bucket_minutes,
+            customer_nodes=req.customer_nodes,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -526,6 +564,14 @@ def solve_dynamic_vrp(req: DynamicSolveRequest):
     )
 
 
+@router.get("/benchmark/stress-test-cached")
+def get_stress_test_cached():
+    data = store.load_stress_test_cache()
+    if data is None:
+        raise HTTPException(status_code=404, detail="Stress test not yet generated — run scripts/generate_stress_test_cache.py")
+    return data
+
+
 # In-Dashboard AI Assistant (Issue #32)
 # ---------------------------------------------------------------------------
 
@@ -533,4 +579,30 @@ def solve_dynamic_vrp(req: DynamicSolveRequest):
 def assistant_chat(req: AssistantChatRequest):
     """Answers judge/user questions about current solve results, QPSO, and map."""
     return assistant_engine.chat(req)
+
+
+# ---------------------------------------------------------------------------
+# Project-Grounded Chatbot / RAG (Issue #33)
+# ---------------------------------------------------------------------------
+
+@router.post("/chat", response_model=ChatResponse)
+def chat_endpoint(req: ChatRequest):
+    """
+    RAG-grounded project chatbot endpoint.
+    Retrieves context from project documents (README, PROJECT_STATUS.md, FORMULATION.md, etc.)
+    and returns an answer citing sources.
+    """
+    query = req.get_query()
+    return rag_engine.ask(query=query, context=req.context, top_k=req.top_k)
+
+
+@router.get("/chat/status", response_model=RAGStatusResponse)
+def chat_status():
+    """Returns RAG knowledge base statistics and indexed documents."""
+    return RAGStatusResponse(
+        total_chunks=len(rag_engine.chunks),
+        indexed_files=rag_engine.indexed_files,
+        status="ready" if rag_engine.chunks else "empty",
+    )
+
 

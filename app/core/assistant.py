@@ -27,6 +27,7 @@ be added to the prompt.
 from __future__ import annotations
 import json
 import logging
+import re
 from typing import Dict, Any, Optional
 
 from app.models.schemas import (
@@ -210,32 +211,33 @@ class AIAssistantExplainer:
 
     def _generate_local_response(self, msg: str, chip: str, ctx: AssistantContext) -> str:
         """Rule-based, domain-grounded synthesis using live session numbers."""
+        words = set(re.findall(r"\b[a-zA-Z0-9_]+\b", msg.lower()))
 
         # 1. Intent: Explain Route & Operational Impact
-        if chip == "explain_route" or any(k in msg for k in ["explain route", "what am i looking at", "summary", "overview", "savings", "result"]):
+        if chip == "explain_route" or "explain route" in msg or "what am i looking at" in msg or bool(words & {"summary", "overview", "savings", "result"}):
             return self._explain_route(ctx)
 
         # 2. Intent: Why QPSO / Quantum Advantage
-        if chip == "why_qpso" or any(k in msg for k in ["why qpso", "why quantum", "quantum advantage", "beat baseline", "delta potential", "metaheuristic"]):
+        if chip == "why_qpso" or "why qpso" in msg or "why quantum" in msg or "quantum advantage" in msg or "beat baseline" in msg or "delta potential" in msg or "metaheuristic" in words:
             return self._explain_why_qpso(ctx)
 
         # 3. Intent: Explain Convergence Chart
-        if chip == "explain_conv" or any(k in msg for k in ["convergence", "chart", "curve", "iterations", "fitness"]):
+        if chip == "explain_conv" or bool(words & {"convergence", "chart", "curve", "iterations", "fitness"}):
             return self._explain_convergence(ctx)
 
         # 4. Intent: Explain Map & Traffic Visuals
-        if chip == "explain_map" or any(k in msg for k in ["map", "color", "red", "green", "depot", "leaflet", "svg", "roads", "friction"]):
+        if chip == "explain_map" or bool(words & {"map", "color", "colors", "red", "green", "depot", "leaflet", "svg", "roads", "friction"}):
             return self._explain_map(ctx)
 
-        # 5. Intent: Constraints & Time Windows
-        if chip == "explain_tw" or any(k in msg for k in ["time window", "sla", "late", "capacity", "penalty", "feasible"]):
+        # 5. Intent: Constraints & Time Windows (avoid substring collisions like 'simulated' -> 'late')
+        if chip == "explain_tw" or "time window" in msg or "time windows" in msg or bool(words & {"sla", "late", "lateness", "capacity", "penalty", "feasible"}):
             return self._explain_constraints(ctx)
 
         # 6. Intent: Benchmark Comparison
-        if any(k in msg for k in ["benchmark", "ga", "genetic", "sa", "annealing", "pso", "compare", "rank"]):
+        if bool(words & {"benchmark", "ga", "genetic", "sa", "annealing", "pso", "compare", "rank", "ranks"}):
             return self._explain_benchmark(ctx)
 
-        # Default: General contextual inquiry
+        # Default: General contextual inquiry (leverages RAG documentation index)
         return self._explain_general(msg, ctx)
 
     # -----------------------------------------------------------------------
@@ -450,6 +452,16 @@ class AIAssistantExplainer:
         )
 
     def _explain_general(self, msg: str, ctx: AssistantContext) -> str:
+        # Check if question can be answered from project documentation (Issue #33)
+        try:
+            from app.core.rag import rag_engine
+            top_matches = rag_engine.retrieve(msg, top_k=1)
+            if top_matches and top_matches[0][1] >= 1.2:
+                rag_res = rag_engine.ask(msg, context=ctx, top_k=2)
+                return rag_res.reply
+        except Exception as e:
+            logger.debug("RAG lookup in _explain_general failed: %s", e)
+
         scenario = ctx.scenario_name or "Current Active Scenario"
 
         if not _has_comparison_results(ctx):
@@ -479,37 +491,49 @@ class AIAssistantExplainer:
         )
 
     # -----------------------------------------------------------------------
-    # External LLM Integration (Story-Card context)
+    # External LLM Integration (Story-Card context + RAG Document Grounding)
     # -----------------------------------------------------------------------
 
     def _call_external_llm(self, prompt: str, ctx: AssistantContext,
                            provider: LLMProvider) -> Optional[str]:
         """
-        Ask the configured provider, grounded in the Story Card: a compact
-        summary of the live session metrics, which keeps prompt size
-        near-constant instead of re-sending raw JSON every turn.
-
-        Document grounding (RAG) is issue #33 and is not implemented here. If
-        you are picking that up: retrieved passages would be appended to
-        `system_parts` between the session context and the instructions, and
-        the instruction block below already tells the model to say when a
-        question isn't answerable from the context it was given.
+        Ask the configured provider, grounded in the Story Card and retrieved
+        project documentation passages (Issue #33 RAG).
 
         Returns None on any failure so the caller falls back to the local
         deterministic engine, which always works.
         """
         story_card = self._get_or_create_story_card(ctx)
 
+        # Retrieve relevant project documentation passages (Issue #33)
+        doc_context = ""
+        try:
+            from app.core.rag import rag_engine
+            matches = rag_engine.retrieve(prompt, top_k=2)
+            if matches and matches[0][1] >= 0.5:
+                doc_context = "PROJECT DOCUMENTATION RETRIEVAL CONTEXT:\n" + "\n\n".join(
+                    f"[{c.document_path} > {c.section_title}]:\n{c.content[:450]}"
+                    for c, _ in matches
+                )
+        except Exception as e:
+            logger.debug("RAG passage retrieval failed in _call_external_llm: %s", e)
+
         system_parts = [
             "You are QuantaRoute AI Copilot, an assistant for a quantum-inspired "
             "(QPSO) traffic route optimization platform.",
             f"SESSION CONTEXT: {story_card}",
+        ]
+        if doc_context:
+            system_parts.append(doc_context)
+
+        system_parts.append(
             "INSTRUCTIONS: Be direct, concise and professional. Prefer 2-4 short "
             "bullet points. Quote figures exactly as given in the session context - "
             "never estimate, extrapolate or invent a number. If the context says a "
-            "value was not measured, say it was not measured. If the question is not "
-            "answerable from the context above, say so plainly instead of guessing.",
-        ]
+            "value was not measured, say it was not measured. If referencing algorithm "
+            "formulation or mechanics, ground your answer in the project documentation above. "
+            "If the question is not answerable from the context above, say so plainly instead of guessing."
+        )
 
         return provider.complete(
             system_prompt="\n\n".join(system_parts),

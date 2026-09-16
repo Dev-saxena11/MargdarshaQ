@@ -218,18 +218,42 @@ def generate_synthetic_vrp(
     seed: int = 1,
     time_dependent: bool = False,
     bucket_minutes: float = 30.0,
+    customer_nodes: Optional[List[int]] = None,
 ) -> VRPProblem:
+    """
+    Build a VRP instance on `net`.
+
+    Customers are sampled at random unless `customer_nodes` names them, which is
+    what the map-driven builder does: the engineer clicks the stops they want on
+    the real road network, so the instance has to honour that exact set rather
+    than draw its own. Demands and time windows are still generated from `seed`,
+    keeping a hand-picked instance as reproducible as a sampled one.
+    """
     rng = random.Random(seed)
     all_graph_nodes = list(net.graph.nodes())
     if depot not in all_graph_nodes:
         depot = all_graph_nodes[0]
     candidates = [n for n in all_graph_nodes if n != depot]
 
-    if n_customers > len(candidates):
-        raise ValueError(f"Requested {n_customers} customers but graph only has "
-                          f"{len(candidates)} non-depot nodes.")
-
-    chosen = rng.sample(candidates, n_customers)
+    if customer_nodes is not None:
+        # De-duplicate while holding the click order, so the instance matches
+        # what the engineer selected on screen.
+        seen = set()
+        chosen = []
+        for nid in customer_nodes:
+            if nid == depot or nid in seen:
+                continue
+            if nid not in net.graph:
+                raise ValueError(f"Node {nid} is not in this road network.")
+            seen.add(nid)
+            chosen.append(nid)
+        if not chosen:
+            raise ValueError("Select at least one stop that is not the depot.")
+    else:
+        if n_customers > len(candidates):
+            raise ValueError(f"Requested {n_customers} customers but graph only has "
+                              f"{len(candidates)} non-depot nodes.")
+        chosen = rng.sample(candidates, n_customers)
 
     customers = []
     for node_id in chosen:
