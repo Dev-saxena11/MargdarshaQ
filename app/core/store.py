@@ -29,6 +29,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 _networks: Dict[str, TrafficNetwork] = {}
 _network_is_geo: Dict[str, bool] = {}
 _vrp_problems: Dict[str, Tuple[str, VRPProblem]] = {}
+from threading import Lock
+_store_lock = Lock()
 
 def get_connection() -> Optional[connection]:
     if not DATABASE_URL:
@@ -86,8 +88,9 @@ def put_network(net: TrafficNetwork, is_geo: bool = False) -> str:
         finally:
             conn.close()
     else:
-        _networks[network_id] = net
-        _network_is_geo[network_id] = is_geo
+        with _store_lock:
+            _networks[network_id] = net
+            _network_is_geo[network_id] = is_geo
     return network_id
 
 def get_network(network_id: str) -> TrafficNetwork:
@@ -136,7 +139,8 @@ def put_vrp(network_id: str, problem: VRPProblem) -> str:
         finally:
             conn.close()
     else:
-        _vrp_problems[vrp_id] = (network_id, problem)
+        with _store_lock:
+            _vrp_problems[vrp_id] = (network_id, problem)
     return vrp_id
 
 def get_vrp(vrp_id: str) -> VRPProblem:
