@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
+from app.core.overpass_network import load_overpass_network
 from app.core.cached_network import (
     load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
 )
@@ -84,15 +85,48 @@ def generate_network(req: NetworkGenerateRequest):
 
 @router.post("/network/from_osm", response_model=NetworkResponse)
 def generate_network_from_osm(req: OSMNetworkRequest):
-    bbox = None
-    if req.north is not None and req.south is not None and req.east is not None and req.west is not None:
-        bbox = (req.north, req.south, req.east, req.west)
-    elif not req.place:
+    """
+    Build a network from live OpenStreetMap data.
+
+    A bounding box goes straight to Overpass over plain HTTP. osmnx is used only
+    for a `place` name, which needs geocoding. That split is deliberate: osmnx
+    failed for every bounding box on the deployed backend with "cannot access
+    local variable 'response'" — its downloader referencing a variable it never
+    assigned — which took the draw-a-boundary feature down in production while
+    hiding the real HTTP error. The direct path is also the one that built the
+    cached networks in data/networks/, so it is known to work.
+    """
+    has_bbox = None not in (req.north, req.south, req.east, req.west)
+    if not has_bbox and not req.place:
         raise HTTPException(status_code=400, detail="Provide either `place` or all four bbox bounds (north/south/east/west).")
+
+    if has_bbox:
+        try:
+            net, meta = load_overpass_network(
+                north=req.north, south=req.south, east=req.east, west=req.west,
+                max_nodes=req.max_nodes, congestion_seed=req.seed,
+            )
+        except ValueError as e:
+            # The box itself is the problem — too small, or over open country.
+            # That is a 400: retrying will not help, drawing elsewhere will.
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"OpenStreetMap did not answer: {type(e).__name__}: {e}",
+            )
+
+        network_id = store.put_network(net, is_geo=True)
+        nodes, edges = _network_payload(net)
+        return NetworkResponse(
+            network_id=network_id, num_nodes=net.num_nodes(),
+            num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+            attribution=meta.get("attribution"),
+        )
 
     try:
         net = load_osm_network(
-            place=req.place, bbox=bbox, network_type=req.network_type,
+            place=req.place, network_type=req.network_type,
             max_nodes=req.max_nodes, congestion_seed=req.seed,
         )
     except ImportError as e:
@@ -107,6 +141,7 @@ def generate_network_from_osm(req: OSMNetworkRequest):
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
         num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+        area_label=req.place,
     )
 
 
