@@ -2920,10 +2920,84 @@
       box-shadow: 0 6px 24px rgba(123, 92, 255, 0.55);
       border-color: rgba(0, 245, 212, 0.6);
     }
+    /* ----------------------------------------------------------------------- */
+    /* PROGRESS BAR / SPINNER OVERLAY */
+    /* ----------------------------------------------------------------------- */
+    #globalProgressOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+    .progress-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      padding: 24px 32px;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0,245,212,0.1);
+      width: 400px;
+      text-align: center;
+    }
+    .progress-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--neo-mint);
+      margin-bottom: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .progress-msg {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 20px;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--neo-purple), var(--neo-mint));
+      transition: width 0.3s ease;
+    }
+    .spinner-ring {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      margin-bottom: 12px;
+      border: 3px solid rgba(0, 245, 212, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--neo-mint);
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 
 <body>
+  <!-- Progress Bar Overlay -->
+  <div id="globalProgressOverlay">
+    <div class="progress-box">
+      <div class="spinner-ring"></div>
+      <div class="progress-title" id="progressTitle">Working...</div>
+      <div class="progress-msg" id="progressMsg">Please wait while the operation completes.</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="progressBarFill"></div>
+      </div>
+    </div>
+  </div>
   <div id="app">
 
     <!-- Header -->
@@ -3765,6 +3839,37 @@
       judgeMarkerAfter: null,
     };
 
+    // ---------------------------------------------------------------------------
+    // Loading State Management
+    // ---------------------------------------------------------------------------
+    let _isGlobalLoading = false;
+
+    function setLoadingState(isLoading, message = "Working...", progressPct = null) {
+      _isGlobalLoading = isLoading;
+      const overlay = document.getElementById('globalProgressOverlay');
+      if (overlay) overlay.style.display = isLoading ? 'flex' : 'none';
+      
+      if (isLoading) {
+        const titleEl = document.getElementById('progressTitle');
+        if (titleEl) titleEl.textContent = message;
+        
+        const fillEl = document.getElementById('progressBarFill');
+        if (fillEl) {
+          if (progressPct !== null) {
+            fillEl.style.width = Math.min(100, Math.max(0, progressPct)) + '%';
+          } else {
+            fillEl.style.width = '100%';
+          }
+        }
+      }
+      
+      // Disable core action buttons to prevent double-submits
+      ['btnJudgeRun', 'btnDynamicRun', 'btnBench', 'btnSolve', 'btnGenSynthetic', 'btnGenReal', 'judgePreset'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = isLoading;
+      });
+    }
+
     var ROUTE_COLORS = ['#0284C7', '#7C3AED', '#059669', '#D97706', '#DB2777', '#2563EB', '#DC2626'];
     var VAN_COLORS = ROUTE_COLORS;
     var BASELINE_COLORS = ['#F59E0B', '#EF4444', '#EC4899', '#D97706', '#F43F5E'];
@@ -4179,6 +4284,28 @@
       renderJudgeComparison();
     }
 
+    async function runBenchmarkSequentially(vrp_id, max_iter, seed) {
+      const algos = [
+        { key: 'greedy', name: 'Greedy Nearest-Neighbor' },
+        { key: 'qpso', name: 'QPSO (Quantum-Inspired)' },
+        { key: 'ga', name: 'Genetic Algorithm' },
+        { key: 'sa', name: 'Simulated Annealing' },
+        { key: 'standard_pso', name: 'Standard PSO' }
+      ];
+      let results = [];
+      for (let i = 0; i < algos.length; i++) {
+        setLoadingState(true, `Running algorithm ${i + 1} of 5: ${algos[i].name}...`, (i / algos.length) * 100);
+        const bench = await api('/api/benchmark/run', {
+          method: 'POST',
+          body: JSON.stringify({ vrp_id, max_iter, seed, algorithms: [algos[i].key] })
+        });
+        if (bench.results && bench.results.length > 0) {
+          results.push(bench.results[0]);
+        }
+      }
+      return results;
+    }
+
     // -------------------------------------------------------------------------
     // One click: every algorithm on the selected district
     //
@@ -4191,6 +4318,7 @@
       const btns = ['btnBenchmarkAll', 'btnAlgoCompare'].map(id => document.getElementById(id)).filter(Boolean);
       const labels = btns.map(b => b.innerHTML);
       btns.forEach(b => { b.disabled = true; b.innerHTML = '<span>⏳</span> Running all five…'; });
+      setLoadingState(true, 'Initializing network comparison...', 0);
 
       const grid = document.getElementById('algoCompareGrid');
       if (grid) grid.innerHTML = '<div class="compare-empty">Solving the same delivery round with every algorithm…</div>';
@@ -4212,6 +4340,7 @@
 
         const area = areaByKey(execState.areaKey);
         setJudgeStatus('Planning routes across ' + area.name + '…');
+        setLoadingState(true, `Comparing QPSO vs Baseline on ${area.name}...`, null);
 
         const comp = await api('/api/vrp/compare', {
           method: 'POST',
@@ -4227,16 +4356,13 @@
         renderJudgeComparison();
 
         setJudgeStatus('Running GA, Simulated Annealing, PSO and greedy on the same instance…');
-        const bench = await api('/api/benchmark/run', {
-          method: 'POST',
-          body: JSON.stringify({ vrp_id: execState.vrp.vrp_id, max_iter: 150, seed: 1 }),
-        });
+        const results = await runBenchmarkSequentially(execState.vrp.vrp_id, 150, 1);
 
-        execState.benchmarkResults = bench.results;
-        renderAlgorithmComparison(bench.results);
-        renderBenchResultsTable(bench.results);
-        drawLandingConvergence(bench.results);
-        renderWhyQpsoWins(bench.results);
+        execState.benchmarkResults = results;
+        renderAlgorithmComparison(results);
+        renderBenchResultsTable(results);
+        drawLandingConvergence(results);
+        renderWhyQpsoWins(results);
         setJudgeStatus(null);
         if (typeof syncAssistantContext === 'function') syncAssistantContext();
       } catch (err) {
@@ -4245,6 +4371,7 @@
         if (grid) grid.innerHTML = '<div class="compare-empty">The benchmark could not be run — '
           + 'the API may be asleep. Try again in a moment.</div>';
       } finally {
+        setLoadingState(false);
         btns.forEach((b, i) => { b.disabled = false; b.innerHTML = labels[i]; });
       }
     }
@@ -6783,6 +6910,7 @@
     async function solveVRP() {
       const btn = document.getElementById('btnSolve');
       btn.disabled = true; btn.textContent = 'SOLVING…';
+      setLoadingState(true, 'Running Solver...', null);
       try {
         const algo = document.getElementById('algorithm').value;
         const result = await api('/api/vrp/solve', {
@@ -6807,6 +6935,7 @@
       } catch (e) {
         alert('Solve failed: ' + e.message);
       } finally {
+        setLoadingState(false);
         btn.disabled = false; btn.textContent = 'Solve';
       }
     }
@@ -6831,40 +6960,36 @@
     async function runBenchmark() {
       const btn = document.getElementById('btnBench');
       btn.disabled = true; btn.textContent = 'RUNNING 5-ALGO BENCHMARK…';
+      setLoadingState(true, 'Starting 5-Algorithm Benchmark...', 0);
       try {
-        const bench = await api('/api/benchmark/run', {
-          method: 'POST',
-          body: JSON.stringify({
-            vrp_id: state.vrp.vrp_id,
-            max_iter: +document.getElementById('max_iter').value,
-            seed: 1,
-          }),
-        });
-        // Retained so the AI assistant can cite the measured ranking instead of
-        // asserting a fixed one.
-        state.benchmarkResults = bench.results;
-        renderBenchTable(bench.results);
-        drawConvergence(bench.results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
+        const maxIter = +document.getElementById('max_iter').value;
+        const results = await runBenchmarkSequentially(state.vrp.vrp_id, maxIter, 1);
+        
+        state.benchmarkResults = results;
+        renderBenchTable(results);
+        drawConvergence(results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
 
         // draw the best result's routes on the map
-        const best = bench.results.reduce((a, b) => (a.fitness < b.fitness ? a : b));
+        const best = results.reduce((a, b) => (a.fitness < b.fitness ? a : b));
         const algoKey = {
           'QPSO (Quantum-Inspired PSO)': 'qpso', 'Genetic Algorithm': 'ga',
           'Simulated Annealing': 'sa', 'Standard PSO': 'standard_pso',
           'Greedy Nearest-Neighbor': 'greedy',
         }[best.algorithm] || 'qpso';
 
+        setLoadingState(true, `Solving routes using the best algorithm (${best.algorithm})...`, null);
         const solved = await api('/api/vrp/solve', {
           method: 'POST',
           body: JSON.stringify({
             vrp_id: state.vrp.vrp_id, algorithm: algoKey,
-            n_particles: 50, max_iter: +document.getElementById('max_iter').value, seed: 1, use_local_search: true
+            n_particles: 50, max_iter: maxIter, seed: 1, use_local_search: true
           }),
         });
         drawRoutes(solved.routes);
         showResult(solved);
         state.optimizedSolution = solved;
 
+        setLoadingState(true, 'Fetching baseline greedy solution...', null);
         // fetch baseline greedy as well
         const greedySolved = await api('/api/vrp/solve', {
           method: 'POST',
@@ -6874,7 +6999,8 @@
       } catch (e) {
         alert('Benchmark failed: ' + e.message);
       } finally {
-        btn.disabled = false; btn.textContent = 'Run full benchmark';
+        setLoadingState(false);
+        btn.disabled = false; btn.textContent = 'RUN 5-ALGO BENCHMARK';
       }
     }
 
