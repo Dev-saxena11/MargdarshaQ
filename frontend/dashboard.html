@@ -5847,7 +5847,21 @@
       btn.disabled = true;
       const label = btn.textContent;
       btn.textContent = 'DOWNLOADING ROADS…';
-      setMapPrompt('Fetching the road network from OpenStreetMap — this can take a minute.');
+
+      // A fixed "this can take a minute" gives no sign of life, and OpenStreetMap
+      // is slow often enough that a still screen reads as a hung one. Counting
+      // up says the wait is real and being waited on, and names the thing the
+      // page is waiting for rather than blaming itself.
+      const started = Date.now();
+      const area = ((state.bounds.north - state.bounds.south) * 111
+        * (state.bounds.east - state.bounds.west) * 111 * Math.cos(state.bounds.north * Math.PI / 180));
+      const tick = setInterval(() => {
+        const secs = Math.round((Date.now() - started) / 1000);
+        setMapPrompt('Fetching roads from OpenStreetMap — ' + secs + 's'
+          + (secs > 20 ? ' · their servers are busy, still trying' : '')
+          + (area > 150 && secs > 8 ? ' · a smaller box would be quicker' : ''));
+      }, 1000);
+      setMapPrompt('Fetching roads from OpenStreetMap — 0s');
 
       try {
         const net = await api('/api/network/from_osm', {
@@ -5902,6 +5916,7 @@
           { warn: true });
         console.warn('Boundary load failed:', e);
       } finally {
+        clearInterval(tick);
         btn.disabled = false;
         btn.textContent = label;
       }

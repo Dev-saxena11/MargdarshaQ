@@ -32,7 +32,8 @@ import json
 import math
 import time
 import urllib.request
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
 from app.core.graph_model import TrafficNetwork
@@ -70,14 +71,22 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def fetch_overpass(south: float, west: float, north: float, east: float,
-                   timeout: int = 180, mirrors: List[str] = None,
-                   attempts: int = 2) -> dict:
+                   timeout: int = 120, mirrors: List[str] = None,
+                   attempts: int = 3) -> dict:
     """
     Download drivable ways (and their nodes) inside the bounding box.
 
-    Tries each mirror in turn, twice over, backing off between rounds. Overpass
-    answers a busy request with a 504 rather than a queue position, so a retry
-    a few seconds later on another host is usually all that is needed.
+    The mirrors are raced, not tried in turn. Measured on a 22x33 km box, the
+    sequential version cost 35s: overpass-api.de spent 10s before returning a
+    504, and only then did the next mirror start, taking a further 24.5s. The
+    parsing and graph building either side of it total 0.07s, so essentially all
+    of the wait was one slow endpoint being asked politely one at a time.
+
+    Racing them costs three cheap requests and returns as soon as any endpoint
+    answers, so a dead or busy mirror costs nothing rather than dominating.
+    Losing requests are left to finish into a daemon thread and ignored;
+    Overpass has no cancel, and the alternative is making the user wait for a
+    reply nobody will read.
     """
     classes = "|".join(ROAD_SPEEDS)
     query = (
@@ -86,34 +95,77 @@ def fetch_overpass(south: float, west: float, north: float, east: float,
         f"(._;>;);out body;"
     )
     mirrors = mirrors or OVERPASS_MIRRORS
-    last_exc = None
+    # Observed answers from a working mirror land between 2s and 25s. A round is
+    # only over once every mirror has settled, so this ceiling is what a single
+    # hung connection costs before the retry — 60s here turned a 2.4s answer
+    # into a 68s wait. Short enough to fail over quickly, long enough to keep
+    # the slow-but-real replies.
+    socket_timeout = min(timeout, 30)
+    body = query.encode("utf-8")
+    errors = []
+    empty_replies = []
+
+    def ask(url):
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"User-Agent": "SIH26137-cache-builder/1.0 (academic project)"},
+        )
+        started = time.time()
+        with urllib.request.urlopen(req, timeout=socket_timeout) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        return url, payload, time.time() - started
 
     for round_no in range(attempts):
-        for url in mirrors:
-            req = urllib.request.Request(
-                url,
-                data=query.encode("utf-8"),
-                headers={"User-Agent": "SIH26137-cache-builder/1.0 (academic project)"},
-            )
-            started = time.time()
+        # Deliberately not a `with` block: its __exit__ joins every worker, so
+        # returning the winner inside one would wait for the losers anyway.
+        pool = ThreadPoolExecutor(max_workers=len(mirrors))
+        try:
+            futures = {pool.submit(ask, url): url for url in mirrors}
             try:
-                with urllib.request.urlopen(req, timeout=timeout + 30) as resp:
-                    payload = json.loads(resp.read().decode("utf-8"))
-            except Exception as exc:
-                last_exc = exc
-                host = url.split("/")[2]
-                print(f"  {host}: {type(exc).__name__}: {exc}")
-                continue
-            print(f"  {url.split('/')[2]} responded in {time.time() - started:.1f}s "
-                  f"({len(payload.get('elements', []))} elements)")
-            return payload
+                for fut in as_completed(futures, timeout=socket_timeout + 5):
+                    url = futures[fut]
+                    try:
+                        url, payload, took = fut.result()
+                    except Exception as exc:
+                        errors.append(exc)
+                        print(f"  {url.split('/')[2]}: {type(exc).__name__}: {exc}")
+                        continue
+
+                    # First to answer is not the same as first to answer with
+                    # anything. One mirror returns an empty result in under a
+                    # second for boxes that plainly have roads in them, and a
+                    # plain race hands the win to exactly that kind of endpoint.
+                    # Empty replies are kept aside and only used if every mirror
+                    # agrees the box is empty, which is a real answer.
+                    if not payload.get("elements"):
+                        print(f"  {url.split('/')[2]}: answered in {took:.1f}s but returned nothing")
+                        empty_replies.append(payload)
+                        continue
+
+                    print(f"  {url.split('/')[2]} answered first in {took:.1f}s "
+                          f"({len(payload.get('elements', []))} elements)")
+                    return payload
+            except TimeoutError:
+                errors.append(RuntimeError("every Overpass mirror timed out"))
+        finally:
+            # Hand back control immediately; the losing requests run themselves
+            # out in the background and their results are dropped.
+            pool.shutdown(wait=False, cancel_futures=True)
 
         if round_no + 1 < attempts:
-            wait = 20 * (round_no + 1)
-            print(f"  all mirrors busy — waiting {wait}s before retrying")
+            # Mirrors that refuse do so quickly; there is little to gain by
+            # pausing long before asking again.
+            wait = 2 * (round_no + 1)
+            print(f"  every mirror refused — waiting {wait}s before retrying")
             time.sleep(wait)
 
-    raise last_exc if last_exc else RuntimeError("no Overpass mirror configured")
+    # Every mirror that managed to reply said the box holds no roads. That is an
+    # answer about the box, not a failure to fetch, and the caller words it as
+    # such.
+    if empty_replies:
+        return empty_replies[0]
+
+    raise (errors[-1] if errors else RuntimeError("no Overpass mirror configured"))
 
 
 def is_oneway(tags: dict) -> Tuple[bool, bool]:
@@ -299,6 +351,18 @@ def crop(adj, nodes, max_nodes, coords=None, center=None):
     return largest_scc(sub, seen)
 
 
+# Keyed on the bounding box rounded to ~10 m and the parameters that change the
+# result. Bounded so a long-running server cannot grow one road network at a
+# time into a memory leak.
+_NETWORK_CACHE: "OrderedDict[tuple, dict]" = OrderedDict()
+_CACHE_LIMIT = 24
+
+
+def _cache_key(north, south, east, west, max_nodes, congestion_seed):
+    return (round(north, 4), round(south, 4), round(east, 4), round(west, 4),
+            int(max_nodes), int(congestion_seed))
+
+
 def load_overpass_network(
     north: float,
     south: float,
@@ -323,6 +387,16 @@ def load_overpass_network(
     if north <= south or east <= west:
         raise ValueError("The boundary is empty — drag a box rather than clicking.")
 
+    key = _cache_key(north, south, east, west, max_nodes, congestion_seed)
+    cached = _NETWORK_CACHE.get(key)
+    if cached is not None:
+        _NETWORK_CACHE.move_to_end(key)
+        print("  served from cache")
+        # A fresh TrafficNetwork each time: callers mutate theirs (congestion,
+        # incidents), and handing out the same object would let one request's
+        # road closure leak into the next.
+        return _network_from_parts(cached), dict(cached["meta"])
+
     payload = fetch_overpass(south, west, north, east, timeout=timeout)
 
     coords, adj = build_graph(payload)
@@ -341,27 +415,36 @@ def load_overpass_network(
             "drag a larger box, or one over a denser street network."
         )
 
-    net = TrafficNetwork()
-    for node_id in keep:
-        lat, lon = coords[node_id]
-        # x=lon, y=lat — the convention the map and the rest of the app use.
-        net.add_node(node_id, x=lon, y=lat)
-
-    n_edges = 0
-    for u in keep:
-        for v, (dist_km, speed_kph) in adj.get(u, {}).items():
-            if v in keep:
-                net.add_edge(u, v, distance=dist_km, base_speed_kmph=speed_kph,
-                             bidirectional=False)
-                n_edges += 1
-
-    net.randomize_congestion(seed=congestion_seed, low=congestion_low,
-                             high=congestion_high)
-
-    meta = {
+    parts = {
+        "nodes": [(nid, coords[nid][1], coords[nid][0]) for nid in keep],   # (id, lon, lat)
+        "edges": [(u, v, d, kph)
+                  for u in keep
+                  for v, (d, kph) in adj.get(u, {}).items() if v in keep],
+        "congestion": (congestion_seed, congestion_low, congestion_high),
+    }
+    parts["meta"] = {
         "attribution": ATTRIBUTION,
         "bbox": {"north": north, "south": south, "east": east, "west": west},
-        "num_nodes": len(keep),
-        "num_edges": n_edges,
+        "num_nodes": len(parts["nodes"]),
+        "num_edges": len(parts["edges"]),
     }
-    return net, meta
+
+    _NETWORK_CACHE[key] = parts
+    while len(_NETWORK_CACHE) > _CACHE_LIMIT:
+        _NETWORK_CACHE.popitem(last=False)
+
+    return _network_from_parts(parts), dict(parts["meta"])
+
+
+def _network_from_parts(parts: dict) -> TrafficNetwork:
+    """Rebuilds a TrafficNetwork from the cached primitives."""
+    seed, low, high = parts["congestion"]
+    net = TrafficNetwork()
+    for nid, lon, lat in parts["nodes"]:
+        # x=lon, y=lat — the convention the map and the rest of the app use.
+        net.add_node(nid, x=lon, y=lat)
+    for u, v, dist_km, speed_kph in parts["edges"]:
+        net.add_edge(u, v, distance=dist_km, base_speed_kmph=speed_kph,
+                     bidirectional=False)
+    net.randomize_congestion(seed=seed, low=low, high=high)
+    return net
