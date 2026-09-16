@@ -2003,6 +2003,146 @@
       filter: grayscale(0.5);
     }
 
+    /* ---------- Fleet simulator ---------- */
+    .sim-transport {
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card-bg);
+      border: 2px solid var(--border-neo);
+      box-shadow: var(--neo-shadow);
+      border-radius: 8px;
+      padding: 8px 14px;
+      width: min(720px, 88%);
+    }
+
+    .sim-btn {
+      background: var(--neo-mint);
+      color: #000000;
+      border: 2px solid var(--border-neo);
+      border-radius: 5px;
+      width: 32px;
+      height: 30px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      flex: none;
+      box-shadow: var(--neo-shadow-sm);
+    }
+
+    .sim-btn:hover {
+      background: var(--neo-mint-dark);
+    }
+
+    .sim-time {
+      font-size: 12px;
+      color: var(--text-main);
+      font-weight: 700;
+      flex: none;
+      min-width: 46px;
+      text-align: center;
+    }
+
+    .sim-scrub {
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 80px;
+      accent-color: var(--neo-mint);
+      cursor: pointer;
+    }
+
+    .sim-speed {
+      background: var(--raised);
+      border: 1.5px solid var(--border-bold);
+      color: var(--text-main);
+      border-radius: 5px;
+      padding: 5px 7px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      flex: 0 0 auto;
+      width: 74px;
+    }
+
+    .sim-legend {
+      margin-top: 12px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .sim-legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .sim-legend-row b {
+      margin-left: auto;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .sim-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1.5px solid var(--border-neo);
+      flex: none;
+    }
+
+    .sim-swatch.is-usual {
+      background: #F59E0B;
+    }
+
+    .sim-swatch.is-ours {
+      background: var(--neo-mint);
+    }
+
+    .sim-kpis {
+      margin-top: 10px;
+      border: 1.5px solid var(--border-bold);
+      border-radius: 6px;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Van markers. A CSS transition would fight the animation loop, which sets
+       a new position every frame, so there is deliberately none. */
+    .sim-van div {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .sim-van.is-serving div {
+      animation: simPulse 0.9s ease-in-out infinite;
+    }
+
+    @keyframes simPulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.22);
+      }
+    }
+
     /* ---------- Map-driven instance builder (control room) ---------- */
     .step-hint {
       font-size: 11.5px;
@@ -3379,6 +3519,24 @@
               <div>Drag a box around a district to begin</div>
             </div>
             <div class="map-prompt" id="mapPrompt" hidden></div>
+
+            <!-- Playback transport. Over the map rather than in a side panel:
+               the clock belongs next to the vans it is driving. -->
+            <div class="sim-transport" id="simTransport" hidden>
+              <button class="sim-btn" id="simPlayBtn" onclick="simTogglePlay()" title="Play / pause">▶</button>
+              <button class="sim-btn" onclick="simSeek(0); simPause();" title="Back to the start">⏮</button>
+              <span class="sim-time mono" id="simTransportClock">06:00</span>
+              <input type="range" id="simScrub" class="sim-scrub" min="0" max="1000" value="0"
+                oninput="simScrubTo(this.value)">
+              <span class="sim-time mono" id="simTransportEnd">—</span>
+              <select id="simSpeed" class="sim-speed" onchange="simSetSpeed(this.value)">
+                <option value="15">15×</option>
+                <option value="30">30×</option>
+                <option value="60" selected>60×</option>
+                <option value="120">120×</option>
+                <option value="300">300×</option>
+              </select>
+            </div>
           </div>
 
           <!-- RIGHT: solve + results -->
@@ -3405,22 +3563,46 @@
             </section>
 
             <section>
-              <h2>4. Dynamic Bottleneck</h2>
+              <h2>4. Run the Shift</h2>
               <p class="step-hint">
-                Close a road the fleet is already driving through, mid-shift, and re-plan the
-                vans that have not finished yet. This is the case static routing cannot answer
-                at all.
+                Drive both plans across the same day, on one clock. The usual method and ours
+                leave the depot together — watch where they diverge.
               </p>
-              <div class="row2">
-                <div><label>Severity (× slower)</label><input id="incident_severity" type="number" step="0.5"
-                    value="4"></div>
-                <div><label>Happens at (min)</label><input id="incident_at" type="number" value="90"></div>
-              </div>
-              <button class="secondary" id="btnDynamicRun" onclick="runDynamicTrafficDemo()"
-                style="border-color:var(--neo-pink); color:var(--neo-pink);" disabled>
-                🚨 Inject bottleneck &amp; re-optimise
+
+              <button class="primary" id="btnSimBuild" onclick="simPrepare()" disabled>
+                🏁 Build the race
               </button>
-              <div id="dynamicInfo" style="margin-top:10px;"></div>
+
+              <div class="sim-legend" id="simLegend" hidden>
+                <div class="sim-legend-row">
+                  <span class="sim-swatch is-usual"></span>
+                  <span>Usual method</span>
+                  <b id="simUsualDone">0</b>
+                </div>
+                <div class="sim-legend-row">
+                  <span class="sim-swatch is-ours"></span>
+                  <span>Our method</span>
+                  <b id="simOursDone">0</b>
+                </div>
+              </div>
+
+              <div class="sim-kpis" id="simKpis" hidden>
+                <div class="stat-line"><span>Clock</span><span class="mono" id="simClock">06:00</span></div>
+                <div class="stat-line"><span>Stops delivered</span><span id="simDelivered">0 / 0</span></div>
+                <div class="stat-line"><span>Vans still out</span><span id="simVansOut">0</span></div>
+                <div class="stat-line"><span>Delay in jams</span><span id="simDelay">0.0 min</span></div>
+                <div class="stat-line"><span>Missed windows</span><span id="simLate" class="feas-yes">0</span></div>
+              </div>
+
+              <div id="simIncidentPanel" hidden>
+                <label style="margin-top:12px;">Bottleneck severity (× slower)</label>
+                <input id="incident_severity" type="number" step="0.5" value="4">
+                <button class="secondary" id="btnDynamicRun" onclick="simInjectBottleneck()"
+                  style="border-color:var(--neo-pink); color:var(--neo-pink);" disabled>
+                  🚨 Close a road right now
+                </button>
+                <div id="dynamicInfo" style="margin-top:10px;"></div>
+              </div>
             </section>
 
             <section id="resultSection" style="display:none;">
@@ -3657,6 +3839,13 @@
       document.getElementById('btnViewControl').classList.toggle('active', mode === 'control');
       document.getElementById('judgeView').style.display = mode === 'judge' ? 'flex' : 'none';
       document.getElementById('controlRoomView').style.display = mode === 'control' ? 'grid' : 'none';
+
+      // The floating copilot button is fixed to the bottom-right, which in the
+      // control room sits on top of the solver panel and swallows clicks meant
+      // for the controls under it. The header button opens the same drawer, so
+      // it is simply out of the way here.
+      const fab = document.getElementById('aiFloatingBtn');
+      if (fab) fab.style.display = mode === 'control' ? 'none' : '';
 
       // Each screen owns its own data, so switching only ever redraws — it never
       // copies one screen's run onto the other.
@@ -5692,7 +5881,8 @@
         document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
-        document.getElementById('btnDynamicRun').disabled = true;
+        document.getElementById('btnSimBuild').disabled = true;
+        simReset();
 
         renderControlNetwork();
         setPickMode('depot');
@@ -5758,7 +5948,8 @@
         document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
-        document.getElementById('btnDynamicRun').disabled = true;
+        document.getElementById('btnSimBuild').disabled = true;
+        simReset();
 
         renderControlNetwork();
         setPickMode('depot');
@@ -5876,11 +6067,661 @@
       }
     }
 
+    // =========================================================================
+    //  FLEET SIMULATOR — both plans, one clock
+    //
+    //  The two fleets leave the depot together and drive the same day, so the
+    //  difference between them is something you watch rather than something you
+    //  are told. That is the whole reason it races instead of animating a single
+    //  plan: a lone van moving along a line shows what the plan is, never why it
+    //  is better.
+    //
+    //  How it runs
+    //  -----------
+    //  Nothing is stepped frame by frame. Each vehicle's whole day is compiled
+    //  once into a list of timed segments — drive this edge from t0 to t1, wait
+    //  here, serve there — and playback is then a lookup at whatever clock time
+    //  is being shown. That is what makes scrubbing instant and the speed
+    //  control free: changing 60x to 300x changes one number, not the work.
+    //  A monotonic cursor per vehicle keeps the common case (playing forwards)
+    //  at O(1) per frame, with a binary search only when the clock jumps.
+    //
+    //  The timings are the solver's own: every edge costs base_time x its
+    //  congestion factor, vans wait out a time window they arrive early for, and
+    //  service takes the instance's service time. Nothing here is decorative.
+    // =========================================================================
+
+    const SIM_USUAL_COLORS = ['#F59E0B', '#EF4444', '#EC4899', '#D97706'];
+    const SIM_OURS_COLORS = ['#00F5D4', '#00BBF9', '#7B5CFF', '#22C55E'];
+
+    let sim = {
+      ready: false,
+      running: false,
+      clock: 0,            // simulated minutes since the start of the shift
+      horizon: 0,          // when the last van gets home
+      speed: 60,           // simulated minutes per real second
+      lastFrame: 0,
+      raf: null,
+      fleets: [],          // [{key, label, colors, vehicles, layer, ...}]
+      incident: null,      // {u, v, factor, start_time} once a road is closed
+      incidentLayer: null,
+      stopLayer: null,
+      stopMarkers: {},     // nodeId -> marker, shared by both fleets
+      totalStops: 0,
+    };
+
+    // Edge costs, keyed both ways round so a lookup is a single hash hit rather
+    // than a scan of several hundred edges per segment.
+    function simEdgeCosts(ctx) {
+      const map = {};
+      for (const e of (ctx.network.edges || [])) {
+        map[e.u + '|' + e.v] = {
+          minutes: (e.base_time || 0) * (e.congestion_factor || 1),
+          base: e.base_time || 0,
+          congestion: e.congestion_factor || 1,
+        };
+      }
+      return map;
+    }
+
+    // Compiles one solution into per-vehicle timelines.
+    function simBuildFleet(solution, ctx, costs, opts = {}) {
+      const customers = {};
+      for (const c of (ctx.vrp.customers || [])) customers[c.node_id] = c;
+
+      const timeDependent = !!opts.timeDependent;
+      const incident = opts.incident || null;
+      // Work handed out by a re-plan cannot have been driven before the re-plan
+      // happened. Null before any incident.
+      const notBefore = (typeof opts.notBefore === 'number') ? opts.notBefore : null;
+      const vehicles = [];
+
+      (solution.routes || []).forEach((route, vi) => {
+        const path = route.full_path || [];
+        if (path.length < 2) return;
+        // The backend numbers the vans; the array index is not the van.
+        const vehicleId = (typeof route.vehicle_id === 'number') ? route.vehicle_id : vi;
+
+        const toServe = new Set(route.customer_sequence || []);
+        const segments = [];
+        const events = [];
+        let t = 0;
+
+        for (let i = 0; i < path.length - 1; i++) {
+          const u = path[i], v = path[i + 1];
+          const edge = costs[u + '|' + v];
+          let minutes = edge ? edge.minutes : 0.5;
+          const base = edge ? edge.base : minutes;
+
+          // Rush hour, if this instance was built with it: a leg is priced by
+          // the time of day the van actually departs, not an average.
+          if (timeDependent) minutes *= tdMultiplier(t);
+
+          // A road closed mid-shift only costs more to vans that reach it after
+          // the closure — which is exactly why re-planning at that moment helps.
+          if (incident && t >= incident.start_time
+            && ((u === incident.u && v === incident.v) || (u === incident.v && v === incident.u))) {
+            minutes *= incident.factor;
+          }
+
+          segments.push({ t0: t, t1: t + minutes, u, v, kind: 'drive', delay: minutes - base });
+          t += minutes;
+
+          // Arriving at a stop this van still owes a delivery to.
+          if (toServe.has(v)) {
+            toServe.delete(v);
+            const c = customers[v];
+            if (c && t < c.ready_time) {
+              // Too early: the customer is not open yet, so the van waits. This
+              // is real dead time and the KPI panel counts it.
+              segments.push({ t0: t, t1: c.ready_time, u: v, v: v, kind: 'wait' });
+              t = c.ready_time;
+            }
+            const arrival = t;
+            const service = c ? c.service_time : 0;
+            segments.push({ t0: t, t1: t + service, u: v, v: v, kind: 'serve', node: v });
+            events.push({
+              t: arrival,
+              node: v,
+              late: c ? arrival > c.due_time : false,
+              lateness: c ? Math.max(0, arrival - c.due_time) : 0,
+            });
+            t += service;
+          }
+        }
+
+        // A van with nothing delivered before the closure was parked at the
+        // depot when it happened, so its whole re-planned day shifts to start
+        // there and then. Vans already part-way through keep their real timings:
+        // their completed legs are what put them where they are.
+        if (notBefore !== null && !events.some(ev => ev.t <= notBefore)) {
+          for (const sg of segments) { sg.t0 += notBefore; sg.t1 += notBefore; }
+          for (const ev of events) ev.t += notBefore;
+          t += notBefore;
+        }
+
+        vehicles.push({
+          id: vehicleId,
+          segments,
+          events,
+          endTime: t,
+          cursor: 0,
+          eventCursor: 0,
+          trailIdx: 0,
+        });
+      });
+
+      return vehicles;
+    }
+
+    // Where a vehicle is at time t. Walks forward from its cursor while playing;
+    // binary searches only when the clock has jumped backwards or far ahead.
+    function simPositionAt(veh, t, coords) {
+      const segs = veh.segments;
+      if (!segs.length) return null;
+      if (t >= veh.endTime) {
+        const last = segs[segs.length - 1];
+        const n = coords[last.v];
+        return n ? { lat: n.y, lng: n.x, kind: 'done' } : null;
+      }
+
+      let i = veh.cursor;
+      if (i >= segs.length || segs[i].t0 > t || segs[i].t1 < t) {
+        if (i < segs.length && segs[i].t1 < t && segs[i + 1] && segs[i + 1].t1 >= t) {
+          i = i + 1;                                  // the usual case: next segment
+        } else {
+          let lo = 0, hi = segs.length - 1;           // a seek
+          while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (segs[mid].t1 < t) lo = mid + 1; else hi = mid;
+          }
+          i = lo;
+        }
+        veh.cursor = i;
+      }
+
+      const seg = segs[i];
+      const a = coords[seg.u], b = coords[seg.v];
+      if (!a) return null;
+      if (seg.kind !== 'drive' || !b) return { lat: a.y, lng: a.x, kind: seg.kind };
+
+      const span = seg.t1 - seg.t0;
+      const f = span > 0 ? Math.min(1, Math.max(0, (t - seg.t0) / span)) : 1;
+      return {
+        lat: a.y + (b.y - a.y) * f,
+        lng: a.x + (b.x - a.x) * f,
+        kind: 'drive',
+      };
+    }
+
+    // ---- Building the race --------------------------------------------------
+    async function simPrepare() {
+      if (!state.vrp) return;
+      const btn = document.getElementById('btnSimBuild');
+      btn.disabled = true;
+      const label = btn.innerHTML;
+      btn.innerHTML = '⏳ Solving both plans…';
+      setMapPrompt('Solving the usual method and ours on this instance…');
+
+      try {
+        const comp = await api('/api/vrp/compare', {
+          method: 'POST',
+          body: JSON.stringify({
+            vrp_id: state.vrp.vrp_id,
+            baseline_algo: 'greedy', optimized_algo: 'qpso',
+            n_particles: +document.getElementById('n_particles').value || 50,
+            max_iter: +document.getElementById('max_iter').value || 150,
+            seed: 1, use_local_search: true,
+          }),
+        });
+
+        state.baselineSolution = comp.baseline;
+        state.optimizedSolution = comp.optimized;
+        sim.incident = null;
+        simBuildFromSolutions(comp.baseline, comp.optimized);
+        simSeek(0);
+        simPlay();
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        setMapPrompt('Could not build the race: ' + detail, { warn: true });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = label;
+      }
+    }
+
+    // Compiles both fleets and lays out every layer the playback touches.
+    function simBuildFromSolutions(baseline, optimized) {
+      const costs = simEdgeCosts(state);
+      const timeDependent = !!(document.getElementById('time_dependent') || {}).checked;
+      const opts = {
+        timeDependent,
+        incident: sim.incident,
+        notBefore: sim.incident ? sim.incident.start_time : null,
+      };
+
+      sim.fleets = [
+        {
+          key: 'usual', label: 'Usual method', colors: SIM_USUAL_COLORS,
+          vehicles: simBuildFleet(baseline, state, costs, opts),
+          delivered: 0, late: 0, delay: 0,
+        },
+        {
+          key: 'ours', label: 'Our method', colors: SIM_OURS_COLORS,
+          vehicles: simBuildFleet(optimized, state, costs, opts),
+          delivered: 0, late: 0, delay: 0,
+        },
+      ];
+
+      ensureControlMap();
+      const coords = nodeCoordMap(state);
+
+      for (const fleet of sim.fleets) {
+        if (fleet.layer) state.map.removeLayer(fleet.layer);
+        fleet.layer = L.layerGroup().addTo(state.map);
+
+        fleet.vehicles.forEach((veh) => {
+          const color = fleet.colors[veh.id % fleet.colors.length];
+
+          // The planned route, drawn faintly: where this van intends to go.
+          const latlngs = veh.segments
+            .filter(sg => sg.kind === 'drive')
+            .map(sg => coords[sg.u])
+            .filter(Boolean)
+            .map(n => [n.y, n.x]);
+          veh.plan = L.polyline(latlngs, {
+            color, weight: 2, opacity: 0.28, dashArray: '4 5', interactive: false,
+          }).addTo(fleet.layer);
+
+          // The trail, filled in as it actually drives. One polyline extended in
+          // place — never re-created — so a long shift costs no more per frame
+          // than a short one.
+          const trailWeight = fleet.key === 'ours' ? 5 : 4;
+          veh.trailCasing = L.polyline([], {
+            color: '#FFFFFF', weight: trailWeight + 3.5, opacity: 0.85,
+            lineCap: 'round', lineJoin: 'round', interactive: false,
+          }).addTo(fleet.layer);
+          veh.trail = L.polyline([], {
+            color, weight: trailWeight, opacity: 1,
+            lineCap: 'round', lineJoin: 'round', interactive: false,
+          }).addTo(fleet.layer);
+          veh.trailPts = [];
+
+          veh.marker = L.marker([0, 0], {
+            icon: L.divIcon({
+              className: 'sim-van',
+              html: '<div style="background:' + color + ';color:#06121f;font-weight:800;">'
+                + (veh.id + 1) + '</div>',
+              iconSize: [22, 22], iconAnchor: [11, 11],
+            }),
+            interactive: false,
+            zIndexOffset: fleet.key === 'ours' ? 600 : 500,
+          }).addTo(fleet.layer);
+        });
+      }
+
+      // Stop pins are shared: both fleets serve the same customers, and the
+      // point of the flashes is which fleet gets there inside the window.
+      if (sim.stopLayer) state.map.removeLayer(sim.stopLayer);
+      sim.stopLayer = L.layerGroup().addTo(state.map);
+      sim.stopMarkers = {};
+      for (const c of (state.vrp.customers || [])) {
+        const n = coords[c.node_id];
+        if (!n) continue;
+        sim.stopMarkers[c.node_id] = L.circleMarker([n.y, n.x], {
+          radius: 6, color: '#FFFFFF', weight: 2,
+          fillColor: '#64748B', fillOpacity: 1,
+        }).bindTooltip('Stop ' + c.node_id + ' — due by ' + tdClock(TD_PROFILE.dayStartMin + c.due_time))
+          .addTo(sim.stopLayer);
+      }
+
+      sim.totalStops = (state.vrp.customers || []).length;
+      sim.horizon = Math.max(1, ...sim.fleets.flatMap(f => f.vehicles.map(v => v.endTime)));
+      sim.ready = true;
+
+      document.getElementById('simTransport').hidden = false;
+      document.getElementById('simLegend').hidden = false;
+      document.getElementById('simKpis').hidden = false;
+      document.getElementById('simIncidentPanel').hidden = false;
+      document.getElementById('btnDynamicRun').disabled = false;
+      document.getElementById('simTransportEnd').textContent = tdClock(TD_PROFILE.dayStartMin + sim.horizon);
+      setMapPrompt('Both fleets leave the depot together. Watch where they diverge.');
+    }
+
+    // ---- Playback -----------------------------------------------------------
+    function simPlay() {
+      if (!sim.ready) return;
+      if (sim.clock >= sim.horizon) simSeek(0);
+      sim.running = true;
+      sim.lastFrame = performance.now();
+      document.getElementById('simPlayBtn').textContent = '❚❚';
+      if (!sim.raf) sim.raf = requestAnimationFrame(simFrame);
+    }
+
+    function simPause() {
+      sim.running = false;
+      document.getElementById('simPlayBtn').textContent = '▶';
+    }
+
+    function simTogglePlay() {
+      sim.running ? simPause() : simPlay();
+    }
+
+    function simSetSpeed(v) {
+      sim.speed = Number(v) || 60;
+    }
+
+    function simScrubTo(v) {
+      simSeek((Number(v) / 1000) * sim.horizon);
+    }
+
+    // Jumping backwards invalidates everything derived from "what has happened
+    // so far", so the per-vehicle cursors and the tallies are rebuilt rather
+    // than nudged.
+    function simSeek(t) {
+      if (!sim.ready) return;
+      sim.clock = Math.max(0, Math.min(t, sim.horizon));
+      for (const fleet of sim.fleets) {
+        fleet.delivered = 0; fleet.late = 0; fleet.delay = 0;
+        for (const veh of fleet.vehicles) {
+          veh.cursor = 0; veh.eventCursor = 0; veh.trailIdx = 0;
+          veh.trailPts = [];
+          veh.trail.setLatLngs([]);
+          veh.trailCasing.setLatLngs([]);
+        }
+      }
+      for (const id in sim.stopMarkers) {
+        const m = sim.stopMarkers[id];
+        m._simServed = false;   // or a replay never re-flashes the pin
+        m.setStyle({ fillColor: '#64748B', radius: 6 });
+      }
+      simAdvanceTo(sim.clock);
+      simRender();
+    }
+
+    // Replays everything up to `t` that the display depends on: trail points,
+    // stop flashes and the running tallies.
+    function simAdvanceTo(t) {
+      const coords = nodeCoordMap(state);
+
+      for (const fleet of sim.fleets) {
+        for (const veh of fleet.vehicles) {
+          // Trail: extend by whole segments already driven.
+          while (veh.trailIdx < veh.segments.length && veh.segments[veh.trailIdx].t1 <= t) {
+            const sg = veh.segments[veh.trailIdx];
+            if (sg.kind === 'drive') {
+              const n = coords[sg.v];
+              if (n) veh.trailPts.push([n.y, n.x]);
+              fleet.delay += Math.max(0, sg.delay || 0);
+            }
+            veh.trailIdx++;
+          }
+          veh.trailCasing.setLatLngs(veh.trailPts);
+          veh.trail.setLatLngs(veh.trailPts);
+
+          // Deliveries that have happened by now.
+          while (veh.eventCursor < veh.events.length && veh.events[veh.eventCursor].t <= t) {
+            const ev = veh.events[veh.eventCursor];
+            fleet.delivered++;
+            if (ev.late) fleet.late++;
+
+            // The pin takes the colour of whichever fleet reached it first —
+            // green inside the promised window, red outside it.
+            const marker = sim.stopMarkers[ev.node];
+            if (marker && !marker._simServed) {
+              marker._simServed = true;
+              marker.setStyle({ fillColor: ev.late ? '#EF4444' : '#22C55E', radius: 8 });
+            }
+            veh.eventCursor++;
+          }
+        }
+      }
+    }
+
+    function simFrame(now) {
+      const dt = (now - sim.lastFrame) / 1000;
+      sim.lastFrame = now;
+
+      if (sim.running) {
+        const next = Math.min(sim.clock + dt * sim.speed, sim.horizon);
+        sim.clock = next;
+        simAdvanceTo(next);
+        simRender();
+        if (next >= sim.horizon) {
+          simPause();
+          setMapPrompt('Shift over. ' + simVerdict());
+        }
+      }
+      sim.raf = requestAnimationFrame(simFrame);
+    }
+
+    // Moves the markers and repaints the readout. Deliberately the only thing
+    // that touches the DOM per frame.
+    function simRender() {
+      const coords = nodeCoordMap(state);
+      let vansOut = 0, delivered = 0, late = 0, delay = 0;
+
+      for (const fleet of sim.fleets) {
+        for (const veh of fleet.vehicles) {
+          const pos = simPositionAt(veh, sim.clock, coords);
+          if (!pos) continue;
+          veh.marker.setLatLng([pos.lat, pos.lng]);
+          const el = veh.marker.getElement();
+          if (el) {
+            el.classList.toggle('is-serving', pos.kind === 'serve');
+            el.style.opacity = pos.kind === 'done' ? '0.35' : '1';
+          }
+          if (sim.clock < veh.endTime) vansOut++;
+        }
+        delivered += fleet.delivered;
+        late += fleet.late;
+        delay += fleet.delay;
+      }
+
+      const clockText = tdClock(TD_PROFILE.dayStartMin + sim.clock);
+      document.getElementById('simClock').textContent = clockText;
+      document.getElementById('simTransportClock').textContent = clockText;
+      document.getElementById('simDelivered').textContent =
+        delivered + ' / ' + (sim.totalStops * sim.fleets.length);
+      document.getElementById('simVansOut').textContent = vansOut;
+      document.getElementById('simDelay').textContent = delay.toFixed(1) + ' min';
+
+      const lateEl = document.getElementById('simLate');
+      lateEl.textContent = late;
+      lateEl.className = late ? 'feas-no' : 'feas-yes';
+
+      const usual = sim.fleets.find(f => f.key === 'usual');
+      const ours = sim.fleets.find(f => f.key === 'ours');
+      document.getElementById('simUsualDone').textContent = usual ? usual.delivered + ' stops' : '—';
+      document.getElementById('simOursDone').textContent = ours ? ours.delivered + ' stops' : '—';
+
+      const scrub = document.getElementById('simScrub');
+      if (document.activeElement !== scrub) {
+        scrub.value = String((sim.clock / sim.horizon) * 1000);
+      }
+    }
+
+    function simVerdict() {
+      const usual = sim.fleets.find(f => f.key === 'usual');
+      const ours = sim.fleets.find(f => f.key === 'ours');
+      if (!usual || !ours) return '';
+
+      const last = f => Math.max(...f.vehicles.map(v => v.endTime));
+      const vanHours = f => f.vehicles.reduce((a, v) => a + v.endTime, 0);
+
+      const gap = last(usual) - last(ours);
+      const home = Math.abs(gap) < 1
+        ? 'Both fleets got home at about the same time'
+        : gap > 0
+          ? 'Ours was home ' + gap.toFixed(0) + ' min earlier'
+          : 'The usual method was home ' + Math.abs(gap).toFixed(0) + ' min earlier';
+
+      // Our plan often does the round with fewer vans, which lands the last one
+      // home later while costing less overall. Giving only the finish time would
+      // read that trade as a straight loss, so both numbers are stated.
+      const saved = vanHours(usual) - vanHours(ours);
+      const cost = Math.abs(saved) < 1
+        ? 'total time on the road was about level'
+        : saved > 0
+          ? 'and used ' + saved.toFixed(0) + ' min less van time overall'
+          : 'but used ' + Math.abs(saved).toFixed(0) + ' min more van time overall';
+
+      const vans = usual.vehicles.length !== ours.vehicles.length
+        ? ' (' + ours.vehicles.length + ' vans against ' + usual.vehicles.length + ')'
+        : '';
+
+      return home + ', ' + cost + vans + '.';
+    }
+
+    // ---- Closing a road while the vans are out ------------------------------
+    async function simInjectBottleneck() {
+      if (!sim.ready || !state.vrp) return;
+      const btn = document.getElementById('btnDynamicRun');
+      const label = btn.innerHTML;
+      const wasRunning = sim.running;
+      simPause();
+      btn.disabled = true;
+      btn.innerHTML = '⏳ RE-PLANNING…';
+
+      const at = sim.clock;
+      setMapPrompt('Closing a road at ' + tdClock(TD_PROFILE.dayStartMin + at) + ' and re-planning…');
+
+      try {
+        const dyn = await api('/api/vrp/solve-dynamic', {
+          method: 'POST',
+          body: JSON.stringify({
+            vrp_id: state.vrp.vrp_id,
+            incident_factor: +document.getElementById('incident_severity').value || 4.0,
+            trigger_time_min: at,
+            algorithm: 'qpso',
+            n_particles: +document.getElementById('n_particles').value || 50,
+            max_iter: +document.getElementById('max_iter').value || 150,
+            seed: 1,
+          }),
+        });
+
+        // Which plan each fleet picks up matters, and getting it wrong both
+        // mislabels the race and makes the vans jump.
+        //
+        // The usual fleet keeps its own greedy plan — it is the method that does
+        // not react, so it drives into the closure. Its timeline is simply
+        // recompiled with the closure priced in, which leaves every leg before
+        // the closure untouched.
+        //
+        // Our fleet takes the re-planned solution. The backend builds that by
+        // solving from t=0 with the same algorithm, seed and budget this race
+        // was compiled from, then keeping each van's completed legs and
+        // re-optimising only what is left — so its prefix is the very plan
+        // already on screen and the vans carry on from where they stand.
+        //
+        // `static_affected_solution` is deliberately not used here: it is our
+        // own plan re-costed under the closure, not the greedy one, so feeding
+        // it to the usual fleet would put the wrong plan under that label.
+        // Where every van stands at the moment the road closes, so any van the
+        // re-plan redirects can be shown being redirected.
+        const wasAt = {};
+        for (const fleet of sim.fleets) {
+          for (const veh of fleet.vehicles) wasAt[fleet.key + '#' + veh.id] = veh.marker.getLatLng();
+        }
+
+        sim.incident = dyn.incident || null;
+        state.dynamicResult = dyn;
+        simBuildFromSolutions(state.baselineSolution, dyn.dynamic_rerouted_solution);
+        simSeek(at);
+        simShowRetasking(wasAt);
+
+        if (sim.incident) {
+          const coords = nodeCoordMap(state);
+          const a = coords[sim.incident.u], b = coords[sim.incident.v];
+          if (sim.incidentLayer) state.map.removeLayer(sim.incidentLayer);
+          if (a && b) {
+            sim.incidentLayer = L.layerGroup().addTo(state.map);
+            L.polyline([[a.y, a.x], [b.y, b.x]], {
+              color: '#FF0054', weight: 9, opacity: 0.95,
+            }).addTo(sim.incidentLayer);
+            L.marker([(a.y + b.y) / 2, (a.x + b.x) / 2], {
+              icon: L.divIcon({
+                className: 'sim-van',
+                html: '<div style="background:#FF0054;color:#FFF;">⛔</div>',
+                iconSize: [22, 22], iconAnchor: [11, 11],
+              }),
+            }).bindTooltip('Road closed at ' + tdClock(TD_PROFILE.dayStartMin + at)
+              + ' — ' + sim.incident.factor + '× slower').addTo(sim.incidentLayer);
+          }
+        }
+
+        // Both figures are our plan: one that ignores the closure, one that
+        // re-plans around it. That is the question this panel answers — whether
+        // reacting was worth it — so it is stated in those terms.
+        const saved = dyn.time_saved_min;
+        document.getElementById('dynamicInfo').innerHTML =
+          '<div class="stat-line"><span>Ours, ignoring it</span><span>'
+          + dyn.static_affected_solution.total_time.toFixed(1) + ' min</span></div>'
+          + '<div class="stat-line"><span>Ours, re-planned</span><span>'
+          + dyn.dynamic_rerouted_solution.total_time.toFixed(1) + ' min</span></div>'
+          + '<div class="stat-line"><span>Re-planning gained</span><span class="'
+          + (saved > 0 ? 'feas-yes' : 'feas-no') + '">'
+          + (saved > 0 ? '−' : '+') + Math.abs(saved).toFixed(1) + ' min</span></div>';
+
+        setMapPrompt('Road closed. The usual method drives into it; ours re-planned around it.');
+        if (wasRunning) simPlay();
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        setMapPrompt('Could not re-plan: ' + detail, { warn: true });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = label;
+      }
+    }
+
+    // Draws the redirections a re-plan caused: a dashed line from where each
+    // van was to where its new orders begin. Only vans that actually moved get
+    // one, which in practice means the ones caught mid-road by the closure.
+    function simShowRetasking(wasAt) {
+      if (!sim.incidentLayer) sim.incidentLayer = L.layerGroup().addTo(state.map);
+
+      for (const fleet of sim.fleets) {
+        for (const veh of fleet.vehicles) {
+          const key = fleet.key + '#' + veh.id;
+          const from = wasAt[key];
+          if (!from) continue;                       // a van the re-plan just put to work
+          const to = veh.marker.getLatLng();
+          const metres = state.map.distance(from, to);
+          if (metres < 50) continue;                 // carried straight on
+
+          L.polyline([from, to], {
+            color: '#FEE440', weight: 3, opacity: 0.9, dashArray: '5 6', interactive: false,
+          }).bindTooltip('Van ' + (veh.id + 1) + ' redirected — its new orders start '
+            + Math.round(metres) + ' m from where it was').addTo(sim.incidentLayer);
+        }
+      }
+    }
+
+    // A new instance invalidates any race already compiled.
+    function simReset() {
+      simPause();
+      sim.ready = false;
+      sim.clock = 0;
+      sim.incident = null;
+      for (const fleet of sim.fleets) {
+        if (fleet.layer) state.map.removeLayer(fleet.layer);
+      }
+      sim.fleets = [];
+      if (sim.stopLayer) { state.map.removeLayer(sim.stopLayer); sim.stopLayer = null; }
+      if (sim.incidentLayer) { state.map.removeLayer(sim.incidentLayer); sim.incidentLayer = null; }
+      for (const id of ['simTransport', 'simLegend', 'simKpis', 'simIncidentPanel']) {
+        const el = document.getElementById(id);
+        if (el) el.hidden = true;
+      }
+      const dyn = document.getElementById('dynamicInfo');
+      if (dyn) dyn.innerHTML = '';
+    }
+
     // ---------------------------------------------------------------------------
     // VRP generation (Control Room)
     // ---------------------------------------------------------------------------
     async function generateVRP() {
-      const btn = event.target;
+      const btn = document.getElementById('btnGenVRP');
       btn.disabled = true; btn.textContent = 'GENERATING…';
       try {
         const vrp = await api('/api/vrp/generate', {
@@ -5902,13 +6743,14 @@
           }),
         });
         state.vrp = vrp;
+        simReset();   // a new instance invalidates any race compiled from the old one
         document.getElementById('vrpInfo').innerHTML =
           '<div class="stat-line"><span>Stops</span><span>' + vrp.customers.length + '</span></div>'
           + '<div class="stat-line"><span>Vehicles available</span><span>' + vrp.n_vehicles + '</span></div>'
           + '<div class="stat-line"><span>Total demand</span><span>' + vrp.total_demand.toFixed(1) + '</span></div>';
         document.getElementById('btnSolve').disabled = false;
         document.getElementById('btnBench').disabled = false;
-        document.getElementById('btnDynamicRun').disabled = false;
+        document.getElementById('btnSimBuild').disabled = false;
         cancelMapMode();
         setMapPrompt('Instance ready — ' + vrp.customers.length + ' stops, '
           + vrp.n_vehicles + ' vans. Solve it from the right-hand panel.');
@@ -5924,7 +6766,7 @@
     // Solve (Control Room)
     // ---------------------------------------------------------------------------
     async function solveVRP() {
-      const btn = event.target;
+      const btn = document.getElementById('btnSolve');
       btn.disabled = true; btn.textContent = 'SOLVING…';
       try {
         const algo = document.getElementById('algorithm').value;
@@ -5954,68 +6796,6 @@
       }
     }
 
-    // ---------------------------------------------------------------------------
-    // Dynamic bottleneck (Control Room)
-    //
-    // Closes a road the fleet is already driving through, part-way into the
-    // shift, and re-plans the vans that have not finished. This is the case a
-    // static plan cannot answer at all, so it belongs next to the map rather
-    // than on a pitch page.
-    // ---------------------------------------------------------------------------
-    async function runDynamicTrafficDemo() {
-      if (!state.vrp) return;
-      const btn = document.getElementById('btnDynamicRun');
-      const label = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '⏳ RE-OPTIMISING…';
-      setMapPrompt('Blocking a road mid-shift and re-planning the vans still out…');
-
-      try {
-        const dyn = await api('/api/vrp/solve-dynamic', {
-          method: 'POST',
-          body: JSON.stringify({
-            vrp_id: state.vrp.vrp_id,
-            incident_factor: +document.getElementById('incident_severity').value || 4.0,
-            trigger_time_min: +document.getElementById('incident_at').value || 90.0,
-            algorithm: 'qpso',
-            n_particles: +document.getElementById('n_particles').value || 50,
-            max_iter: +document.getElementById('max_iter').value || 150,
-            seed: 1,
-          }),
-        });
-
-        state.dynamicResult = dyn;
-        const stat = dyn.static_affected_solution || {};
-        const rerouted = dyn.dynamic_rerouted_solution || {};
-        const saved = (typeof stat.total_time === 'number' && typeof rerouted.total_time === 'number')
-          ? stat.total_time - rerouted.total_time : null;
-
-        document.getElementById('dynamicInfo').innerHTML =
-          '<div class="stat-line"><span>Kept to the old plan</span><span>'
-          + (typeof stat.total_time === 'number' ? stat.total_time.toFixed(1) + ' min' : '—') + '</span></div>'
-          + '<div class="stat-line"><span>Re-optimised</span><span>'
-          + (typeof rerouted.total_time === 'number' ? rerouted.total_time.toFixed(1) + ' min' : '—') + '</span></div>'
-          + '<div class="stat-line"><span>Time saved</span><span class="'
-          + (saved !== null && saved > 0 ? 'feas-yes' : 'feas-no') + '">'
-          + (saved === null ? '—' : (saved > 0 ? '−' : '+') + Math.abs(saved).toFixed(1) + ' min')
-          + '</span></div>';
-
-        // Show the re-planned routes on the map the engineer is looking at.
-        if (rerouted.routes) {
-          state.optimizedSolution = rerouted;
-          drawRoutes(rerouted.routes);
-        }
-        setMapPrompt(saved !== null && saved > 0
-          ? 'Re-optimised around the blockage — ' + saved.toFixed(1) + ' min saved against keeping the old plan.'
-          : 'Re-optimised around the blockage. Figures are in the panel on the right.');
-      } catch (e) {
-        setMapPrompt('Dynamic re-optimisation failed: ' + e.message, { warn: true });
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = label;
-      }
-    }
-
     function showResult(r) {
       document.getElementById('resultSection').style.display = 'block';
       document.getElementById('resultAlgo').textContent = r.algorithm;
@@ -6034,7 +6814,7 @@
     // Benchmark (Control Room)
     // ---------------------------------------------------------------------------
     async function runBenchmark() {
-      const btn = event.target;
+      const btn = document.getElementById('btnBench');
       btn.disabled = true; btn.textContent = 'RUNNING 5-ALGO BENCHMARK…';
       try {
         const bench = await api('/api/benchmark/run', {
