@@ -172,3 +172,12 @@ def get_vrp_network_id(vrp_id: str) -> str:
         if vrp_id not in _vrp_problems:
             raise KeyError(f"vrp_id '{vrp_id}' not found")
         return _vrp_problems[vrp_id][0]
+
+def load_stress_test_cache() -> dict | None:
+    """Loads data/stress_test_cache.json if present, else None."""
+    import os, json
+    path = os.path.join("data", "stress_test_cache.json")
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return None

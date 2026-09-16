@@ -256,8 +256,109 @@ def run_real_city_demo_benchmark(place: str = "New Delhi, India", max_nodes: int
     except Exception as e:
         print(f"Could not run real city benchmark: {e}")
 
+import multiprocessing
+import traceback
+
+def _worker_solve(problem, algorithm, seed, out_q):
+    try:
+        t0 = time.perf_counter()
+        if algorithm == "qpso_local_search":
+            opt = QPSOVRPOptimizer(problem, n_particles=50, max_iter=200, seed=seed, use_local_search=True)
+            res = opt.optimize()
+            sol = res.best_solution
+            fit = res.best_fitness
+        elif algorithm == "standard_pso":
+            res = run_standard_pso_vrp(problem, n_particles=50, max_iter=200, seed=seed)
+            sol = res.best_solution
+            fit = res.best_fitness
+        else:
+            raise ValueError(f"Unknown algorithm {algorithm}")
+            
+        runtime = time.perf_counter() - t0
+        
+        # Serialize routes (just as a dict structure so it can be JSON dumped)
+        routes_dump = []
+        if sol and sol.routes:
+            for route in sol.routes:
+                routes_dump.append(route)
+            
+        out_q.put({
+            "status": "success",
+            "runtime_ms": runtime * 1000,
+            "fitness": fit,
+            "feasible": sol.feasible if sol else False,
+            "routes": routes_dump
+        })
+    except Exception as e:
+        traceback.print_exc()
+        out_q.put({"status": "error", "error": str(e)})
+
+def run_stress_test_at_scale(
+    n_customers_list: list[int] = [100, 200],
+    algorithms: list[str] = ["qpso_local_search", "standard_pso"],
+    network_source: str = "real_city",
+    network_id: str | None = None,
+    time_budget_seconds: float = 300.0,
+    n_seeds: int = 3,
+) -> dict:
+    import json
+    from app.core.osm_network import load_osm_network
+    
+    if network_source == "real_city":
+        net = load_osm_network(place="New Delhi, India", max_nodes=500)
+        actual_network_id = network_id or "real_city_delhi"
+    else:
+        net = generate_synthetic_city_graph(n_nodes=300, seed=1)
+        actual_network_id = "synthetic"
+        
+    results = {}
+    
+    for n_customers in n_customers_list:
+        results[str(n_customers)] = {}
+        problem = generate_synthetic_vrp(net, n_customers=n_customers, depot=0, vehicle_capacity=80)
+        
+        for algo in algorithms:
+            print(f"Running {algo} at {n_customers} customers...")
+            best_res = None
+            
+            for seed in range(n_seeds):
+                ctx = multiprocessing.get_context('spawn')
+                out_q = ctx.Queue()
+                p = ctx.Process(target=_worker_solve, args=(problem, algo, seed, out_q))
+                p.start()
+                p.join(timeout=time_budget_seconds)
+                
+                if p.is_alive():
+                    print(f"Timeout reached for {algo} at seed {seed}")
+                    p.terminate()
+                    p.join()
+                    res = {"status": "timeout", "runtime_ms": time_budget_seconds * 1000, "fitness": None, "feasible": False, "routes": []}
+                else:
+                    if not out_q.empty():
+                        res = out_q.get()
+                    else:
+                        res = {"status": "crash", "runtime_ms": time_budget_seconds * 1000, "fitness": None, "feasible": False, "routes": []}
+                
+                if res["status"] == "success":
+                    if best_res is None or res["fitness"] < best_res["fitness"]:
+                        best_res = res
+                        
+            if best_res is None:
+                best_res = {"status": "timeout", "runtime_ms": time_budget_seconds * 1000, "fitness": None, "feasible": False, "routes": []}
+                
+            results[str(n_customers)][algo] = {
+                "fitness": best_res.get("fitness"),
+                "runtime_ms": best_res.get("runtime_ms"),
+                "feasible": best_res.get("feasible"),
+                "routes": best_res.get("routes")
+            }
+            
+    return {
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "network_id": actual_network_id,
+        "results": results
+    }
+
 if __name__ == "__main__":
     # Also run the real city benchmark at the end
     run_real_city_demo_benchmark()
-
-

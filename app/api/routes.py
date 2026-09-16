@@ -564,6 +564,14 @@ def solve_dynamic_vrp(req: DynamicSolveRequest):
     )
 
 
+@router.get("/benchmark/stress-test-cached")
+def get_stress_test_cached():
+    data = store.load_stress_test_cache()
+    if data is None:
+        raise HTTPException(status_code=404, detail="Stress test not yet generated — run scripts/generate_stress_test_cache.py")
+    return data
+
+
 # In-Dashboard AI Assistant (Issue #32)
 # ---------------------------------------------------------------------------
 
