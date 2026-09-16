@@ -3618,6 +3618,21 @@
       return res.json();
     }
 
+    // Unpacks the Error thrown by api() — "<status>: <json body>" — into the
+    // status code and the human-readable detail the backend sent.
+    function describeApiError(err) {
+      const text = (err && err.message) ? String(err.message) : '';
+      const m = text.match(/^(\d{3}):\s*([\s\S]*)$/);
+      if (!m) return { status: 0, detail: 'Could not reach the backend. Is it running?' };
+      const status = Number(m[1]);
+      let detail = m[2].trim();
+      try {
+        const parsed = JSON.parse(detail);
+        if (parsed && parsed.detail) detail = parsed.detail;
+      } catch (_) { /* not JSON — show it as it came */ }
+      return { status, detail: detail || ('The backend returned ' + status + '.') };
+    }
+
     async function checkHealth() {
       const dot = document.getElementById('connDot');
       const label = document.getElementById('connLabel');
@@ -4959,7 +4974,7 @@
         document.getElementById('svgJudgeBefore').style.display = 'block';
         document.getElementById('svgJudgeAfter').style.display = 'block';
 
-        const coords = nodeCoordMap();
+        const coords = nodeCoordMap(execState);
         const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
         const minX = Math.min(...xs), maxX = Math.max(...xs);
         const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -5246,11 +5261,25 @@
     //  Draws every edge of the road network as a visible directed segment:
     //    • White casing halo → colored line → directional arrow → node dots
     // =========================================================================
-    function drawDirectedRoadGraphLeaflet(layerGroup, map, paneName, ctx = state) {
+    function drawDirectedRoadGraphLeaflet(layerGroup, map, paneName, ctx) {
+      if (!ctx) throw new Error('drawDirectedRoadGraphLeaflet: pass the workspace (state or execState)');
       if (!ctx.network || !ctx.network.edges) return;
       const coords = nodeCoordMap(ctx);
       const drawnNodes = new Set();
       const pOpts = paneName ? { pane: paneName } : {};
+
+      // This layer is context, not the subject. On a real district it carries
+      // several hundred edges, and drawn at full strength — an arrow on every
+      // one — it buried the vehicle routes that layer 3 puts on top, which are
+      // the whole point of the comparison. So the plain streets recede and the
+      // congested ones keep their weight: "red roads are jammed" is the part of
+      // this layer the story actually needs.
+      const edgeCount = ctx.network.edges.length;
+
+      // On a small hand-drawn boundary every street can carry its arrow. On a
+      // whole district only the congested ones do, or the map becomes a field
+      // of arrowheads with the routes lost underneath.
+      const arrowsEverywhere = edgeCount <= 160;
 
       for (const e of ctx.network.edges) {
         const a = coords[e.u], b = coords[e.v];
@@ -5259,13 +5288,13 @@
         const jam = e.congestion_factor >= JAM_THRESHOLD;
         const busy = e.congestion_factor > BUSY_THRESHOLD;
         const color = jam ? '#EF4444' : busy ? '#F59E0B' : '#64748B';
-        const weight = jam ? 4 : busy ? 3 : 2;
-        const opacity = jam ? 0.85 : busy ? 0.75 : 0.6;
+        const weight = jam ? 3.2 : busy ? 2.4 : 1.5;
+        const opacity = jam ? 0.85 : busy ? 0.62 : 0.38;
 
         // White casing halo for contrast against map tiles
         L.polyline([[a.y, a.x], [b.y, b.x]], {
           ...pOpts,
-          color: '#FFFFFF', weight: weight + 3, opacity: 0.8,
+          color: '#FFFFFF', weight: weight + 2, opacity: jam ? 0.75 : 0.45,
           lineCap: 'round', lineJoin: 'round'
         }).addTo(layerGroup);
 
@@ -5278,34 +5307,31 @@
         }).addTo(layerGroup);
 
         // Directional arrow at 62% of the segment
-        const midLat = a.y + (b.y - a.y) * 0.62;
-        const midLon = a.x + (b.x - a.x) * 0.62;
-        const angleDeg = Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI;
+        if (jam || busy || arrowsEverywhere) {
+          const midLat = a.y + (b.y - a.y) * 0.62;
+          const midLon = a.x + (b.x - a.x) * 0.62;
+          const angleDeg = Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI;
+          const size = jam ? 11 : busy ? 10 : 9;
 
-        L.marker([midLat, midLon], {
-          icon: L.divIcon({
-            className: 'leaflet-road-arrow',
-            html: `<div style="transform:rotate(${angleDeg.toFixed(0)}deg);color:${color};font-size:12px;font-weight:900;line-height:1;text-shadow:0 0 3px #FFF,0 0 6px #FFF;">&#10148;</div>`,
-            iconSize: [14, 14], iconAnchor: [7, 7]
-          }),
-          interactive: false
-        }).addTo(layerGroup);
-
-        // Node dots (deduplicated)
-        if (!drawnNodes.has(e.u)) {
-          drawnNodes.add(e.u);
-          L.circleMarker([a.y, a.x], {
-            ...pOpts,
-            radius: 4, color: '#FFFFFF', fillColor: '#334155',
-            fillOpacity: 0.9, weight: 1.5
+          L.marker([midLat, midLon], {
+            icon: L.divIcon({
+              className: 'leaflet-road-arrow',
+              html: `<div style="transform:rotate(${angleDeg.toFixed(0)}deg);color:${color};opacity:${jam ? 0.95 : busy ? 0.8 : 0.5};font-size:${size}px;font-weight:900;line-height:1;text-shadow:0 0 3px #FFF,0 0 5px #FFF;">&#10148;</div>`,
+              iconSize: [14, 14], iconAnchor: [7, 7]
+            }),
+            interactive: false
           }).addTo(layerGroup);
         }
-        if (!drawnNodes.has(e.v)) {
-          drawnNodes.add(e.v);
-          L.circleMarker([b.y, b.x], {
+
+        // Node dots (deduplicated) — junctions of the graph, kept small so the
+        // numbered stops of layer 3 remain the only prominent points.
+        for (const [id, pt] of [[e.u, a], [e.v, b]]) {
+          if (drawnNodes.has(id)) continue;
+          drawnNodes.add(id);
+          L.circleMarker([pt.y, pt.x], {
             ...pOpts,
-            radius: 4, color: '#FFFFFF', fillColor: '#334155',
-            fillOpacity: 0.9, weight: 1.5
+            radius: 2.2, color: '#FFFFFF', fillColor: '#475569',
+            fillOpacity: 0.6, weight: 0.8
           }).addTo(layerGroup);
         }
       }
@@ -5316,7 +5342,8 @@
     //  Draws each vehicle's delivery route with white contrast halo, glowing
     //  flowing animated stroke, tooltips, and directional flow arrows.
     // =========================================================================
-    function drawVehicleRoutesLeaflet(layerGroup, solution, coords, isDashed, map, paneName, ctx = state) {
+    function drawVehicleRoutesLeaflet(layerGroup, solution, coords, isDashed, map, paneName, ctx) {
+      if (!ctx) throw new Error('drawVehicleRoutesLeaflet: pass the workspace (state or execState)');
       if (!solution || !solution.routes) return;
       const depotId = (ctx.vrp && ctx.vrp.depot !== undefined) ? ctx.vrp.depot : 0;
       const pOpts = paneName ? { pane: paneName } : {};
@@ -5447,25 +5474,29 @@
       }
 
       function drawBothJudgeMaps() {
-        const curCoords = nodeCoordMap();
+        // Every helper below takes the workspace to draw from as its last
+        // argument. It must be passed explicitly: the default is the control
+        // room's `state`, and letting these fall through to it is what left the
+        // landing page showing bare OpenStreetMap tiles with no graph on top.
+        const curCoords = nodeCoordMap(execState);
 
         // ─── DRAW BEFORE MAP (3 layers) ───────────────────────────────────
         execState.judgeGraphBefore.clearLayers();
         execState.judgeRouteBefore.clearLayers();
         execState.judgeMarkerBefore.clearLayers();
 
-        drawDirectedRoadGraphLeaflet(execState.judgeGraphBefore, execState.judgeMapBefore, 'roadGraphPane');                          // Layer 2
-        drawVehicleRoutesLeaflet(execState.judgeRouteBefore, execState.baselineSolution, curCoords, true, execState.judgeMapBefore, 'vehicleRoutePane');  // Layer 3
-        markDepotAndCustomers(execState.judgeMarkerBefore, true, execState.baselineSolution);  // Top
+        drawDirectedRoadGraphLeaflet(execState.judgeGraphBefore, execState.judgeMapBefore, 'roadGraphPane', execState);                          // Layer 2
+        drawVehicleRoutesLeaflet(execState.judgeRouteBefore, execState.baselineSolution, curCoords, true, execState.judgeMapBefore, 'vehicleRoutePane', execState);  // Layer 3
+        markDepotAndCustomers(execState.judgeMarkerBefore, true, execState.baselineSolution, execState);  // Top
 
         // ─── DRAW AFTER MAP (3 layers) ────────────────────────────────────
         execState.judgeGraphAfter.clearLayers();
         execState.judgeRouteAfter.clearLayers();
         execState.judgeMarkerAfter.clearLayers();
 
-        drawDirectedRoadGraphLeaflet(execState.judgeGraphAfter, execState.judgeMapAfter, 'roadGraphPane');                            // Layer 2
-        drawVehicleRoutesLeaflet(execState.judgeRouteAfter, execState.optimizedSolution, curCoords, false, execState.judgeMapAfter, 'vehicleRoutePane');  // Layer 3
-        markDepotAndCustomers(execState.judgeMarkerAfter, true, execState.optimizedSolution);    // Top
+        drawDirectedRoadGraphLeaflet(execState.judgeGraphAfter, execState.judgeMapAfter, 'roadGraphPane', execState);                            // Layer 2
+        drawVehicleRoutesLeaflet(execState.judgeRouteAfter, execState.optimizedSolution, curCoords, false, execState.judgeMapAfter, 'vehicleRoutePane', execState);  // Layer 3
+        markDepotAndCustomers(execState.judgeMarkerAfter, true, execState.optimizedSolution, execState);    // Top
       }
 
       drawBothJudgeMaps();
@@ -5666,12 +5697,20 @@
         renderControlNetwork();
         setPickMode('depot');
       } catch (e) {
+        // Say what actually went wrong. This used to assert rate-limiting for
+        // every failure, which sent people away from a boundary that was merely
+        // empty and hid the real fault when the service was down.
+        const { status, detail } = describeApiError(e);
         const near = nearestCuratedArea(state.bounds);
-        setMapPrompt('OpenStreetMap could not serve that box — it rate-limits by IP and is '
-          + 'often busy. You can work on a district shipped with the app instead: '
+        const offer = ' You can work on a district shipped with the app instead: '
           + '<button onclick="loadCuratedIntoControlRoom(&quot;' + near.key + '&quot;)">'
-          + 'load ' + near.name + '</button>', { warn: true });
-        console.warn('Live OSM download failed:', e);
+          + 'load ' + near.name + '</button>';
+
+        // 400 means the box is the problem, and redrawing fixes it. Anything
+        // else is OpenStreetMap or the backend, where the fallback is the way on.
+        setMapPrompt(status === 400 ? detail + ' Draw another box.' : detail + offer,
+          { warn: true });
+        console.warn('Boundary load failed:', e);
       } finally {
         btn.disabled = false;
         btn.textContent = label;
@@ -6112,14 +6151,16 @@
 
     // `ctx` is whichever workspace is being drawn — the control room (`state`)
     // or the landing page (`execState`).
-    function nodeCoordMap(ctx = state) {
+    function nodeCoordMap(ctx) {
       const m = {};
+      if (!ctx) throw new Error('nodeCoordMap: pass the workspace (state or execState)');
       if (!ctx.network || !ctx.network.nodes) return m;
       for (const n of ctx.network.nodes) m[n.id] = n;
       return m;
     }
 
-    function markDepotAndCustomers(layerOrGroup, isLeaflet, solution = null, ctx = state) {
+    function markDepotAndCustomers(layerOrGroup, isLeaflet, solution = null, ctx) {
+      if (!ctx) throw new Error('markDepotAndCustomers: pass the workspace (state or execState)');
       if (!ctx.vrp) return;
       const coords = nodeCoordMap(ctx);
       const depotNode = coords[ctx.vrp.depot];
@@ -6206,7 +6247,7 @@
 
       // depot + customers
       if (state.vrp) {
-        const coords = nodeCoordMap();
+        const coords = nodeCoordMap(state);
         const depotNode = coords[state.vrp.depot];
         if (depotNode) {
           const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
