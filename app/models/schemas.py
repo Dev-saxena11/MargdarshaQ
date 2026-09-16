@@ -5,7 +5,7 @@ Pydantic request/response models for the SIH26137 FastAPI backend.
 """
 
 from __future__ import annotations
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal, Dict, Any
 
 
@@ -86,6 +86,18 @@ class VRPGenerateRequest(BaseModel):
     seed: int = Field(1)
     time_dependent: bool = Field(False, description="Price each leg by the time of day the vehicle departs, so routes account for rush hour")
     bucket_minutes: float = Field(30.0, ge=5.0, le=120.0, description="Width of each time bucket when time_dependent is on")
+
+    @model_validator(mode="after")
+    def validate_vrp_params(self) -> "VRPGenerateRequest":
+        if self.demand_min > self.demand_max:
+            raise ValueError("demand_min cannot be greater than demand_max.")
+        if self.demand_max > self.vehicle_capacity:
+            raise ValueError(f"vehicle_capacity ({self.vehicle_capacity}) cannot be smaller than demand_max ({self.demand_max}).")
+        if self.window_length_min > self.window_length_max:
+            raise ValueError("window_length_min cannot be greater than window_length_max.")
+        if self.window_length_max > self.horizon:
+            raise ValueError(f"window_length_max ({self.window_length_max}) cannot be greater than the horizon ({self.horizon}).")
+        return self
 
 
 class CustomerOut(BaseModel):

@@ -1626,7 +1626,14 @@ async function api(path, opts={}) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`${res.status}: ${text}`);
+    let msg = `${res.status}: ${text}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.detail) {
+        msg = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail);
+      }
+    } catch(e) {}
+    throw new Error(msg);
   }
   return res.json();
 }
