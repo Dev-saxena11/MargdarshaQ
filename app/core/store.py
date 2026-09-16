@@ -18,7 +18,6 @@ from dotenv import load_dotenv
 load_dotenv()  # Load variables from .env into os.environ
 
 from app.core.graph_model import TrafficNetwork
-
 from app.core.vrp_problem import VRPProblem
 
 logger = logging.getLogger(__name__)
@@ -31,6 +30,8 @@ _network_is_geo: Dict[str, bool] = {}
 _vrp_problems: Dict[str, Tuple[str, VRPProblem]] = {}
 from threading import Lock
 _store_lock = Lock()
+
+MAX_MEMORY_ITEMS = 50
 
 def get_connection() -> Optional[connection]:
     if not DATABASE_URL:
@@ -52,16 +53,21 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS networks (
                     id TEXT PRIMARY KEY,
                     is_geo BOOLEAN,
-                    data BYTEA
+                    data BYTEA,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS vrp_problems (
                     id TEXT PRIMARY KEY,
                     network_id TEXT,
-                    data BYTEA
+                    data BYTEA,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Patch existing tables just in case they were created before this update
+            cur.execute("ALTER TABLE networks ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            cur.execute("ALTER TABLE vrp_problems ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         conn.commit()
     except Exception as e:
         logger.error(f"Failed to initialize tables: {e}")
@@ -70,6 +76,20 @@ def init_db():
 
 # Run table creation on import
 init_db()
+
+def cleanup_old_db_entries():
+    conn = get_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM networks WHERE created_at < NOW() - INTERVAL '24 hours'")
+            cur.execute("DELETE FROM vrp_problems WHERE created_at < NOW() - INTERVAL '24 hours'")
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to cleanup database: {e}")
+    finally:
+        conn.close()
 
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
@@ -87,10 +107,16 @@ def put_network(net: TrafficNetwork, is_geo: bool = False) -> str:
             conn.commit()
         finally:
             conn.close()
+        # Fire and forget background cleanup
+        cleanup_old_db_entries()
     else:
         with _store_lock:
             _networks[network_id] = net
             _network_is_geo[network_id] = is_geo
+            if len(_networks) > MAX_MEMORY_ITEMS:
+                oldest = next(iter(_networks))
+                del _networks[oldest]
+                del _network_is_geo[oldest]
     return network_id
 
 def get_network(network_id: str) -> TrafficNetwork:
@@ -138,9 +164,14 @@ def put_vrp(network_id: str, problem: VRPProblem) -> str:
             conn.commit()
         finally:
             conn.close()
+        # Fire and forget background cleanup
+        cleanup_old_db_entries()
     else:
         with _store_lock:
             _vrp_problems[vrp_id] = (network_id, problem)
+            if len(_vrp_problems) > MAX_MEMORY_ITEMS:
+                oldest = next(iter(_vrp_problems))
+                del _vrp_problems[oldest]
     return vrp_id
 
 def get_vrp(vrp_id: str) -> VRPProblem:
@@ -176,3 +207,4 @@ def get_vrp_network_id(vrp_id: str) -> str:
         if vrp_id not in _vrp_problems:
             raise KeyError(f"vrp_id '{vrp_id}' not found")
         return _vrp_problems[vrp_id][0]
+
