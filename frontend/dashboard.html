@@ -2640,6 +2640,7 @@
       flex-direction: column;
       gap: 16px;
       background: transparent;
+      scroll-behavior: smooth;
     }
 
     .ai-messages-container::-webkit-scrollbar {
@@ -2873,27 +2874,27 @@
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .ai-input-footer input {
+    .ai-input-footer input, .ai-input-footer textarea {
       flex: 1;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(255, 255, 255, 0.14);
       color: #FFFFFF;
       padding: 11px 16px;
-      border-radius: 22px;
-      font-size: 12.5px;
+      border-radius: 6px;
+      font-size: 13px;
       font-family: 'Inter', sans-serif;
       outline: none;
-      backdrop-filter: blur(8px);
-      transition: all .22s ease;
+      transition: all .15s ease;
+      resize: none;
     }
 
-    .ai-input-footer input:focus {
+    .ai-input-footer input:focus, .ai-input-footer textarea:focus {
       border-color: rgba(0, 245, 212, 0.75);
       box-shadow: 0 0 16px rgba(0, 245, 212, 0.25), inset 0 0 6px rgba(0, 245, 212, 0.1);
       background: rgba(255, 255, 255, 0.07);
     }
 
-    .ai-input-footer input::placeholder {
+    .ai-input-footer input::placeholder, .ai-input-footer textarea::placeholder {
       color: rgba(148, 163, 184, 0.65);
     }
 
@@ -2984,6 +2985,7 @@
       to { transform: rotate(360deg); }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
@@ -3759,16 +3761,8 @@
     <div class="ai-chips-wrap">
       <div class="ai-chips-label">SUGGESTED EXPLAINERS:</div>
       <div class="ai-chips-row" id="aiChipsRow">
-        <button class="ai-chip" onclick="handleChipClick('explain_route', '⚡ Explain this route & savings')">⚡ Explain
-          Route</button>
-        <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why did Quantum QPSO win?')">⚛️ Why QPSO
-          Won</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_map', '🗺️ Explain the map & traffic colors')">🗺️ Map
-          & Traffic</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does convergence chart show?')">📈
-          Convergence</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_tw', '🎯 Are time windows respected?')">🎯 Did
-          deliveries arrive on time?</button>
+        <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why is QPSO better here?')">⚛️ Why is QPSO better here?</button>
+        <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does this chart show?')">📈 What does this chart show?</button>
       </div>
     </div>
 
@@ -3779,8 +3773,8 @@
 
     <!-- Chat Input Footer -->
     <div class="ai-input-footer">
-      <input type="text" id="aiInput" placeholder="Ask about routes, algorithms, or traffic..."
-        onkeydown="if(event.key==='Enter') sendAssistantMessage()">
+      <textarea id="aiInput" rows="1" placeholder="Ask about routes, algorithms, or traffic..."
+        onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }"></textarea>
       <button id="aiBtnSend" class="ai-btn-send" onclick="sendAssistantMessage()">
         <span>Ask</span>
         <span>➔</span>
@@ -7344,9 +7338,15 @@
       }
     }
 
+    function saveChatHistory() {
+      const container = document.getElementById('aiMessagesContainer');
+      if (container) sessionStorage.setItem('aiChatHistory', container.innerHTML);
+    }
+
     function resetAssistantChat() {
       const container = document.getElementById('aiMessagesContainer');
       if (container) container.innerHTML = '';
+      sessionStorage.removeItem('aiChatHistory');
       initAssistantChat(true);
     }
 
@@ -7381,6 +7381,8 @@
   `;
       container.appendChild(msgDiv);
       container.scrollTop = container.scrollHeight;
+      
+      if (typeof saveChatHistory === 'function') saveChatHistory();
     }
 
     async function queryAssistant(message, chip = null) {
@@ -7420,6 +7422,7 @@
 
     function renderAssistantMarkdown(md) {
       if (!md) return '';
+      if (typeof marked !== 'undefined') return marked.parse(md);
       let html = md;
       // Replace HTML special chars in raw text
       html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -7601,6 +7604,13 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
       const container = document.getElementById('aiMessagesContainer');
       if (!container) return;
       if (!force && container.children.length > 0) return;
+
+      const history = sessionStorage.getItem('aiChatHistory');
+      if (!force && history) {
+        container.innerHTML = history;
+        syncAssistantContext();
+        return;
+      }
 
       const ctx = buildAssistantContext();
       const welcomeHtml = `
