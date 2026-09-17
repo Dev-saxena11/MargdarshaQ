@@ -22,6 +22,13 @@ This is the same code path that built the cached networks in data/networks/,
 which is the strongest argument for it: it is known to work against Overpass
 from an ordinary machine.
 
+Where the query goes
+====================
+By default, the three public mirrors listed below. They are shared and
+rate-limited by IP, so for a live demo set OVERPASS_URL to a local instance
+(see docker-compose.overpass.yml and DEPLOYMENT.md) and the public endpoints
+become a fallback rather than the critical path.
+
 Data (c) OpenStreetMap contributors, ODbL. Attribution must be displayed
 wherever the map is shown.
 """
@@ -30,6 +37,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 import urllib.request
 from collections import OrderedDict, defaultdict
@@ -44,6 +52,63 @@ OVERPASS_MIRRORS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.osm.ch/api/interpreter",
 ]
+
+# A local Overpass instance is preferred over the public mirrors whenever one is
+# configured (see docker-compose.overpass.yml). The public endpoints are shared
+# and rate-limited by IP: measured answers range from 2s to 25s and include
+# outright 502s minutes apart, which is not something a live demo should rest
+# on. A local instance answers the same query in well under a second and cannot
+# be throttled by another tenant's traffic.
+#
+# Set OVERPASS_URL=http://localhost:12345/api/interpreter to switch. Leaving it
+# unset keeps the previous behaviour exactly, so this is opt-in.
+DEFAULT_LOCAL_TIMEOUT = 20
+
+
+def local_overpass_url() -> Optional[str]:
+    """
+    The configured local Overpass endpoint, or None when unset.
+
+    Read at call time rather than at import: load_dotenv() runs from
+    app.core.store, so reading this at import time would make the value depend
+    on module import order — the kind of bug that only shows up once, on the
+    machine that matters.
+    """
+    return (os.getenv("OVERPASS_URL") or "").strip() or None
+
+
+def public_fallback_enabled() -> bool:
+    """
+    Whether a failing local instance may fall through to the public mirrors.
+
+    Defaults to on, so forgetting to start Docker costs latency rather than the
+    whole draw-a-boundary feature. Turn it off to catch a misconfigured local
+    instance during a rehearsal, when a silent fallback would hide the problem
+    until the day it matters.
+    """
+    return (os.getenv("OVERPASS_PUBLIC_FALLBACK") or "").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
+def local_timeout() -> int:
+    """
+    Seconds to wait on the local instance before giving up on it.
+
+    A healthy local instance answers a city-sized box in under a second, so the
+    default is generous. It exists to bound the damage when the container is up
+    but wedged: the fallback race costs another 30s on top, and the point of
+    this whole exercise was to not spend a minute staring at a map.
+    """
+    raw = (os.getenv("OVERPASS_LOCAL_TIMEOUT") or "").strip()
+    if not raw:
+        return DEFAULT_LOCAL_TIMEOUT
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_LOCAL_TIMEOUT
+    return value if value > 0 else DEFAULT_LOCAL_TIMEOUT
+
 
 # Road classes worth routing a delivery van over. Ordered fastest first; the
 # speeds are typical urban free-flow values in km/h and are only used when the
@@ -70,14 +135,69 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def build_query(south: float, west: float, north: float, east: float,
+                timeout: int = 120) -> str:
+    """The Overpass QL for every drivable way (and its nodes) in the box."""
+    classes = "|".join(ROAD_SPEEDS)
+    return (
+        f"[out:json][timeout:{timeout}];"
+        f'way["highway"~"^({classes})$"]({south},{west},{north},{east});'
+        f"(._;>;);out body;"
+    )
+
+
+def ask_endpoint(url: str, body: bytes, socket_timeout: int):
+    """POST the query to one endpoint. Returns (url, payload, seconds taken)."""
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"User-Agent": "SIH26137-cache-builder/1.0 (academic project)"},
+    )
+    started = time.time()
+    with urllib.request.urlopen(req, timeout=socket_timeout) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    return url, payload, time.time() - started
+
+
+def fetch_local_overpass(url: str, body: bytes) -> Optional[dict]:
+    """
+    Ask the local Overpass instance, returning None if it cannot answer.
+
+    An empty result counts as "cannot answer" here, which is the opposite of how
+    the public mirrors are read. A local instance is built from a regional
+    .osm.pbf extract, so a box outside that region returns zero elements and is
+    indistinguishable from open farmland. Falling through to the public mirrors
+    tells the two apart, instead of confidently reporting "no drivable roads" for
+    Mumbai on a Delhi-only extract — which is the exact failure a judge would
+    find by drawing somewhere unplanned.
+    """
+    try:
+        _, payload, took = ask_endpoint(url, body, local_timeout())
+    except Exception as exc:
+        print(f"  local Overpass ({url}): {type(exc).__name__}: {exc}")
+        return None
+
+    if not payload.get("elements"):
+        print(f"  local Overpass answered in {took:.1f}s but returned nothing — "
+              f"the box is probably outside the imported extract")
+        return None
+
+    print(f"  local Overpass answered in {took:.1f}s "
+          f"({len(payload['elements'])} elements)")
+    return payload
+
+
 def fetch_overpass(south: float, west: float, north: float, east: float,
                    timeout: int = 120, mirrors: List[str] = None,
                    attempts: int = 3) -> dict:
     """
     Download drivable ways (and their nodes) inside the bounding box.
 
-    The mirrors are raced, not tried in turn. Measured on a 22x33 km box, the
-    sequential version cost 35s: overpass-api.de spent 10s before returning a
+    A local Overpass instance is tried first when OVERPASS_URL is set, and the
+    public mirrors are only touched if it fails to produce anything. With the
+    variable unset the behaviour is unchanged from before.
+
+    The public mirrors are raced, not tried in turn. Measured on a 22x33 km box,
+    the sequential version cost 35s: overpass-api.de spent 10s before returning a
     504, and only then did the next mirror start, taking a further 24.5s. The
     parsing and graph building either side of it total 0.07s, so essentially all
     of the wait was one slow endpoint being asked politely one at a time.
@@ -88,12 +208,26 @@ def fetch_overpass(south: float, west: float, north: float, east: float,
     Overpass has no cancel, and the alternative is making the user wait for a
     reply nobody will read.
     """
-    classes = "|".join(ROAD_SPEEDS)
-    query = (
-        f"[out:json][timeout:{timeout}];"
-        f'way["highway"~"^({classes})$"]({south},{west},{north},{east});'
-        f"(._;>;);out body;"
-    )
+    body = build_query(south, west, north, east, timeout).encode("utf-8")
+
+    # An explicit `mirrors` argument is a deliberate override — the cache
+    # builder's --overpass-url flag, and the tests — so it bypasses the
+    # env-configured local instance rather than silently ignoring the caller.
+    if mirrors is None:
+        local = local_overpass_url()
+        if local:
+            payload = fetch_local_overpass(local, body)
+            if payload is not None:
+                return payload
+            if not public_fallback_enabled():
+                raise RuntimeError(
+                    f"The local Overpass instance at {local} did not answer, and "
+                    "OVERPASS_PUBLIC_FALLBACK is off. Start it with "
+                    "`docker compose -f docker-compose.overpass.yml up -d`, or "
+                    "unset OVERPASS_PUBLIC_FALLBACK to allow the public mirrors."
+                )
+            print("  falling back to the public Overpass mirrors")
+
     mirrors = mirrors or OVERPASS_MIRRORS
     # Observed answers from a working mirror land between 2s and 25s. A round is
     # only over once every mirror has settled, so this ceiling is what a single
@@ -101,26 +235,16 @@ def fetch_overpass(south: float, west: float, north: float, east: float,
     # into a 68s wait. Short enough to fail over quickly, long enough to keep
     # the slow-but-real replies.
     socket_timeout = min(timeout, 30)
-    body = query.encode("utf-8")
     errors = []
     empty_replies = []
-
-    def ask(url):
-        req = urllib.request.Request(
-            url, data=body,
-            headers={"User-Agent": "SIH26137-cache-builder/1.0 (academic project)"},
-        )
-        started = time.time()
-        with urllib.request.urlopen(req, timeout=socket_timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-        return url, payload, time.time() - started
 
     for round_no in range(attempts):
         # Deliberately not a `with` block: its __exit__ joins every worker, so
         # returning the winner inside one would wait for the losers anyway.
         pool = ThreadPoolExecutor(max_workers=len(mirrors))
         try:
-            futures = {pool.submit(ask, url): url for url in mirrors}
+            futures = {pool.submit(ask_endpoint, url, body, socket_timeout): url
+                       for url in mirrors}
             try:
                 for fut in as_completed(futures, timeout=socket_timeout + 5):
                     url = futures[fut]
