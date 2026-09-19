@@ -462,6 +462,10 @@ class AIAssistantExplainer:
         except Exception as e:
             logger.debug("RAG lookup in _explain_general failed: %s", e)
 
+        # If the query fell through all specific intents and RAG, refuse it.
+        if msg:
+            return "I don't have that info."
+
         scenario = ctx.scenario_name or "Current Active Scenario"
 
         if not _has_comparison_results(ctx):
@@ -532,7 +536,7 @@ class AIAssistantExplainer:
             "never estimate, extrapolate or invent a number. If the context says a "
             "value was not measured, say it was not measured. If referencing algorithm "
             "formulation or mechanics, ground your answer in the project documentation above. "
-            "If the question is not answerable from the context above, say so plainly instead of guessing."
+            "If the question is not answerable from the context above, do not speculate. Instead, explicitly state: 'I don't have that info'."
         )
 
         return provider.complete(
