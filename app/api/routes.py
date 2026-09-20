@@ -42,6 +42,24 @@ from app.models.schemas import (
     ChatRequest, ChatResponse, RAGStatusResponse,
 )
 
+import os
+import jwt
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends
+
+security = HTTPBearer()
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        return payload.get("sub")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 router = APIRouter(prefix="/api")
 
 
@@ -68,12 +86,12 @@ def _network_payload(net):
 # ---------------------------------------------------------------------------
 
 @router.post("/network/generate", response_model=NetworkResponse)
-def generate_network(req: NetworkGenerateRequest):
+def generate_network(req: NetworkGenerateRequest, user_id: str = Depends(get_current_user)):
     net = generate_synthetic_city_graph(
         n_nodes=req.n_nodes, connectivity=req.connectivity,
         seed=req.seed, grid_size=req.grid_size,
     )
-    network_id = store.put_network(net, is_geo=False)
+    network_id = store.put_network(user_id, net, is_geo=False)
 
     nodes, edges = _network_payload(net)
 
@@ -84,7 +102,7 @@ def generate_network(req: NetworkGenerateRequest):
 
 
 @router.post("/network/from_osm", response_model=NetworkResponse)
-def generate_network_from_osm(req: OSMNetworkRequest):
+def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get_current_user)):
     """
     Build a network from live OpenStreetMap data.
 
@@ -116,7 +134,7 @@ def generate_network_from_osm(req: OSMNetworkRequest):
                 detail=f"OpenStreetMap did not answer: {type(e).__name__}: {e}",
             )
 
-        network_id = store.put_network(net, is_geo=True)
+        network_id = store.put_network(user_id, net, is_geo=True)
         nodes, edges = _network_payload(net)
         return NetworkResponse(
             network_id=network_id, num_nodes=net.num_nodes(),
@@ -134,7 +152,7 @@ def generate_network_from_osm(req: OSMNetworkRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Failed to fetch OSM network: {e}")
 
-    network_id = store.put_network(net, is_geo=True)
+    network_id = store.put_network(user_id, net, is_geo=True)
 
     nodes, edges = _network_payload(net)
 
@@ -152,7 +170,7 @@ def list_cached_networks():
 
 
 @router.post("/network/from_cache", response_model=NetworkResponse)
-def network_from_cache(req: CachedNetworkRequest):
+def network_from_cache(req: CachedNetworkRequest, user_id: str = Depends(get_current_user)):
     """
     Load a pre-downloaded real city network from disk.
 
@@ -166,7 +184,7 @@ def network_from_cache(req: CachedNetworkRequest):
         raise HTTPException(status_code=404, detail=str(e))
 
     meta = cache_metadata(req.name)
-    network_id = store.put_network(net, is_geo=True)
+    network_id = store.put_network(user_id, net, is_geo=True)
     nodes, edges = _network_payload(net)
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
@@ -175,13 +193,13 @@ def network_from_cache(req: CachedNetworkRequest):
     )
 
 @router.get("/network/{network_id}", response_model=NetworkResponse)
-def get_network(network_id: str):
+def get_network(network_id: str, user_id: str = Depends(get_current_user)):
     try:
-        net = store.get_network(network_id)
+        net = store.get_network(user_id, network_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    is_geo = store.is_geo_network(network_id)
+    is_geo = store.is_geo_network(user_id, network_id)
     nodes, edges = _network_payload(net)
     return NetworkResponse(
         network_id=network_id, num_nodes=net.num_nodes(),
@@ -194,9 +212,9 @@ def get_network(network_id: str):
 # ---------------------------------------------------------------------------
 
 @router.post("/vrp/generate", response_model=VRPInstanceResponse)
-def generate_vrp(req: VRPGenerateRequest):
+def generate_vrp(req: VRPGenerateRequest, user_id: str = Depends(get_current_user)):
     try:
-        net = store.get_network(req.network_id)
+        net = store.get_network(user_id, req.network_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -214,7 +232,7 @@ def generate_vrp(req: VRPGenerateRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    vrp_id = store.put_vrp(req.network_id, problem)
+    vrp_id = store.put_vrp(user_id, req.network_id, problem)
 
     customers = [
         CustomerOut(node_id=c.node_id, demand=c.demand, ready_time=c.ready_time,
@@ -230,10 +248,10 @@ def generate_vrp(req: VRPGenerateRequest):
 
 
 @router.get("/vrp/{vrp_id}", response_model=VRPInstanceResponse)
-def get_vrp_instance(vrp_id: str):
+def get_vrp_instance(vrp_id: str, user_id: str = Depends(get_current_user)):
     try:
-        problem = store.get_vrp(vrp_id)
-        network_id = store.get_vrp_network_id(vrp_id)
+        problem = store.get_vrp(user_id, vrp_id)
+        network_id = store.get_vrp_network_id(user_id, vrp_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -374,9 +392,9 @@ def _solve_one(problem: VRPProblem, algorithm: str, n_particles: int,
 
 
 @router.post("/vrp/solve", response_model=VRPSolveResponse)
-def solve_vrp(req: VRPSolveRequest):
+def solve_vrp(req: VRPSolveRequest, user_id: str = Depends(get_current_user)):
     try:
-        problem = store.get_vrp(req.vrp_id)
+        problem = store.get_vrp(user_id, req.vrp_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -398,9 +416,9 @@ ALL_ALGORITHMS = ["greedy", "qpso", "ga", "sa", "standard_pso"]
 
 
 @router.post("/benchmark/run", response_model=BenchmarkResponse)
-def run_benchmark(req: BenchmarkRequest):
+def run_benchmark(req: BenchmarkRequest, user_id: str = Depends(get_current_user)):
     try:
-        problem = store.get_vrp(req.vrp_id)
+        problem = store.get_vrp(user_id, req.vrp_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -432,9 +450,9 @@ def run_benchmark(req: BenchmarkRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/vrp/compare", response_model=VRPCompareResponse)
-def compare_vrp(req: VRPCompareRequest):
+def compare_vrp(req: VRPCompareRequest, user_id: str = Depends(get_current_user)):
     try:
-        problem = store.get_vrp(req.vrp_id)
+        problem = store.get_vrp(user_id, req.vrp_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -496,9 +514,9 @@ def compare_vrp(req: VRPCompareRequest):
 # ---------------------------------------------------------------------------
 
 @router.post("/traffic/incident", response_model=TrafficIncidentResponse)
-def create_traffic_incident(req: TrafficIncidentRequest):
+def create_traffic_incident(req: TrafficIncidentRequest, user_id: str = Depends(get_current_user)):
     try:
-        net = store.get_network(req.network_id)
+        net = store.get_network(user_id, req.network_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -515,9 +533,9 @@ def create_traffic_incident(req: TrafficIncidentRequest):
 
 
 @router.post("/vrp/solve-dynamic", response_model=DynamicSolveResponse)
-def solve_dynamic_vrp(req: DynamicSolveRequest):
+def solve_dynamic_vrp(req: DynamicSolveRequest, user_id: str = Depends(get_current_user)):
     try:
-        problem = store.get_vrp(req.vrp_id)
+        problem = store.get_vrp(user_id, req.vrp_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -604,5 +622,12 @@ def chat_status():
         indexed_files=rag_engine.indexed_files,
         status="ready" if rag_engine.chunks else "empty",
     )
+
+@router.get("/config")
+def get_config():
+    return {
+        "supabase_url": os.getenv("SUPABASE_URL", ""),
+        "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", "")
+    }
 
 

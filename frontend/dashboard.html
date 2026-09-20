@@ -2921,9 +2921,23 @@
       border-color: rgba(0, 245, 212, 0.6);
     }
   </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
+
+  <div id="authOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
+    <div style="background:#1e1e1e; padding:30px; border-radius:8px; width:300px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+      <h2 style="margin-top:0;">Secure Session</h2>
+      <p style="font-size:0.9em; color:#ccc;">Log in to access your isolated workspace.</p>
+      <input type="email" id="authEmail" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
+      <input type="password" id="authPassword" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
+      <button onclick="handleLogin()" style="width:100%; padding:10px; background:#00BBF9; color:#000; font-weight:bold; border:none; border-radius:4px; cursor:pointer; margin-bottom:10px;">Login</button>
+      <button onclick="handleSignup()" style="width:100%; padding:10px; background:transparent; color:#00BBF9; border:1px solid #00BBF9; border-radius:4px; cursor:pointer;">Sign Up</button>
+      <div id="authError" style="color:#FF0054; margin-top:10px; font-size:0.85em;"></div>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- Header -->
@@ -3774,6 +3788,55 @@
     // local uvicorn without anyone editing the field.
     const DEPLOYED_API_BASE = 'https://sih26137.onrender.com';
 
+    
+    let supabaseClient = null;
+    let currentSession = null;
+    
+    async function initAuth() {
+      try {
+        const confRes = await fetch(apiBase() + '/api/config');
+        const conf = await confRes.json();
+        if (!conf.supabase_url) {
+            document.getElementById('authOverlay').style.display = 'none';
+            return;
+        }
+        supabaseClient = supabase.createClient(conf.supabase_url, conf.supabase_anon_key);
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (data && data.session) {
+          currentSession = data.session;
+          document.getElementById('authOverlay').style.display = 'none';
+        }
+      } catch (e) {
+        console.error("Failed to init auth", e);
+      }
+    }
+    
+    async function handleLogin() {
+      const e = document.getElementById('authEmail').value;
+      const p = document.getElementById('authPassword').value;
+      document.getElementById('authError').textContent = "Logging in...";
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email: e, password: p });
+      if (error) { document.getElementById('authError').textContent = error.message; return; }
+      currentSession = data.session;
+      document.getElementById('authOverlay').style.display = 'none';
+      checkHealth();
+    }
+    
+    async function handleSignup() {
+      const e = document.getElementById('authEmail').value;
+      const p = document.getElementById('authPassword').value;
+      document.getElementById('authError').textContent = "Signing up...";
+      const { data, error } = await supabaseClient.auth.signUp({ email: e, password: p });
+      if (error) { document.getElementById('authError').textContent = error.message; return; }
+      if (data.session) {
+        currentSession = data.session;
+        document.getElementById('authOverlay').style.display = 'none';
+        checkHealth();
+      } else {
+        document.getElementById('authError').textContent = "Check your email for confirmation link.";
+      }
+    }
+
     function isLocalHost() {
       return ['localhost', '127.0.0.1', '0.0.0.0', ''].includes(location.hostname);
     }
@@ -3789,9 +3852,13 @@
     function apiBase() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
 
     async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (currentSession && currentSession.access_token) {
+        headers['Authorization'] = 'Bearer ' + currentSession.access_token;
+      }
       const res = await fetch(apiBase() + path, {
-        headers: { 'Content-Type': 'application/json' },
         ...opts,
+        headers,
       });
       if (!res.ok) {
         const text = await res.text();
@@ -7508,6 +7575,10 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
 
     setTimeout(initAssistantChat, 100);
 
+    // Run auth init on load
+    window.addEventListener('DOMContentLoaded', () => {
+      initAuth();
+    });
   </script>
 </body>
 
