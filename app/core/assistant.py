@@ -36,6 +36,9 @@ from app.models.schemas import (
     AssistantChatResponse,
 )
 from app.core.llm_providers import LLMProvider, get_provider
+from app.core import store
+from app.core.vrp_problem import generate_synthetic_vrp
+from app.core.qpso_vrp import QPSOVRPOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +48,7 @@ SUGGESTED_CHIPS = [
     "🗺️ Explain the map & traffic colors",
     "📈 What does convergence chart show?",
     "🎯 Are time windows respected?",
+    "🚗 Plan a Route",
 ]
 
 # Shown instead of performance numbers whenever no comparison run has been
@@ -111,6 +115,9 @@ class AIAssistantExplainer:
         msg = (req.message or "").strip().lower()
         chip = req.chip or ""
 
+        if chip == "🚗 Plan a Route" or "plan a route" in msg or ctx.slot_filling_active:
+            return self._handle_slot_filling(req.message or chip, ctx)
+
         # Preset chips are answered by the local deterministic engine: they map
         # to fixed explanations, so spending an API call on them would buy
         # nothing. Free-text questions are where an LLM actually helps.
@@ -137,7 +144,224 @@ class AIAssistantExplainer:
             reply=reply,
             suggested_chips=SUGGESTED_CHIPS,
             metrics_summary=self._extract_metrics_summary(ctx),
+            context=ctx,
         )
+
+    def _handle_slot_filling(self, msg: str, ctx: AssistantContext) -> AssistantChatResponse:
+        # Define the parameters we need to collect
+        params = [
+            {"key": "horizon", "prompt": "How much time do you want this delivery plan completed in? (in minutes, e.g. 480 for 8 hours)", "type": "int"},
+            {"key": "n_vehicles", "prompt": "How many vehicles do you have available?", "type": "int"},
+            {"key": "n_customers", "prompt": "How many stops/customers does this route need to cover?", "type": "int"},
+            {"key": "depot", "prompt": "Where is the depot/starting point? (node id, typically 0)", "type": "int"},
+        ]
+
+        if not ctx.slot_filling_active:
+            ctx.slot_filling_active = True
+            ctx.collected_params = {}
+            ctx.current_prompt = params[0]["key"]
+            return AssistantChatResponse(
+                reply=f"Sure, let's plan a route! {params[0]['prompt']}",
+                suggested_chips=["Cancel"],
+                context=ctx
+            )
+
+        if msg.lower() in ["cancel", "stop", "quit"]:
+            ctx.slot_filling_active = False
+            ctx.collected_params = {}
+            ctx.current_prompt = None
+            return AssistantChatResponse(
+                reply="Route planning cancelled. Let me know if you need anything else.",
+                suggested_chips=SUGGESTED_CHIPS,
+                context=ctx
+            )
+
+        provider = get_provider()
+        
+        # Check if the user is trying to correct a parameter (e.g., "change vehicles to 5")
+        if "change" in msg or "update" in msg:
+            k = None
+            if "vehicle" in msg:
+                k = "n_vehicles"
+            elif "customer" in msg or "stop" in msg:
+                k = "n_customers"
+            elif "time" in msg or "budget" in msg or "horizon" in msg:
+                k = "horizon"
+            elif "depot" in msg or "start" in msg:
+                k = "depot"
+            
+            matches = re.findall(r'\d+', msg)
+            if k and matches:
+                ctx.collected_params[k] = int(matches[0])
+                ctx.current_prompt = None
+                return AssistantChatResponse(
+                    reply=f"Updated {k} to {ctx.collected_params[k]}. Let's continue.",
+                    suggested_chips=["Cancel"],
+                    context=ctx
+                )
+
+        if ctx.current_prompt == "confirm":
+            if "yes" in msg or "yep" in msg or "sure" in msg or "ok" in msg:
+                ctx.current_prompt = "solve"
+            elif "no" in msg or "wait" in msg:
+                return AssistantChatResponse(
+                    reply="Okay, which parameter would you like to change? (e.g., 'change vehicles to 5')",
+                    suggested_chips=["Cancel"],
+                    context=ctx
+                )
+            else:
+                return AssistantChatResponse(
+                    reply="Please reply with 'yes' to proceed or tell me what to change.",
+                    suggested_chips=["Yes, proceed", "Cancel"],
+                    context=ctx
+                )
+        elif ctx.current_prompt:
+            # Extract the value from msg using LLM
+            extracted_val = None
+            if provider:
+                sys_prompt = (
+                    f"Extract the integer value for the parameter '{ctx.current_prompt}' from the user's message. "
+                    "Return ONLY the integer number. If it cannot be found, return 'None'."
+                )
+                raw_val = provider.complete(system_prompt=sys_prompt, user_prompt=msg, max_tokens=10)
+                if raw_val:
+                    try:
+                        extracted_val = int(re.search(r'\d+', raw_val).group())
+                    except Exception:
+                        pass
+            
+            # Fallback to simple regex if LLM fails or is absent
+            if extracted_val is None:
+                matches = re.findall(r'\d+', msg)
+                if matches:
+                    extracted_val = int(matches[0])
+
+            if extracted_val is not None:
+                ctx.collected_params[ctx.current_prompt] = extracted_val
+                ctx.current_prompt = None
+            else:
+                # Could not extract, ask again
+                current_p = next((p for p in params if p["key"] == ctx.current_prompt), params[0])
+                return AssistantChatResponse(
+                    reply=f"I didn't catch that. {current_p['prompt']}",
+                    suggested_chips=["Cancel"],
+                    context=ctx
+                )
+
+        # Determine next missing parameter
+        for p in params:
+            if p["key"] not in ctx.collected_params:
+                ctx.current_prompt = p["key"]
+                return AssistantChatResponse(
+                    reply=f"Got it. Next: {p['prompt']}",
+                    suggested_chips=["Cancel"],
+                    context=ctx
+                )
+
+        if ctx.current_prompt != "solve":
+            ctx.current_prompt = "confirm"
+            confirm_msg = (
+                "Great! I have all the details needed:\n"
+                f"- **Time Budget:** {ctx.collected_params.get('horizon')} mins\n"
+                f"- **Available Vehicles:** {ctx.collected_params.get('n_vehicles')}\n"
+                f"- **Customers/Stops:** {ctx.collected_params.get('n_customers')}\n"
+                f"- **Depot Node:** {ctx.collected_params.get('depot')}\n\n"
+                "Should I go ahead and generate the route plan? (Reply 'yes' to proceed or tell me what to change)"
+            )
+            return AssistantChatResponse(
+                reply=confirm_msg,
+                suggested_chips=["Yes, proceed", "Cancel"],
+                context=ctx
+            )
+
+        # All parameters collected and confirmed, generate and solve
+        try:
+            # Generate VRP
+            network_id = "synthetic_1" # Default network id or fetch from existing active context if any
+            # Note: A real app would get the active network ID from the frontend or context
+            # Let's generate a quick synthetic graph if one doesn't exist
+            from app.core.graph_model import generate_synthetic_city_graph
+            n_customers = ctx.collected_params.get("n_customers", 10)
+            net = generate_synthetic_city_graph(n_nodes=max(30, n_customers + 10))
+            network_id = store.put_network(net, is_geo=False)
+
+            problem = generate_synthetic_vrp(
+                net=net,
+                n_customers=ctx.collected_params["n_customers"],
+                depot=ctx.collected_params["depot"],
+                vehicle_capacity=100.0,
+                n_vehicles=ctx.collected_params["n_vehicles"],
+                demand_range=(5.0, 20.0),
+                horizon=ctx.collected_params["horizon"],
+                window_length_range=(60.0, 180.0),
+                service_time=10.0,
+                seed=42,
+                time_dependent=False,
+                bucket_minutes=30.0,
+            )
+            vrp_id = store.put_vrp(network_id, problem)
+
+            # Solve VRP with slightly faster settings for the chatbot response
+            opt = QPSOVRPOptimizer(problem, n_particles=20, max_iter=30, seed=42, use_local_search=True)
+            result = opt.optimize()
+
+            ctx.slot_filling_active = False
+            ctx.current_prompt = None
+            ctx.collected_params = {}
+            ctx.optimized_time = round(result.best_solution.total_time, 2)
+            ctx.optimized_dist = round(result.best_solution.total_distance, 2)
+            ctx.num_vehicles = len([r for r in result.best_solution.routes if r])
+            
+            reply = (
+                f"✅ **Route Planned Successfully!**\n\n"
+                f"I've generated and solved the route plan based on your requirements.\n"
+                f"- **Total Time:** {ctx.optimized_time} min\n"
+                f"- **Total Distance:** {ctx.optimized_dist} km\n"
+                f"- **Vehicles Used:** {ctx.num_vehicles} out of {problem.n_vehicles}\n\n"
+                "The Engineer's Control Room and map have been automatically updated."
+            )
+            from app.api.routes import _network_payload, _build_solve_response
+            nodes, edges = _network_payload(net)
+            
+            sol_response = _build_solve_response(
+                problem, result.best_solution, result.convergence_curve, 
+                result.n_evaluations, "QPSO", 100.0
+            )
+            
+            return AssistantChatResponse(
+                reply=reply,
+                suggested_chips=SUGGESTED_CHIPS,
+                context=ctx,
+                map_action={
+                    "network": {
+                        "network_id": network_id,
+                        "num_nodes": net.num_nodes(),
+                        "num_edges": len(edges),
+                        "is_geo": False,
+                        "nodes": [n.model_dump() for n in nodes],
+                        "edges": [e.model_dump() for e in edges],
+                        "area_label": "Synthetic City"
+                    },
+                    "vrp": {
+                        "vrp_id": vrp_id,
+                        "network_id": network_id,
+                        "depot": problem.depot,
+                        "n_vehicles": problem.n_vehicles,
+                        "vehicle_capacity": problem.vehicle_capacity,
+                        "customers": [{"node_id": c.node_id, "demand": c.demand, "ready_time": c.ready_time, "due_time": c.due_time, "service_time": c.service_time} for c in problem.customers],
+                        "time_dependent": problem.time_dependent
+                    },
+                    "solution": sol_response.model_dump()
+                }
+            )
+        except Exception as e:
+            logger.error(f"Slot filling solve error: {e}")
+            ctx.slot_filling_active = False
+            return AssistantChatResponse(
+                reply=f"Oops, something went wrong while generating the route: {e}",
+                suggested_chips=SUGGESTED_CHIPS,
+                context=ctx
+            )
 
     def _get_or_create_story_card(self, ctx: AssistantContext) -> str:
         """
