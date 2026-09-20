@@ -317,6 +317,11 @@ class AssistantContext(BaseModel):
     # node ids, which nobody outside this codebase knows.
     selected_depot: Optional[int] = Field(None, description="Depot node the user clicked on the map")
     selected_stops: List[int] = Field(default_factory=list, description="Stop nodes the user clicked on the map")
+    # The network those clicks belong to. A boundary clipped out of the offline
+    # map numbers its nodes from zero, while the full cached city carries OSM
+    # ids, so the two id spaces do not overlap at all. Planning has to run
+    # against the network the user actually picked on, not a fresh load of it.
+    active_network_id: Optional[str] = Field(None, description="network_id currently loaded in the control room")
 
 
 class AssistantChatRequest(BaseModel):

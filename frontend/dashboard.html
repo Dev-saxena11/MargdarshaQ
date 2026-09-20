@@ -6443,6 +6443,10 @@
         });
 
         state.network = net;
+        // No longer one of the shipped districts, so nothing should treat it
+        // as one — a clipped box numbers its nodes from zero and shares no
+        // ids with the full city it was cut from.
+        state.controlAreaKey = null;
         state.vrp = null;
         state.selectedDepot = null;
         state.selectedStops = [];
@@ -8028,6 +8032,9 @@
         // a depot and stops by handing over to the map, so these are its answer.
         selected_depot: (state.selectedDepot === undefined) ? null : state.selectedDepot,
         selected_stops: (state.selectedStops || []).slice(),
+        // Which network those clicks belong to. A drawn boundary swaps this for
+        // a clipped one whose node ids are unrelated to the full city's.
+        active_network_id: state.network ? (state.network.network_id || null) : null,
         num_nodes: state.network ? pick(state.network.num_nodes, state.network.nodes && state.network.nodes.length) : null,
         num_customers: state.vrp && state.vrp.customers ? state.vrp.customers.length : null,
         num_vehicles: state.vrp ? pick(state.vrp.n_vehicles) : null,
@@ -8199,12 +8206,28 @@
       switchView('control');
       await new Promise(r => setTimeout(r, 80));   // let the map get its size
 
+      if (action.kind === 'draw_boundary') {
+        // Keep whatever is loaded as the backdrop to drag a box over; the city
+        // only needs loading if the room is still empty.
+        if (!state.network) {
+          await loadCuratedIntoControlRoom(action.network_name || CONTROL_ROOM_DEFAULT_AREA);
+        }
+        startBoundaryDraw();
+        setMapPrompt('The assistant is waiting — drag a box, press '
+          + '<b>Load roads in this boundary</b>, then tell it <b>done</b>.');
+        return;
+      }
+
       if (action.kind === 'open_picker') {
         // Load the area the assistant is planning on, unless it is already up.
         const want = action.network_name || CONTROL_ROOM_DEFAULT_AREA;
-        if (!state.network || state.controlAreaKey !== want) {
-          await loadCuratedIntoControlRoom(want);
-        }
+        // ensure_area is false once a boundary has been drawn: the clipped
+        // network is the one the user is about to click on, and its node ids
+        // have nothing to do with the full city's.
+        const needsCity = action.ensure_area === false
+          ? !state.network
+          : (!state.network || state.controlAreaKey !== want);
+        if (needsCity) await loadCuratedIntoControlRoom(want);
         setPlanMode('manual');
         setPickMode(state.selectedDepot === null ? 'depot' : 'stops');
         setMapPrompt('The assistant is waiting — click the <b>depot</b>, then each '
