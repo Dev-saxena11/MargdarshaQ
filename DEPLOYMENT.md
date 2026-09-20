@@ -217,13 +217,23 @@ Pick the smallest extract that covers everywhere a judge might plausibly draw.
 | Extract | Size | Import | Use when |
 |---|---|---|---|
 | City / district | ~50–200 MB | Minutes | The case study is locked to one city and the demo stays there. |
-| Single state / zone | ~200–600 MB | ~15–40 min | Recommended default. `northern-zone` covers Delhi; `southern-zone` covers Bengaluru and Hyderabad. |
+| Single state / zone | ~200–600 MB | ~15–40 min | Recommended default. `central-zone` (335 MB) covers Bareilly, which is what the control room opens on. |
 | India-wide | ~1.3 GB | 2 h+ | Only if the demo genuinely roams the country. |
 
 Browse extracts at [download.geofabrik.de/asia/india.html](https://download.geofabrik.de/asia/india.html).
-Note that the four networks in `data/networks/` span four states, so covering
-all of them from one extract means either India-wide or merging several state
-extracts with `osmium merge` beforehand.
+
+**Geofabrik's India zones are administrative, not compass directions.** Bareilly
+is in northern India but Uttar Pradesh belongs to `central-zone`; Delhi is in
+`northern-zone`; Bengaluru and Hyderabad are in `southern-zone`. Picking by the
+name alone is how you end up importing 335 MB that does not contain the city you
+are demoing — and because a box outside the extract returns zero elements and
+falls back to the public API silently, nothing will tell you. If in doubt, test
+the coordinates against the zone's `.poly` file before starting the import, and
+confirm afterwards with `scripts/check_overpass.py`.
+
+The five networks in `data/networks/` span five states, so covering all of them
+from one extract means either India-wide or merging several zone extracts with
+`osmium merge` beforehand.
 
 #### Runbook
 
@@ -263,6 +273,22 @@ in a way nobody would catch on stage. And the fallback is silent by design,
 which is why `scripts/check_overpass.py` exists: run it before the demo, or you
 will never notice you're back on the public API until it's slow in front of
 judges.
+
+#### If every query comes back "Permission denied"
+
+Symptom: the container is up, `docker logs` shows nginx returning `200`, but any
+real query returns XML containing
+`runtime error: open64: 13 Permission denied /db/db//osm3s_osm_base`.
+
+Cause: the image creates `/db` as `0700` owned by `overpass`, but serves queries
+through `fcgiwrap` running as the `nginx` user, which then cannot traverse into
+`/db` to reach the dispatcher socket. The compose file fixes this with a
+`post_start` hook that runs `chmod o+x /db`, which grants traversal without
+granting read access to the database.
+
+This one is worth knowing because it looks healthy from the outside: the port is
+open, nginx logs success, and only the response body says otherwise — which the
+silent public-API fallback then hides completely.
 
 ### Load order at demo time
 
