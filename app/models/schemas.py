@@ -77,6 +77,12 @@ class VRPGenerateRequest(BaseModel):
     depot: int = Field(0, description="Node id to use as the depot")
     vehicle_capacity: float = Field(100.0, gt=0)
     n_vehicles: Optional[int] = Field(None, description="If omitted, auto-computed from total demand")
+    require_all_vehicles: bool = Field(
+        False,
+        description="Treat n_vehicles as a fleet that must all be sent out rather than a "
+                    "ceiling. Off by default: parking a van the plan does not need is "
+                    "normally the better answer.",
+    )
     demand_min: float = Field(5.0)
     demand_max: float = Field(20.0)
     horizon: float = Field(480.0, description="Operating time horizon in minutes")

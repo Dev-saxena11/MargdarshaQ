@@ -2298,6 +2298,153 @@
       color: var(--neo-mint);
     }
 
+    /* ---- the 5x5 benchmark matrix on the Executive Overview ---- */
+    .bench-matrix-section {
+      background: var(--card-bg);
+      border: 2px solid var(--border-neo);
+      box-shadow: var(--neo-shadow);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin: 0 auto 22px;
+      max-width: 1180px;
+      width: 100%;
+    }
+
+    .bench-matrix-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .bench-matrix-head h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text-main);
+    }
+
+    .bench-matrix-head p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 620px;
+      line-height: 1.5;
+    }
+
+    .bench-metric-toggle {
+      display: flex;
+      gap: 0;
+      border: 2px solid var(--border-neo);
+      border-radius: 6px;
+      overflow: hidden;
+      flex: none;
+    }
+
+    .bench-metric-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 12px;
+      cursor: pointer;
+    }
+
+    .bench-metric-btn.active {
+      background: var(--neo-mint);
+      color: #04121A;
+    }
+
+    .bench-matrix-wrap {
+      overflow-x: auto;
+    }
+
+    .bench-matrix-loading {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 18px 0;
+    }
+
+    table.bench-matrix {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: 'Space Grotesk', sans-serif;
+      min-width: 720px;
+    }
+
+    table.bench-matrix th,
+    table.bench-matrix td {
+      padding: 9px 10px;
+      text-align: right;
+      border-bottom: 1px solid var(--border-soft, rgba(148, 163, 184, 0.18));
+      white-space: nowrap;
+    }
+
+    table.bench-matrix th:first-child,
+    table.bench-matrix td:first-child {
+      text-align: left;
+      white-space: normal;
+    }
+
+    table.bench-matrix thead th {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border-neo);
+    }
+
+    table.bench-matrix .scenario-name {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    table.bench-matrix .scenario-sub {
+      display: block;
+      font-weight: 400;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    table.bench-matrix td.is-best {
+      background: rgba(0, 245, 212, 0.14);
+      color: var(--text-main);
+      font-weight: 800;
+      border-radius: 4px;
+    }
+
+    table.bench-matrix td.is-infeasible {
+      color: var(--neo-amber, #F59E0B);
+    }
+
+    table.bench-matrix td.is-infeasible::after {
+      content: ' ✕';
+      font-size: 10px;
+    }
+
+    .bench-matrix-verdict {
+      font-size: 12.5px;
+      color: var(--text-main);
+      background: rgba(0, 245, 212, 0.08);
+      border-left: 3px solid var(--neo-mint);
+      padding: 9px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .bench-matrix-foot {
+      margin-top: 10px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -3155,6 +3302,42 @@
         </div>
 
         <!-- =================================================================
+           The benchmark. Leads the page because it is the claim: five solvers,
+           five real city networks, one table. Precomputed and committed (see
+           scripts/build_benchmark_matrix.py) so it is on screen immediately
+           and needs no internet — every instance is seeded, so solving it live
+           would spend a minute to print the same numbers.
+           ================================================================= -->
+        <div class="bench-matrix-section" id="benchMatrixSection">
+          <div class="bench-matrix-head">
+            <div>
+              <h3>Five algorithms, five cities, one table</h3>
+              <p>
+                Every solver run against the same instance on each district's real road
+                network — same stops, same vans, same traffic, same seed. Lower is better
+                on every measure here.
+              </p>
+            </div>
+            <div class="bench-metric-toggle" id="benchMetricToggle">
+              <button class="bench-metric-btn active" data-metric="fitness"
+                onclick="setBenchMetric('fitness')">Fitness</button>
+              <button class="bench-metric-btn" data-metric="time_min"
+                onclick="setBenchMetric('time_min')">Fleet time</button>
+              <button class="bench-metric-btn" data-metric="distance_km"
+                onclick="setBenchMetric('distance_km')">Distance</button>
+              <button class="bench-metric-btn" data-metric="runtime_ms"
+                onclick="setBenchMetric('runtime_ms')">Solve time</button>
+            </div>
+          </div>
+
+          <div id="benchMatrixVerdict" class="bench-matrix-verdict" hidden></div>
+          <div id="benchMatrixWrap" class="bench-matrix-wrap">
+            <div class="bench-matrix-loading">Loading benchmark…</div>
+          </div>
+          <div id="benchMatrixFoot" class="bench-matrix-foot" hidden></div>
+        </div>
+
+        <!-- =================================================================
            Problem & Approach (Executive Overview)
            Sits above the maps deliberately: a reader who has never heard of
            vehicle routing needs the problem in plain words before the
@@ -3641,10 +3824,14 @@
                   <input id="n_vehicles" type="number" min="1" max="60" placeholder="auto">
                 </div>
               </div>
-              <p class="step-hint" style="margin:-2px 0 8px;">
+              <p class="step-hint" style="margin:-2px 0 6px;">
                 Leave vans blank and the fleet is sized from total demand. Set it to see how
                 the same stops are covered with fewer or more vehicles.
               </p>
+              <div class="chk" style="margin-bottom:10px;">
+                <input type="checkbox" id="require_all_vehicles">
+                <label style="margin:0;">Send every van out (don't leave any parked)</label>
+              </div>
               <div class="row2">
                 <div><label>Demand min</label><input id="demand_min" type="number" value="5"></div>
                 <div><label>Demand max</label><input id="demand_max" type="number" value="20"></div>
@@ -4305,6 +4492,130 @@
 
     function areaByKey(key) {
       return CURATED_AREAS.find(a => a.key === key) || CURATED_AREAS[0];
+    }
+
+    // ---- The 5x5 benchmark matrix ------------------------------------------
+    // Precomputed by scripts/build_benchmark_matrix.py and served from disk.
+    const BENCH_METRICS = {
+      fitness:     { label: 'Fitness',    unit: '',     digits: 1 },
+      time_min:    { label: 'Fleet time', unit: ' min', digits: 0 },
+      distance_km: { label: 'Distance',   unit: ' km',  digits: 1 },
+      runtime_ms:  { label: 'Solve time', unit: ' ms',  digits: 0 },
+    };
+    let benchMatrix = null;
+    let benchMetric = 'fitness';
+
+    async function loadBenchmarkMatrix() {
+      const wrap = document.getElementById('benchMatrixWrap');
+      try {
+        benchMatrix = await api('/api/benchmark/matrix');
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        wrap.innerHTML = '<div class="bench-matrix-loading">Benchmark not available: '
+          + detail + '</div>';
+        return;
+      }
+      renderBenchmarkMatrix();
+    }
+
+    function setBenchMetric(metric) {
+      benchMetric = metric;
+      for (const b of document.querySelectorAll('.bench-metric-btn')) {
+        b.classList.toggle('active', b.dataset.metric === metric);
+      }
+      renderBenchmarkMatrix();
+    }
+
+    function renderBenchmarkMatrix() {
+      if (!benchMatrix) return;
+      const spec = BENCH_METRICS[benchMetric];
+      const algos = benchMatrix.algorithms;
+      const shortName = {
+        greedy: 'Greedy NN', qpso: 'QPSO', ga: 'Genetic', sa: 'Annealing',
+        standard_pso: 'Standard PSO',
+      };
+
+      // "Best" always means best among the plans that actually meet every
+      // delivery window. A quicker plan that turns up late is not a better
+      // plan, and highlighting one as the winner would be the kind of chart
+      // that wins a demo and loses a pilot.
+      const rows = benchMatrix.scenarios.map(s => {
+        const byAlgo = Object.fromEntries(s.results.map(r => [r.algorithm, r]));
+        const feasible = s.results.filter(r => r.feasible);
+        const pool = feasible.length ? feasible : s.results;
+        const bestVal = Math.min(...pool.map(r => r[benchMetric]));
+
+        const cells = algos.map(a => {
+          const r = byAlgo[a];
+          if (!r) return '<td>—</td>';
+          const isBest = r[benchMetric] === bestVal && (r.feasible || !feasible.length);
+          const cls = [isBest ? 'is-best' : '', r.feasible ? '' : 'is-infeasible']
+            .filter(Boolean).join(' ');
+          const title = r.feasible ? r.label
+            : r.label + ' — misses at least one delivery window';
+          return `<td class="${cls}" title="${title}">`
+            + r[benchMetric].toFixed(spec.digits) + spec.unit + '</td>';
+        }).join('');
+
+        return `<tr><td><span class="scenario-name">${s.label}</span>`
+          + `<span class="scenario-sub">${s.junctions} junctions · ${s.stops} stops · `
+          + `${s.vehicles} vans · ${s.feasible_count}/${s.results.length} solvers feasible`
+          + `</span></td>${cells}</tr>`;
+      }).join('');
+
+      document.getElementById('benchMatrixWrap').innerHTML =
+        '<table class="bench-matrix"><thead><tr><th>District</th>'
+        + algos.map(a => `<th>${shortName[a] || a}</th>`).join('')
+        + `</tr></thead><tbody>${rows}</tbody></table>`;
+
+      // Counted on the same feasible-first basis as the highlight, and on the
+      // metric actually being shown — a verdict quoting fitness while the table
+      // shows distance is how a reader learns not to trust the table.
+      const wins = {};
+      for (const s of benchMatrix.scenarios) {
+        const feas = s.results.filter(r => r.feasible);
+        const pool = feas.length ? feas : s.results;
+        const bv = Math.min(...pool.map(r => r[benchMetric]));
+        const w = pool.find(r => r[benchMetric] === bv);
+        if (w) wins[w.algorithm] = (wins[w.algorithm] || 0) + 1;
+      }
+      const total = benchMatrix.scenarios.length;
+      const top = Object.entries(wins).sort((a, b) => b[1] - a[1])[0];
+      const nice = { greedy: 'Greedy nearest-neighbour', qpso: 'QPSO', ga: 'The genetic algorithm',
+                     sa: 'Simulated annealing', standard_pso: 'Standard PSO' };
+
+      let body;
+      if (benchMetric === 'runtime_ms') {
+        body = 'Greedy is fastest to compute because it does not search at all — it takes the '
+          + 'nearest stop each time. That is the point: it costs nothing and produces the '
+          + 'worst day for the fleet. Solve time is paid once by a dispatcher; fleet time is '
+          + 'paid every day by every van.';
+      } else if (benchMetric === 'distance_km') {
+        body = 'Shortest distance is not the same as the best plan. Greedy often wins here by '
+          + 'chaining nearby stops, then loses badly on fleet time because those short hops '
+          + 'run straight into congestion and miss delivery windows.';
+      } else {
+        body = 'Where QPSO does not win, it is because it broke a delivery window to save '
+          + 'driving — those runs are marked ✕ and cannot win, however good their numbers look.';
+      }
+
+      const verdict = document.getElementById('benchMatrixVerdict');
+      verdict.innerHTML =
+        `<b>${nice[top[0]] || top[0]} wins ${top[1]} of ${total} districts on `
+        + `${spec.label.toLowerCase()}.</b> ` + body;
+      verdict.hidden = false;
+
+      const cfg = benchMatrix.config || {};
+      const foot = document.getElementById('benchMatrixFoot');
+      foot.innerHTML =
+        `Run ${benchMatrix.generated_at} · ${cfg.n_particles} particles · `
+        + `${cfg.max_iter} iterations · seed ${cfg.seed} · `
+        + `${cfg.vehicle_capacity} capacity · ${cfg.horizon_min} min horizon. `
+        + 'Every instance is seeded, so re-running <code>scripts/build_benchmark_matrix.py</code> '
+        + 'on unchanged code reproduces this table exactly. Greedy solves in ~0 ms because '
+        + 'it does not search — it takes the nearest stop each time, which is the habit '
+        + 'the rest of the table is measured against.';
+      foot.hidden = false;
     }
 
     function renderAreaPicker() {
@@ -7146,6 +7457,7 @@
           body: JSON.stringify({
             network_id: state.network.network_id,
             ...(vans ? { n_vehicles: vans } : {}),
+            require_all_vehicles: document.getElementById('require_all_vehicles').checked,
             // The stops are the ones clicked on the map, not a random draw.
             customer_nodes: state.selectedStops,
             n_customers: state.selectedStops.length,
@@ -7398,11 +7710,19 @@
           }
         }
 
-        // START / DEPOT Marker Pin
+        // A map needle, tip on the junction. The old pill badge was a 130px
+        // wide label centred on the node, which covered the streets around the
+        // depot and left the actual point ambiguous — the one place on the map
+        // where every route begins and ends.
         const depotIcon = L.divIcon({
           className: 'custom-depot-pin',
-          html: `<div style="background:#0F172A; color:#FFD166; font-weight:900; font-family:'Space Grotesk',sans-serif; padding:4px 9px; border-radius:12px; border:2px solid #EA580C; box-shadow:0 3px 8px rgba(0,0,0,0.35); font-size:11px; white-space:nowrap; display:flex; align-items:center; gap:4px;"><span style="color:#EA580C;">🏁</span> START / DEPOT</div>`,
-          iconSize: [130, 26], iconAnchor: [65, 13]
+          html: `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 41 C15 41 3 22.5 3 14 A12 12 0 1 1 27 14 C27 22.5 15 41 15 41 Z"
+                    fill="#EA580C" stroke="#FFFFFF" stroke-width="2.5"
+                    stroke-linejoin="round" paint-order="stroke"/>
+              <circle cx="15" cy="14" r="5.5" fill="#FFFFFF"/>
+            </svg>`,
+          iconSize: [30, 42], iconAnchor: [15, 41]
         });
         const areaName = (ctx.network && ctx.network.area_label) ? ctx.network.area_label : 'this area';
         L.marker([depotNode.y, depotNode.x], { icon: depotIcon })
@@ -7480,7 +7800,20 @@
           const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
           const latlngs = route.full_path.map(nid => coords[nid]).filter(Boolean).map(n => [n.y, n.x]);
           if (latlngs.length > 1) {
-            L.polyline(latlngs, { color, weight: 4.5, opacity: 0.95, className: 'route-line' }).addTo(state.routeLayer);
+            // vehicleRoutePane (450) sits above roadGraphPane (410). Without it
+            // these land in the default overlay pane at 400 — underneath the
+            // congestion colouring — so the plan you are meant to be reading
+            // was drawn under the traffic it is routing through.
+            L.polyline(latlngs, {
+              pane: 'vehicleRoutePane',
+              color: '#FFFFFF', weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
+              interactive: false,
+            }).addTo(state.routeLayer);
+            L.polyline(latlngs, {
+              pane: 'vehicleRoutePane',
+              color, weight: 4.5, opacity: 1, lineCap: 'round', lineJoin: 'round',
+              className: 'route-line',
+            }).addTo(state.routeLayer);
           }
         });
       } else {
@@ -7930,6 +8263,7 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // visitor sees is a real road network rather than an empty frame. If the API
     // is asleep, the stored run stands in and says so.
     renderAreaPicker();
+    loadBenchmarkMatrix();
     selectArea(CURATED_AREAS[0].key, { quiet: true })
       .catch(err => {
         console.warn('Could not load the opening district, showing the stored run:', err);
