@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
 from app.core.overpass_network import load_overpass_network
+from app.core.offline_osm import load_offline_network, available_coverage
 from app.core.cached_network import (
     load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
 )
@@ -101,6 +102,31 @@ def generate_network_from_osm(req: OSMNetworkRequest):
         raise HTTPException(status_code=400, detail="Provide either `place` or all four bbox bounds (north/south/east/west).")
 
     if has_bbox:
+        # A box inside a city we ship offline is clipped from the committed
+        # graph. Same OpenStreetMap geometry Overpass would have returned, but
+        # in milliseconds and with no network call — which is the whole point on
+        # a deployed backend that cannot reach a local Overpass instance.
+        try:
+            net, meta = load_offline_network(
+                north=req.north, south=req.south, east=req.east, west=req.west,
+                max_nodes=req.max_nodes, congestion_seed=req.seed,
+            )
+        except LookupError:
+            pass                      # not covered — ask Overpass below
+        except ValueError as e:
+            # Covered, but the box holds too little road. Overpass would say the
+            # same thing more slowly.
+            raise HTTPException(status_code=400, detail=str(e))
+        else:
+            network_id = store.put_network(net, is_geo=True)
+            nodes, edges = _network_payload(net)
+            return NetworkResponse(
+                network_id=network_id, num_nodes=net.num_nodes(),
+                num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+                attribution=meta.get("attribution"),
+                area_label=meta.get("area_label"),
+            )
+
         try:
             net, meta = load_overpass_network(
                 north=req.north, south=req.south, east=req.east, west=req.west,
@@ -149,6 +175,17 @@ def generate_network_from_osm(req: OSMNetworkRequest):
 def list_cached_networks():
     """Real OSM networks shipped with the app, loadable without touching the internet."""
     return {"networks": available_networks()}
+
+
+@router.get("/network/offline-coverage")
+def list_offline_coverage():
+    """
+    Cities whose full road graph ships with the app, so a boundary drawn inside
+    one is served from disk instead of Overpass. The map draws these extents so
+    the fast area is visible before someone drags a box, rather than being
+    discovered by waiting 88 seconds for the slow one.
+    """
+    return {"coverage": available_coverage()}
 
 
 @router.post("/network/from_cache", response_model=NetworkResponse)
