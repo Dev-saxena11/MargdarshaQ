@@ -208,6 +208,38 @@ class AIAssistantExplainer:
                 return self._slot_retry(ctx, "How many vans do you have available?",
                                         ["3 vans", "Cancel"])
             ctx.collected_params["n_vehicles"] = value
+            ctx.current_prompt = "area_choice"
+            return AssistantChatResponse(
+                reply=(
+                    f"{value} vans. Now the area.\n\n"
+                    f"Do you want to plan across the whole of **{MVP_AREA_LABEL}**, "
+                    "or draw a smaller patch of it — one district, one ward — "
+                    "and work inside that?"
+                ),
+                suggested_chips=["Use the whole city", "Draw an area", "Cancel"],
+                context=ctx,
+            )
+
+        if step == "area_choice":
+            if any(w in low for w in ("draw", "smaller", "area", "boundary", "patch", "district", "ward")):
+                ctx.current_prompt = "await_boundary"
+                return self._slot_ask_for_boundary(ctx, first_time=True)
+            if any(w in low for w in ("whole", "all", "city", "everything", "full")):
+                ctx.current_prompt = "await_map"
+                return self._slot_ask_for_map(ctx, first_time=True)
+            return AssistantChatResponse(
+                reply="Whole city, or draw a smaller area?",
+                suggested_chips=["Use the whole city", "Draw an area", "Cancel"],
+                context=ctx,
+            )
+
+        if step == "await_boundary":
+            # The drawn box is loaded by the control room, which swaps the
+            # active network. Nothing to validate beyond it having happened —
+            # the picker step checks the clicks themselves.
+            if not ctx.active_network_id:
+                return self._slot_ask_for_boundary(ctx, first_time=False)
+            ctx.collected_params["boundary_network"] = ctx.active_network_id
             ctx.current_prompt = "await_map"
             return self._slot_ask_for_map(ctx, first_time=True)
 
@@ -292,11 +324,37 @@ class AIAssistantExplainer:
             "On the map: click the **depot** first, then each **stop**, "
             "then say **done**."
         )
+        # After a boundary was drawn the control room holds the clipped network,
+        # and reloading the city over it would throw away the area the user
+        # chose — and with it the node ids they are about to click.
+        drew_boundary = bool(ctx.collected_params.get("boundary_network"))
         return AssistantChatResponse(
             reply=reply,
             suggested_chips=["Done picking", "Cancel"],
             context=ctx,
-            map_action={"kind": "open_picker", "network_name": MVP_NETWORK},
+            map_action={
+                "kind": "open_picker",
+                "network_name": MVP_NETWORK,
+                "ensure_area": not drew_boundary,
+            },
+        )
+
+    def _slot_ask_for_boundary(self, ctx: AssistantContext, first_time: bool) -> AssistantChatResponse:
+        """Hands over so the user can drag a box and load the roads inside it."""
+        reply = (
+            "Drag a box around the area you want to work in, then press "
+            "**Load roads in this boundary**. Inside the dashed purple outline "
+            "it comes straight off the offline map, so it is instant.\n\n"
+            "Tell me **done** once the roads are on screen."
+        ) if first_time else (
+            "I can't see a loaded area yet. Drag a box on the map, press "
+            "**Load roads in this boundary**, then say **done**."
+        )
+        return AssistantChatResponse(
+            reply=reply,
+            suggested_chips=["Done", "Use the whole city", "Cancel"],
+            context=ctx,
+            map_action={"kind": "draw_boundary", "network_name": MVP_NETWORK},
         )
 
     def _apply_correction(self, low: str, ctx: AssistantContext) -> Optional[str]:
@@ -354,8 +412,21 @@ class AIAssistantExplainer:
             depot = int(ctx.collected_params["depot"])
             vans = int(ctx.collected_params["n_vehicles"])
 
-            net = load_cached_network(MVP_NETWORK, congestion_seed=42)
-            network_id = store.put_network(net, is_geo=True)
+            # Plan on the network those clicks came from. A boundary clipped out
+            # of the offline map numbers its nodes from zero while the full
+            # cached city carries OSM ids, and the two sets do not overlap at
+            # all — so re-loading the city here would reject every stop the user
+            # picked inside a drawn area.
+            network_id = ctx.active_network_id
+            net = None
+            if network_id:
+                try:
+                    net = store.get_network(network_id)
+                except KeyError:
+                    net = None
+            if net is None:
+                net = load_cached_network(MVP_NETWORK, congestion_seed=42)
+                network_id = store.put_network(net, is_geo=True)
 
             # Delivery windows cannot outlast the shift they sit in; the API
             # rejects the instance outright if they do.
