@@ -223,6 +223,13 @@ class AIAssistantExplainer:
         if step == "area_choice":
             if any(w in low for w in ("draw", "smaller", "area", "boundary", "patch", "district", "ward")):
                 ctx.current_prompt = "await_boundary"
+                # The control room already has a network loaded before this step
+                # starts (Bareilly, by default), so `active_network_id` is never
+                # empty. Recording which one it was here is the only way to
+                # later tell "a box was drawn and loaded" apart from "nothing
+                # happened yet, the old network is still active" — checking for
+                # any id at all made every "done" true immediately.
+                ctx.collected_params["pre_boundary_network_id"] = ctx.active_network_id
                 return self._slot_ask_for_boundary(ctx, first_time=True)
             if any(w in low for w in ("whole", "all", "city", "everything", "full")):
                 ctx.current_prompt = "await_map"
@@ -234,10 +241,12 @@ class AIAssistantExplainer:
             )
 
         if step == "await_boundary":
-            # The drawn box is loaded by the control room, which swaps the
-            # active network. Nothing to validate beyond it having happened —
-            # the picker step checks the clicks themselves.
-            if not ctx.active_network_id:
+            # A box was drawn and loaded only once the active network is BOTH
+            # present and different from whatever was loaded when this wait
+            # began — not merely present, which the pre-existing Bareilly load
+            # already satisfied before the user touched the map.
+            before = ctx.collected_params.get("pre_boundary_network_id")
+            if not ctx.active_network_id or ctx.active_network_id == before:
                 return self._slot_ask_for_boundary(ctx, first_time=False)
             ctx.collected_params["boundary_network"] = ctx.active_network_id
             ctx.current_prompt = "await_map"
