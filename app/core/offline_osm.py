@@ -94,6 +94,34 @@ def coverage_for_bbox(north: float, south: float,
     return None
 
 
+def _thin_to_budget(adj, nodes, max_nodes):
+    """
+    Drop the lowest road classes until the network fits the node budget.
+
+    Speed stands in for road class (see ROAD_SPEEDS): service lanes and
+    residential streets go first, arterials last. Thresholds are tried from the
+    lowest up and the first one that fits wins, so the result keeps as much
+    detail as the budget allows while still reaching the edges of the box.
+
+    Returns the original graph untouched if no threshold both fits the budget
+    and leaves something routable behind.
+    """
+    speeds = sorted({kph for outs in adj.values() for (_, kph) in outs.values()})
+    for threshold in speeds[1:]:            # the lowest keeps everything
+        sub: Dict[int, Dict[int, Tuple[float, float]]] = {}
+        for u, outs in adj.items():
+            kept = {v: d for v, d in outs.items() if d[1] >= threshold}
+            if kept:
+                sub[u] = kept
+        touched = (set(sub) | {v for outs in sub.values() for v in outs}) & nodes
+        scc = largest_scc(sub, touched)
+        if len(scc) < 10:
+            break                            # any further cut is emptier still
+        if len(scc) <= max_nodes:
+            return scc, sub
+    return nodes, adj
+
+
 def load_offline_network(
     north: float, south: float, east: float, west: float,
     max_nodes: int = 400,
@@ -138,9 +166,23 @@ def load_offline_network(
             "on. Draw a box that covers a connected set of streets."
         )
 
-    coords = {i: (raw_nodes[i][0], raw_nodes[i][1]) for i in keep}
-    center = ((north + south) / 2, (east + west) / 2)
-    keep = crop(adj, keep, max_nodes, coords=coords, center=center)
+    # Fitting the box into max_nodes by walking outwards from the middle keeps
+    # a dense blob and leaves the rest of the drawn area blank — measured on a
+    # 7 x 6 km box, the result covered about a quarter of it in each direction,
+    # so most of what the user drew came back empty. Dropping the smallest road
+    # classes first instead keeps a skeleton that still spans the whole box,
+    # which is both what drawing that box asked for and the roads a van would
+    # actually use.
+    if len(keep) > max_nodes:
+        keep, adj = _thin_to_budget(adj, keep, max_nodes)
+
+    # Only if even the arterials alone overshoot — a very large box — does the
+    # centre-out walk come back, because at that point something has to give
+    # and staying connected matters more than spanning.
+    if len(keep) > max_nodes:
+        coords = {i: (raw_nodes[i][0], raw_nodes[i][1]) for i in keep}
+        center = ((north + south) / 2, (east + west) / 2)
+        keep = crop(adj, keep, max_nodes, coords=coords, center=center)
 
     net = TrafficNetwork()
     for i in sorted(keep):
