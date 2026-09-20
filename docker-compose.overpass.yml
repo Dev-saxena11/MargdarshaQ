@@ -40,10 +40,16 @@ services:
       OVERPASS_MODE: init
 
       # The regional extract to import. Set OSM_EXTRACT_URL in .env — see the
-      # size/time table in DEPLOYMENT.md before choosing. Defaults to a single
-      # small state so an unconfigured run fails fast and cheap rather than
-      # silently starting a 2-hour country import.
-      OVERPASS_PLANET_URL: ${OSM_EXTRACT_URL:-https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf}
+      # size/time table in DEPLOYMENT.md before choosing. Defaults to the zone
+      # containing Bareilly, which is the district the control room opens on.
+      #
+      # Geofabrik's India zones are not the compass directions they sound like:
+      # Bareilly is in Uttar Pradesh, which sits in central-zone, NOT
+      # northern-zone. Importing the wrong zone is near-invisible — a box outside
+      # the extract returns zero elements, which falls back to the public API
+      # silently, which is the exact failure this whole file exists to prevent.
+      # Verify with the .poly boundary before trusting a zone name.
+      OVERPASS_PLANET_URL: ${OSM_EXTRACT_URL:-https://download.geofabrik.de/asia/india/central-zone-latest.osm.pbf}
 
       # The image expects a .osm.bz2 planet file and downloads whatever URL it
       # is given to that name. Geofabrik serves .osm.pbf, which is several times
@@ -77,6 +83,17 @@ services:
       # The built database. Named rather than a bind mount so it survives
       # `docker compose down` — losing this means repeating the whole import.
       - overpass_db:/db
+    post_start:
+      # The image creates /db as 0700 owned by `overpass`, but serves queries
+      # through fcgiwrap running as `nginx` (see supervisord.conf). nginx cannot
+      # traverse into 0700 to reach the dispatcher socket at
+      # /db/db/osm3s_osm_base, so every query comes back as the XML error
+      # "runtime error: open64: 13 Permission denied". The container still
+      # answers on port 80 and nginx still logs 200s, so this looks healthy from
+      # outside while serving nothing usable. o+x makes the directory traversable
+      # without granting read access to its contents.
+      - command: ["chmod", "o+x", "/db"]
+        user: root
     healthcheck:
       # A trivial query that exercises the actual interpreter endpoint, so the
       # container is only "healthy" once it can really answer, not merely once

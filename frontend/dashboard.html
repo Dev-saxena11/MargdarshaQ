@@ -3500,11 +3500,12 @@
           <!-- LEFT: network + VRP generation -->
           <div class="col">
             <section>
-              <h2>1. Draw Your Study Area</h2>
+              <h2>1. Choose Your Study Area</h2>
               <p class="step-hint">
-                Pan the map to anywhere in the world, then drag a box around the district you
-                want to route through. The real road network inside that box is pulled from
-                OpenStreetMap — one-way streets included.
+                Bareilly is loaded and ready — go straight to step 2 to work on it. To route
+                somewhere else, pan the map anywhere in the world and drag a box around the
+                district. The real road network inside that box is pulled from OpenStreetMap
+                — one-way streets included.
               </p>
 
               <button class="primary" id="btnDrawBoundary" onclick="startBoundaryDraw()">
@@ -3512,6 +3513,9 @@
               </button>
               <button class="secondary" id="btnClearBoundary" onclick="clearBoundary()" disabled>
                 Clear boundary
+              </button>
+              <button class="secondary" id="btnHomeArea" onclick="loadDefaultArea()">
+                ↩︎ Back to Bareilly
               </button>
 
               <div class="row2" style="margin-top:10px;">
@@ -3526,15 +3530,45 @@
             </section>
 
             <section>
-              <h2>2. Pick Depot &amp; Stops</h2>
+              <h2>2. Place Depot &amp; Stops</h2>
               <p class="step-hint">
-                Click a junction on the map to place the depot, then click the stops the fleet has
-                to serve. Click a chosen stop again to drop it.
+                Mark the depot and the stops on the map yourself, or tell the system how many
+                you want and let it place them.
               </p>
 
               <div class="seg">
-                <button id="segPickDepot" onclick="setPickMode('depot')" disabled>🏁 Set depot</button>
-                <button id="segPickStops" onclick="setPickMode('stops')" disabled>📍 Add stops</button>
+                <button id="segPlanManual" onclick="setPlanMode('manual')" disabled>✋ I'll mark them</button>
+                <button id="segPlanAuto" onclick="setPlanMode('auto')" disabled>⚙️ Generate them</button>
+              </div>
+
+              <div id="planManualPanel" style="display:none; margin-top:10px;">
+                <div class="seg">
+                  <button id="segPickDepot" onclick="setPickMode('depot')" disabled>🏁 Set depot</button>
+                  <button id="segPickStops" onclick="setPickMode('stops')" disabled>📍 Add stops</button>
+                </div>
+                <p class="step-hint" style="margin-top:8px;">
+                  Click a junction to place the depot, then click each stop the fleet has to
+                  serve. Click a chosen stop again to drop it.
+                </p>
+              </div>
+
+              <div id="planAutoPanel" style="display:none; margin-top:10px;">
+                <div class="row2">
+                  <div>
+                    <label>How many stops</label>
+                    <input id="autoStopCount" type="number" value="12" min="1" max="60">
+                  </div>
+                  <div>
+                    <label>Depot</label>
+                    <select id="autoDepotMode">
+                      <option value="central">Place it for me</option>
+                      <option value="manual">I'll click it myself</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="secondary" id="btnRandomStops" onclick="pickRandomStops()" disabled>
+                  🎲 Generate depot &amp; stops
+                </button>
               </div>
 
               <div class="pick-summary" id="pickSummary">
@@ -3542,9 +3576,6 @@
                 <div class="stat-line"><span>Stops selected</span><span id="pickStopCount">0</span></div>
               </div>
 
-              <button class="secondary" id="btnRandomStops" onclick="pickRandomStops()" disabled>
-                🎲 Scatter 12 stops for me
-              </button>
               <button class="secondary" id="btnClearPicks" onclick="clearPicks()" disabled>
                 Clear selection
               </button>
@@ -3801,6 +3832,7 @@
       // Map-driven instance builder (veroviz-style): draw a boundary, then
       // click the stops you want inside it.
       drawMode: null,        // null | 'boundary' | 'depot' | 'stops'
+      planMode: 'manual',    // 'manual' (click them) | 'auto' (system places them)
       bounds: null,          // {north, south, east, west} of the drawn boundary
       boundaryLayer: null,   // rectangle drawn on the map
       nodeLayer: null,       // clickable node markers
@@ -3957,6 +3989,8 @@
           if (state.network) {
             renderControlNetwork();
             if (state.optimizedSolution) drawRoutes(state.optimizedSolution.routes);
+          } else {
+            bootstrapControlRoom();
           }
         }, 60);
       }
@@ -4187,7 +4221,19 @@
         why: 'IT-park grid with tight one-way loops and heavy shift-change surges twice a day.',
         stops: 14,
       },
+      {
+        key: 'bareilly',
+        name: 'Bareilly City, Uttar Pradesh',
+        lat: 28.3670, lon: 79.4304,
+        why: 'A tier-2 city road system — mixed arterial and lane hierarchy, few one-ways, and the kind of network most Indian municipal fleets actually run on.',
+        stops: 14,
+      },
     ];
+
+    // The control room opens on Bareilly: it ships pre-cached, so the workspace
+    // has real roads on it the moment the screen is opened rather than an empty
+    // world map waiting for someone to know where to drag a box.
+    const CONTROL_ROOM_DEFAULT_AREA = 'bareilly';
 
     function areaByKey(key) {
       return CURATED_AREAS.find(a => a.key === key) || CURATED_AREAS[0];
@@ -5842,12 +5888,15 @@
         ? ' <button onclick="cancelMapMode()">cancel</button>' : '');
     }
 
-    // The control-room map exists from the start, with no network loaded, because
-    // the first thing to do on it is pan the world and draw a boundary.
+    // The control-room map opens over Bareilly rather than the whole country.
+    // The pre-cached network is loaded onto it (see bootstrapControlRoom), so the
+    // first thing on screen is a real road network to work on; panning out and
+    // drawing a boundary elsewhere still works exactly as before.
     function ensureControlMap() {
       if (state.map) return state.map;
 
-      state.map = L.map('leafletMap', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+      const home = areaByKey(CONTROL_ROOM_DEFAULT_AREA);
+      state.map = L.map('leafletMap', { zoomControl: true }).setView([home.lat, home.lon], 13);
       L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
@@ -6010,7 +6059,8 @@
           + (net.attribution || 'OpenStreetMap') + '</span></div>';
 
         document.getElementById('emptyHint').style.display = 'none';
-        for (const id of ['segPickDepot', 'segPickStops', 'btnRandomStops', 'btnClearPicks']) {
+        for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
+                          'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
         document.getElementById('btnGenVRP').disabled = true;
@@ -6020,7 +6070,7 @@
         simReset();
 
         renderControlNetwork();
-        setPickMode('depot');
+        setPlanMode(state.planMode || 'manual');
       } catch (e) {
         // Say what actually went wrong. This used to assert rate-limiting for
         // every failure, which sent people away from a boundary that was merely
@@ -6078,7 +6128,8 @@
           + '<div class="stat-line"><span>Area</span><span>' + (net.area_label || area.name) + '</span></div>';
 
         document.getElementById('emptyHint').style.display = 'none';
-        for (const id of ['segPickDepot', 'segPickStops', 'btnRandomStops', 'btnClearPicks']) {
+        for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
+                          'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
         document.getElementById('btnGenVRP').disabled = true;
@@ -6088,13 +6139,68 @@
         simReset();
 
         renderControlNetwork();
-        setPickMode('depot');
+        setPlanMode(state.planMode || 'manual');
       } catch (e) {
-        setMapPrompt('Could not load that district either: ' + e.message, { warn: true });
+        setMapPrompt('Could not load ' + area.name + ': ' + e.message
+          + ' You can still draw a boundary anywhere on the map.', { warn: true });
       }
     }
 
+    // Opens the control room on the pre-cached default district so there is a
+    // real network to work with immediately. Tried once: if the backend is down
+    // the room still works as a draw-a-boundary workspace, and retrying on every
+    // tab switch would just replace the error with the same error.
+    let controlRoomBootstrapped = false;
+    async function bootstrapControlRoom() {
+      if (controlRoomBootstrapped || state.network) return;
+      controlRoomBootstrapped = true;
+      await loadCuratedIntoControlRoom(CONTROL_ROOM_DEFAULT_AREA);
+    }
+
+    // The way back after drawing a boundary somewhere else.
+    async function loadDefaultArea() {
+      clearBoundary();
+      await loadCuratedIntoControlRoom(CONTROL_ROOM_DEFAULT_AREA);
+    }
+
     // ---- Picking the depot and the stops ------------------------------------
+
+    // Manual or generated. Both paths write the same selectedDepot/selectedStops,
+    // so everything downstream — building the instance, solving, the simulator —
+    // cannot tell which was used.
+    function setPlanMode(mode) {
+      if (!state.network) return;
+      state.planMode = mode;
+      document.getElementById('segPlanManual').classList.toggle('active', mode === 'manual');
+      document.getElementById('segPlanAuto').classList.toggle('active', mode === 'auto');
+      document.getElementById('planManualPanel').style.display = mode === 'manual' ? '' : 'none';
+      document.getElementById('planAutoPanel').style.display = mode === 'auto' ? '' : 'none';
+
+      if (mode === 'manual') {
+        setPickMode(state.selectedDepot === null ? 'depot' : 'stops');
+      } else {
+        setDrawMode(null);
+        setMapPrompt('Set how many stops you want, then press '
+          + '<b>Generate depot &amp; stops</b>.');
+      }
+    }
+
+    // The junction closest to the middle of the network. A depot wants to be
+    // central — putting it in a corner (which is what taking the first node did)
+    // makes every route start with the same long run inwards and flatters any
+    // solver that is merely undoing that.
+    function centralNodeId(nodes) {
+      const lat = nodes.reduce((s, n) => s + n.y, 0) / nodes.length;
+      const lon = nodes.reduce((s, n) => s + n.x, 0) / nodes.length;
+      const scale = Math.cos(lat * Math.PI / 180);
+      let best = nodes[0].id, bestD = Infinity;
+      for (const n of nodes) {
+        const d = Math.pow(n.y - lat, 2) + Math.pow((n.x - lon) * scale, 2);
+        if (d < bestD) { bestD = d; best = n.id; }
+      }
+      return best;
+    }
+
     function setPickMode(mode) {
       if (!state.network) return;
       setDrawMode(mode);
@@ -6109,7 +6215,15 @@
         state.selectedDepot = nodeId;
         // The depot cannot also be a stop.
         state.selectedStops = state.selectedStops.filter(n => n !== nodeId);
-        setPickMode('stops');
+        // Rolling straight on to stop-picking is the point in manual mode. In
+        // generated mode the stops are the machine's job, so stop here rather
+        // than dropping the user into a picking mode they did not ask for.
+        if (state.planMode === 'auto') {
+          setDrawMode(null);
+          setMapPrompt('Depot set. Press <b>Generate depot &amp; stops</b> to place the stops.');
+        } else {
+          setPickMode('stops');
+        }
       } else if (state.drawMode === 'stops') {
         if (nodeId === state.selectedDepot) return;
         const at = state.selectedStops.indexOf(nodeId);
@@ -6122,23 +6236,38 @@
       updatePickUI();
     }
 
-    // Scatters stops for someone who wants a quick run rather than a hand-built
-    // instance. Spread across the network rather than clustered, so the routes
-    // are worth looking at.
+    // Places the depot and the requested number of stops. Stepping through the
+    // node list rather than sampling at random spreads the stops over the whole
+    // network instead of clustering them, and keeps a given network and count
+    // reproducible — the same demo twice running gives the same picture.
     function pickRandomStops() {
       if (!state.network) return;
       const nodes = state.network.nodes;
-      if (!state.selectedDepot) state.selectedDepot = nodes[0].id;
+      const asked = +document.getElementById('autoStopCount').value || 12;
+      const want = Math.max(1, Math.min(asked, nodes.length - 1));
+
+      if (document.getElementById('autoDepotMode').value === 'central') {
+        state.selectedDepot = centralNodeId(nodes);
+      }
 
       const pool = nodes.filter(n => n.id !== state.selectedDepot);
-      const step = Math.max(1, Math.floor(pool.length / 12));
+      const step = Math.max(1, Math.floor(pool.length / want));
       const picks = [];
-      for (let i = 0; i < pool.length && picks.length < 12; i += step) picks.push(pool[i].id);
+      for (let i = 0; i < pool.length && picks.length < want; i += step) picks.push(pool[i].id);
 
       state.selectedStops = picks;
       renderPickableNodes();
       updatePickUI();
-      setMapPrompt('Scattered ' + picks.length + ' stops. Adjust them by clicking, or build the instance.');
+
+      if (state.selectedDepot === null) {
+        setPickMode('depot');
+        setMapPrompt('Placed ' + picks.length + ' stops. Now <b>click the junction</b> '
+          + 'the vans should start and finish at.', { cancel: true });
+        return;
+      }
+      setMapPrompt('Placed a depot and ' + picks.length + ' stops'
+        + (want < asked ? ' (this network only has ' + nodes.length + ' junctions)' : '')
+        + '. Adjust them by clicking, or build the instance.');
     }
 
     function clearPicks() {
