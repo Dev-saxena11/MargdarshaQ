@@ -3904,7 +3904,7 @@
             <section>
               <h2>3. Metaheuristic Solver</h2>
               <label>Algorithm</label>
-              <select id="algorithm">
+              <select id="algorithm" onchange="syncSoloButtonLabel()">
                 <option value="qpso">QPSO (Quantum Hybrid)</option>
                 <option value="ga">Genetic Algorithm</option>
                 <option value="sa">Simulated Annealing</option>
@@ -3925,26 +3925,21 @@
             <section>
               <h2>4. Run the Shift</h2>
               <p class="step-hint">
-                Drive both plans across the same day, on one clock. The usual method and ours
-                leave the depot together — watch where they diverge.
+                Drive the plan across the day on one clock. Race the usual method against
+                ours to see where they diverge, or watch a single algorithm drive its own
+                plan with nothing else on the map.
               </p>
 
               <button class="primary" id="btnSimBuild" onclick="simPrepare()" disabled>
                 🏁 Build the race
               </button>
+              <button class="secondary" id="btnSimSolo" onclick="simPrepareSolo()" disabled>
+                ▶ Watch QPSO drive alone
+              </button>
 
-              <div class="sim-legend" id="simLegend" hidden>
-                <div class="sim-legend-row">
-                  <span class="sim-swatch is-usual"></span>
-                  <span>Usual method</span>
-                  <b id="simUsualDone">0</b>
-                </div>
-                <div class="sim-legend-row">
-                  <span class="sim-swatch is-ours"></span>
-                  <span>Our method</span>
-                  <b id="simOursDone">0</b>
-                </div>
-              </div>
+              <!-- One row per fleet on the clock, built in simRenderLegend:
+                   two for the race, one when a single algorithm is run. -->
+              <div class="sim-legend" id="simLegend" hidden></div>
 
               <div class="sim-kpis" id="simKpis" hidden>
                 <div class="stat-line"><span>Clock</span><span class="mono" id="simClock">06:00</span></div>
@@ -6471,6 +6466,7 @@
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
         document.getElementById('btnSimBuild').disabled = true;
+        document.getElementById('btnSimSolo').disabled = true;
         simReset();
 
         renderControlNetwork();
@@ -6541,6 +6537,7 @@
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
         document.getElementById('btnSimBuild').disabled = true;
+        document.getElementById('btnSimSolo').disabled = true;
         simReset();
 
         renderControlNetwork();
@@ -7005,8 +7002,82 @@
       }
     }
 
-    // Compiles both fleets and lays out every layer the playback touches.
+    // Short names for the algorithm picked in step 3, for the button and the
+    // playback legend. The <select> carries the long ones.
+    const ALGO_SHORT = {
+      qpso: 'QPSO', ga: 'the genetic algorithm', sa: 'simulated annealing',
+      standard_pso: 'standard PSO', greedy: 'greedy nearest-neighbour',
+    };
+
+    function syncSoloButtonLabel() {
+      const sel = document.getElementById('algorithm');
+      const btn = document.getElementById('btnSimSolo');
+      if (!sel || !btn) return;
+      btn.innerHTML = '▶ Watch ' + (ALGO_SHORT[sel.value] || sel.value) + ' drive alone';
+    }
+
+    // Runs the algorithm chosen in step 3 and plays back its plan on its own.
+    // The race answers "is ours better"; this answers "what does this one
+    // actually do", which is the question you cannot get at while two fleets
+    // are moving over each other on the same streets.
+    async function simPrepareSolo() {
+      if (!state.vrp) return;
+      const algo = document.getElementById('algorithm').value;
+      const name = ALGO_SHORT[algo] || algo;
+      const btn = document.getElementById('btnSimSolo');
+      const label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Solving…';
+      setMapPrompt('Solving with ' + name + '…');
+
+      try {
+        const solution = await api('/api/vrp/solve', {
+          method: 'POST',
+          body: JSON.stringify({
+            vrp_id: state.vrp.vrp_id,
+            algorithm: algo,
+            n_particles: +document.getElementById('n_particles').value || 50,
+            max_iter: +document.getElementById('max_iter').value || 150,
+            seed: 1,
+            use_local_search: document.getElementById('use_local_search').checked,
+          }),
+        });
+
+        // The solo run is this screen's only plan, so it also becomes the one
+        // the route layer and the bottleneck re-plan work from. Clearing the
+        // baseline stops the race's verdict line claiming a comparison that is
+        // no longer on the map.
+        state.optimizedSolution = solution;
+        state.baselineSolution = null;
+        sim.incident = null;
+        simBuildFleets([{
+          key: 'solo',
+          label: (solution.algorithm || name),
+          colors: SIM_OURS_COLORS,
+          solution,
+        }]);
+        simSeek(0);
+        simPlay();
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        setMapPrompt('Could not run ' + name + ': ' + detail, { warn: true });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = label;
+      }
+    }
+
+    // The two-plan race. A thin wrapper now that the playback takes any number
+    // of fleets, so watching one algorithm on its own runs the same machinery.
     function simBuildFromSolutions(baseline, optimized) {
+      simBuildFleets([
+        { key: 'usual', label: 'Usual method', colors: SIM_USUAL_COLORS, solution: baseline },
+        { key: 'ours', label: 'Our method', colors: SIM_OURS_COLORS, solution: optimized },
+      ]);
+    }
+
+    // Compiles each fleet and lays out every layer the playback touches.
+    function simBuildFleets(specs) {
       const costs = simEdgeCosts(state);
       const timeDependent = !!(document.getElementById('time_dependent') || {}).checked;
       const opts = {
@@ -7015,18 +7086,11 @@
         notBefore: sim.incident ? sim.incident.start_time : null,
       };
 
-      sim.fleets = [
-        {
-          key: 'usual', label: 'Usual method', colors: SIM_USUAL_COLORS,
-          vehicles: simBuildFleet(baseline, state, costs, opts),
-          delivered: 0, late: 0, delay: 0,
-        },
-        {
-          key: 'ours', label: 'Our method', colors: SIM_OURS_COLORS,
-          vehicles: simBuildFleet(optimized, state, costs, opts),
-          delivered: 0, late: 0, delay: 0,
-        },
-      ];
+      sim.fleets = specs.map(spec => ({
+        key: spec.key, label: spec.label, colors: spec.colors,
+        vehicles: simBuildFleet(spec.solution, state, costs, opts),
+        delivered: 0, late: 0, delay: 0,
+      }));
 
       ensureControlMap();
       const coords = nodeCoordMap(state);
@@ -7094,13 +7158,29 @@
       sim.horizon = Math.max(1, ...sim.fleets.flatMap(f => f.vehicles.map(v => v.endTime)));
       sim.ready = true;
 
+      simRenderLegend();
       document.getElementById('simTransport').hidden = false;
       document.getElementById('simLegend').hidden = false;
       document.getElementById('simKpis').hidden = false;
       document.getElementById('simIncidentPanel').hidden = false;
       document.getElementById('btnDynamicRun').disabled = false;
       document.getElementById('simTransportEnd').textContent = tdClock(TD_PROFILE.dayStartMin + sim.horizon);
-      setMapPrompt('Both fleets leave the depot together. Watch where they diverge.');
+      setMapPrompt(sim.fleets.length > 1
+        ? 'Both fleets leave the depot together. Watch where they diverge.'
+        : sim.fleets[0].label + ' is driving its plan. '
+          + sim.fleets[0].vehicles.length + ' vans out.');
+    }
+
+    // One row per fleet, so the same legend serves the two-plan race and a
+    // single algorithm running on its own.
+    function simRenderLegend() {
+      document.getElementById('simLegend').innerHTML = sim.fleets.map(f =>
+        '<div class="sim-legend-row">'
+        + `<span class="sim-swatch" style="background:${f.colors[0]}"></span>`
+        + `<span>${f.label}</span>`
+        + `<b id="simDone_${f.key}">0 stops</b>`
+        + '</div>'
+      ).join('');
     }
 
     // ---- Playback -----------------------------------------------------------
@@ -7245,10 +7325,10 @@
       lateEl.textContent = late;
       lateEl.className = late ? 'feas-no' : 'feas-yes';
 
-      const usual = sim.fleets.find(f => f.key === 'usual');
-      const ours = sim.fleets.find(f => f.key === 'ours');
-      document.getElementById('simUsualDone').textContent = usual ? usual.delivered + ' stops' : '—';
-      document.getElementById('simOursDone').textContent = ours ? ours.delivered + ' stops' : '—';
+      for (const fleet of sim.fleets) {
+        const el = document.getElementById('simDone_' + fleet.key);
+        if (el) el.textContent = fleet.delivered + ' stops';
+      }
 
       const scrub = document.getElementById('simScrub');
       if (document.activeElement !== scrub) {
@@ -7257,6 +7337,17 @@
     }
 
     function simVerdict() {
+      // A single fleet has nothing to be compared against, so it reports its
+      // own day instead of an empty string where a verdict should be.
+      if (sim.fleets.length === 1) {
+        const f = sim.fleets[0];
+        const last = Math.max(...f.vehicles.map(v => v.endTime));
+        return f.label + ' delivered ' + f.delivered + ' of ' + sim.totalStops
+          + ' stops with ' + f.vehicles.length + ' vans, last one home after '
+          + last.toFixed(0) + ' min'
+          + (f.late ? ', ' + f.late + ' outside their window.' : ', all on time.');
+      }
+
       const usual = sim.fleets.find(f => f.key === 'usual');
       const ours = sim.fleets.find(f => f.key === 'ours');
       if (!usual || !ours) return '';
@@ -7301,6 +7392,11 @@
       const at = sim.clock;
       setMapPrompt('Closing a road at ' + tdClock(TD_PROFILE.dayStartMin + at) + ' and re-planning…');
 
+      // A solo run re-plans with the algorithm being watched, not with QPSO —
+      // switching solvers behind a label that says "simulated annealing" would
+      // credit the wrong one for reacting well.
+      const soloLabel = sim.fleets.length === 1 ? sim.fleets[0].label : null;
+
       try {
         const dyn = await api('/api/vrp/solve-dynamic', {
           method: 'POST',
@@ -7308,7 +7404,7 @@
             vrp_id: state.vrp.vrp_id,
             incident_factor: +document.getElementById('incident_severity').value || 4.0,
             trigger_time_min: at,
-            algorithm: 'qpso',
+            algorithm: soloLabel ? document.getElementById('algorithm').value : 'qpso',
             n_particles: +document.getElementById('n_particles').value || 50,
             max_iter: +document.getElementById('max_iter').value || 150,
             seed: 1,
@@ -7341,7 +7437,17 @@
 
         sim.incident = dyn.incident || null;
         state.dynamicResult = dyn;
-        simBuildFromSolutions(state.baselineSolution, dyn.dynamic_rerouted_solution);
+        if (soloLabel) {
+          // A solo run has no unreacting method to keep alongside it, so the
+          // single fleet simply takes the re-planned solution. Rebuilding it
+          // as a race here would invent a baseline that was never on screen.
+          simBuildFleets([{
+            key: 'solo', label: soloLabel, colors: SIM_OURS_COLORS,
+            solution: dyn.dynamic_rerouted_solution,
+          }]);
+        } else {
+          simBuildFromSolutions(state.baselineSolution, dyn.dynamic_rerouted_solution);
+        }
         simSeek(at);
         simShowRetasking(wasAt);
 
@@ -7483,6 +7589,7 @@
         document.getElementById('btnSolve').disabled = false;
         document.getElementById('btnBench').disabled = false;
         document.getElementById('btnSimBuild').disabled = false;
+        document.getElementById('btnSimSolo').disabled = false;
         cancelMapMode();
         setMapPrompt('Instance ready — ' + vrp.customers.length + ' stops, '
           + vrp.n_vehicles + ' vans. Solve it from the right-hand panel.');
@@ -8283,6 +8390,7 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // is asleep, the stored run stands in and says so.
     renderAreaPicker();
     loadBenchmarkMatrix();
+    syncSoloButtonLabel();
     selectArea(CURATED_AREAS[0].key, { quiet: true })
       .catch(err => {
         console.warn('Could not load the opening district, showing the stored run:', err);
