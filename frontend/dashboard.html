@@ -5650,11 +5650,16 @@
         const weight = jam ? 3.2 : busy ? 2.4 : 1.5;
         const opacity = jam ? 0.85 : busy ? 0.62 : 0.38;
 
+        // The road graph is decoration — nothing binds a click or a tooltip to
+        // it. Leaflet paths are interactive by default though, and this layer
+        // sits in a pane above the pickable junctions, so leaving it that way
+        // meant every click meant for a junction landed on a road instead and
+        // picking a depot or a stop by hand simply did not work.
         // White casing halo for contrast against map tiles
         L.polyline([[a.y, a.x], [b.y, b.x]], {
           ...pOpts,
           color: '#FFFFFF', weight: weight + 2, opacity: jam ? 0.75 : 0.45,
-          lineCap: 'round', lineJoin: 'round'
+          lineCap: 'round', lineJoin: 'round', interactive: false
         }).addTo(layerGroup);
 
         // Colored road segment
@@ -5662,7 +5667,7 @@
           ...pOpts,
           color, weight, opacity,
           lineCap: 'round', lineJoin: 'round',
-          dashArray: jam ? '6, 4' : null
+          dashArray: jam ? '6, 4' : null, interactive: false
         }).addTo(layerGroup);
 
         // Directional arrow at 62% of the segment
@@ -5690,7 +5695,7 @@
           L.circleMarker([pt.y, pt.x], {
             ...pOpts,
             radius: 2.2, color: '#FFFFFF', fillColor: '#475569',
-            fillOpacity: 0.6, weight: 0.8
+            fillOpacity: 0.6, weight: 0.8, interactive: false
           }).addTo(layerGroup);
         }
       }
@@ -5910,6 +5915,12 @@
       }
       if (!state.map.getPane('vehicleRoutePane')) {
         state.map.createPane('vehicleRoutePane').style.zIndex = 450;
+      }
+      // Above the road graph and the solved routes. These are the only things
+      // on the map that are meant to be clicked, so nothing drawn later should
+      // be able to cover them.
+      if (!state.map.getPane('pickNodePane')) {
+        state.map.createPane('pickNodePane').style.zIndex = 460;
       }
 
       state.roadLayer = L.layerGroup().addTo(state.map);
@@ -6369,6 +6380,7 @@
         const isDepot = n.id === state.selectedDepot;
         const isStop = stopSet.has(n.id);
         const marker = L.circleMarker([n.y, n.x], {
+          pane: state.map.getPane('pickNodePane') ? 'pickNodePane' : undefined,
           radius: isDepot ? 8 : isStop ? 6 : 3,
           color: isDepot ? '#EA580C' : isStop ? '#FFFFFF' : '#475569',
           weight: isDepot ? 3 : isStop ? 2 : 0,
@@ -7040,6 +7052,14 @@
       const btn = document.getElementById('btnGenVRP');
       btn.disabled = true; btn.textContent = 'GENERATING…';
       try {
+        // Delivery windows have to fit inside the shift. They used to be fixed
+        // at 60-180 minutes while the horizon next to them was editable, so
+        // typing anything under 180 there produced a 422 from the backend —
+        // a validation error about numbers the user never chose.
+        const horizon = Math.max(1, +document.getElementById('horizon').value || 480);
+        const windowMax = Math.min(180, horizon);
+        const windowMin = Math.min(60, windowMax);
+
         const vrp = await api('/api/vrp/generate', {
           method: 'POST',
           body: JSON.stringify({
@@ -7051,8 +7071,9 @@
             vehicle_capacity: +document.getElementById('capacity').value,
             demand_min: +document.getElementById('demand_min').value,
             demand_max: +document.getElementById('demand_max').value,
-            horizon: +document.getElementById('horizon').value,
-            window_length_min: 60, window_length_max: 180, service_time: 10,
+            horizon: horizon,
+            window_length_min: windowMin, window_length_max: windowMax,
+            service_time: 10,
             seed: +document.getElementById('vrp_seed').value,
             time_dependent: document.getElementById('time_dependent').checked,
             bucket_minutes: +document.getElementById('bucket_minutes').value || 30,
