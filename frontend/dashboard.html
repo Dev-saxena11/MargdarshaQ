@@ -3503,9 +3503,10 @@
               <h2>1. Choose Your Study Area</h2>
               <p class="step-hint">
                 Bareilly is loaded and ready — go straight to step 2 to work on it. To route
-                somewhere else, pan the map anywhere in the world and drag a box around the
-                district. The real road network inside that box is pulled from OpenStreetMap
-                — one-way streets included.
+                somewhere else, drag a box around any district. Inside the dashed purple
+                outline the whole city ships with the app, so the roads appear instantly with
+                no internet; outside it they are pulled live from OpenStreetMap, which can
+                take a minute. One-way streets included either way.
               </p>
 
               <button class="primary" id="btnDrawBoundary" onclick="startBoundaryDraw()">
@@ -3835,6 +3836,8 @@
       planMode: 'manual',    // 'manual' (click them) | 'auto' (system places them)
       bounds: null,          // {north, south, east, west} of the drawn boundary
       boundaryLayer: null,   // rectangle drawn on the map
+      offlineCoverage: [],   // cities whose full road graph ships with the app
+      coverageLayer: null,   // their extents, outlined on the map
       nodeLayer: null,       // clickable node markers
       selectedDepot: null,
       selectedStops: [],
@@ -5914,6 +5917,7 @@
       state.routeLayer = L.layerGroup().addTo(state.map);
 
       attachBoundaryDrawing(state.map);
+      loadOfflineCoverage();
       return state.map;
     }
 
@@ -6016,22 +6020,32 @@
       const btn = document.getElementById('btnLoadArea');
       btn.disabled = true;
       const label = btn.textContent;
-      btn.textContent = 'DOWNLOADING ROADS…';
 
-      // A fixed "this can take a minute" gives no sign of life, and OpenStreetMap
-      // is slow often enough that a still screen reads as a hung one. Counting
-      // up says the wait is real and being waited on, and names the thing the
-      // page is waiting for rather than blaming itself.
+      // Inside a shipped city this is a disk read, not a download. Counting
+      // seconds at someone whose answer arrives in 40ms makes a fast path look
+      // slow, and naming OpenStreetMap would be a lie — nothing leaves the page.
+      const offline = bboxIsOffline(state.bounds);
+      btn.textContent = offline ? 'READING OFFLINE MAP…' : 'DOWNLOADING ROADS…';
+
+      // Outside one, a fixed "this can take a minute" gives no sign of life, and
+      // OpenStreetMap is slow often enough that a still screen reads as a hung
+      // one. Counting up says the wait is real and being waited on, and names
+      // the thing the page is waiting for rather than blaming itself.
       const started = Date.now();
       const area = ((state.bounds.north - state.bounds.south) * 111
         * (state.bounds.east - state.bounds.west) * 111 * Math.cos(state.bounds.north * Math.PI / 180));
-      const tick = setInterval(() => {
-        const secs = Math.round((Date.now() - started) / 1000);
-        setMapPrompt('Fetching roads from OpenStreetMap — ' + secs + 's'
-          + (secs > 20 ? ' · their servers are busy, still trying' : '')
-          + (area > 150 && secs > 8 ? ' · a smaller box would be quicker' : ''));
-      }, 1000);
-      setMapPrompt('Fetching roads from OpenStreetMap — 0s');
+      let tick = null;
+      if (offline) {
+        setMapPrompt('Clipping the roads from the offline map…');
+      } else {
+        tick = setInterval(() => {
+          const secs = Math.round((Date.now() - started) / 1000);
+          setMapPrompt('Fetching roads from OpenStreetMap — ' + secs + 's'
+            + (secs > 20 ? ' · their servers are busy, still trying' : '')
+            + (area > 150 && secs > 8 ? ' · a smaller box would be quicker' : ''));
+        }, 1000);
+        setMapPrompt('Fetching roads from OpenStreetMap — 0s');
+      }
 
       try {
         const net = await api('/api/network/from_osm', {
@@ -6056,7 +6070,8 @@
           '<div class="stat-line"><span>Junctions / streets</span><span>'
           + net.num_nodes + ' / ' + net.num_edges + '</span></div>'
           + '<div class="stat-line"><span>Source</span><span>'
-          + (net.attribution || 'OpenStreetMap') + '</span></div>';
+          + (offline ? 'Offline map — ' + (net.area_label || 'shipped with the app')
+                     : (net.attribution || 'OpenStreetMap')) + '</span></div>';
 
         document.getElementById('emptyHint').style.display = 'none';
         for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
@@ -6161,6 +6176,42 @@
     async function loadDefaultArea() {
       clearBoundary();
       await loadCuratedIntoControlRoom(CONTROL_ROOM_DEFAULT_AREA);
+    }
+
+    // Cities whose whole road graph ships with the app. A box drawn inside one
+    // is clipped from disk in milliseconds; anywhere else goes to Overpass and
+    // can take a minute or more. Drawing the extents makes that difference
+    // visible before someone commits to a box, rather than after.
+    async function loadOfflineCoverage() {
+      let cov;
+      try {
+        cov = (await api('/api/network/offline-coverage')).coverage || [];
+      } catch (e) {
+        return;                       // older backend — the map still works
+      }
+      state.offlineCoverage = cov;
+      if (!state.map || !cov.length) return;
+
+      state.coverageLayer = state.coverageLayer || L.layerGroup().addTo(state.map);
+      state.coverageLayer.clearLayers();
+      for (const c of cov) {
+        const e = c.extent;
+        if (!e) continue;
+        L.rectangle([[e.south, e.west], [e.north, e.east]], {
+          color: '#7C3AED', weight: 1.5, dashArray: '4 5',
+          fill: false, interactive: false,
+        }).bindTooltip('Offline map — drawing here is instant', { sticky: true })
+          .addTo(state.coverageLayer);
+      }
+    }
+
+    function bboxIsOffline(b) {
+      if (!b) return false;
+      return (state.offlineCoverage || []).some(c => {
+        const e = c.extent;
+        return e && b.south >= e.south && b.north <= e.north
+          && b.west >= e.west && b.east <= e.east;
+      });
     }
 
     // ---- Picking the depot and the stops ------------------------------------
