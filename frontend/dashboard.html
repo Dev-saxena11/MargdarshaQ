@@ -2320,6 +2320,59 @@
       border-radius: 2px;
     }
 
+    /* Which colour on the map is which van. Top-right of the map: the prompt
+       owns the top-centre and the playback transport owns the bottom, and an
+       earlier version of this sat under both with no z-index at all, which on
+       a Leaflet map (whose panes carry z-index 400-700) means underneath the
+       roads. */
+    #routeLegend {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 520;
+      max-height: calc(100% - 120px);
+      overflow-y: auto;
+      display: block;
+      margin: 0;
+      background: var(--card-bg);
+      border: 2px solid var(--border-neo);
+      box-shadow: var(--neo-shadow-sm);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    #routeLegend .route-legend-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    #routeLegend span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-main);
+      padding: 2px 0;
+      white-space: nowrap;
+    }
+
+    #routeLegend i {
+      width: 16px;
+      height: 5px;
+      border-radius: 2px;
+      flex: none;
+    }
+
+    #routeLegend .route-legend-sub {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
     /* =========================================================================
      IN-DASHBOARD AI ASSISTANT EXPLAINER — ULTRA GLASSMORPHISM THEME
      ========================================================================= */
@@ -3583,15 +3636,27 @@
 
               <div class="row2" style="margin-top:12px;">
                 <div><label>Vehicle capacity</label><input id="capacity" type="number" value="80"></div>
-                <div><label>Seed</label><input id="vrp_seed" type="number" value="1"></div>
+                <div>
+                  <label>How many vans</label>
+                  <input id="n_vehicles" type="number" min="1" max="60" placeholder="auto">
+                </div>
               </div>
+              <p class="step-hint" style="margin:-2px 0 8px;">
+                Leave vans blank and the fleet is sized from total demand. Set it to see how
+                the same stops are covered with fewer or more vehicles.
+              </p>
               <div class="row2">
                 <div><label>Demand min</label><input id="demand_min" type="number" value="5"></div>
                 <div><label>Demand max</label><input id="demand_max" type="number" value="20"></div>
               </div>
-              <label>Horizon (min)</label>
-              <input id="horizon" type="number" value="480"
-                oninput="if(document.getElementById('time_dependent').checked) renderTrafficProfile();">
+              <div class="row2">
+                <div>
+                  <label>Horizon (min)</label>
+                  <input id="horizon" type="number" value="480"
+                    oninput="if(document.getElementById('time_dependent').checked) renderTrafficProfile();">
+                </div>
+                <div><label>Seed</label><input id="vrp_seed" type="number" value="1"></div>
+              </div>
 
               <div class="chk" style="margin-top:10px;">
                 <input type="checkbox" id="time_dependent" onchange="onTimeDependentToggle()">
@@ -6076,6 +6141,7 @@
         state.selectedStops = [];
         state.baselineSolution = null;
         state.optimizedSolution = null;
+        hideRouteLegend();
 
         document.getElementById('netInfo').innerHTML =
           '<div class="stat-line"><span>Junctions / streets</span><span>'
@@ -6147,6 +6213,7 @@
         state.selectedStops = [];
         state.baselineSolution = null;
         state.optimizedSolution = null;
+        hideRouteLegend();
 
         document.getElementById('netInfo').innerHTML =
           '<div class="stat-line"><span>Junctions / streets</span><span>'
@@ -6337,8 +6404,16 @@
       state.selectedStops = [];
       state.vrp = null;
       if (state.routeLayer) state.routeLayer.clearLayers();
+      hideRouteLegend();
       renderPickableNodes();
       updatePickUI();
+    }
+
+    // The legend names colours that are on the map right now. Once the routes
+    // are gone it is a key to nothing, so it goes with them.
+    function hideRouteLegend() {
+      const el = document.getElementById('routeLegend');
+      if (el) el.hidden = true;
     }
 
     function updatePickUI() {
@@ -7060,10 +7135,17 @@
         const windowMax = Math.min(180, horizon);
         const windowMin = Math.min(60, windowMax);
 
+        // Blank means "size the fleet from total demand", which is what the
+        // backend does when n_vehicles is absent. Sending 0 or null instead
+        // would be a request for a fleet of no vans.
+        const vansRaw = document.getElementById('n_vehicles').value.trim();
+        const vans = vansRaw === '' ? null : Math.max(1, Math.round(+vansRaw));
+
         const vrp = await api('/api/vrp/generate', {
           method: 'POST',
           body: JSON.stringify({
             network_id: state.network.network_id,
+            ...(vans ? { n_vehicles: vans } : {}),
             // The stops are the ones clicked on the map, not a random draw.
             customer_nodes: state.selectedStops,
             n_customers: state.selectedStops.length,
@@ -7430,26 +7512,31 @@
         });
       }
 
-      // legend
-      const legendHtml = routes.map((r, i) =>
-        `<span><i style="background:${ROUTE_COLORS[i % ROUTE_COLORS.length]}"></i><b>Vehicle ${r.vehicle_id}</b> (${r.customer_sequence.length} stops, load ${r.load.toFixed(1)})</span>`
-      ).join('');
+      // Which colour on the map is which van. The solver only returns routes
+      // that carry stops, so the fleet size comes from the instance instead —
+      // worth showing, because asking for eight vans and seeing three used is
+      // the answer to "how many do I actually need?".
+      const fleet = (state.vrp && state.vrp.n_vehicles) || routes.length;
+      const legendHtml =
+        '<div class="route-legend-title">'
+        + (fleet > routes.length ? `Vans used — ${routes.length} of ${fleet}` : 'Vans on this plan')
+        + '</div>'
+        + routes.map((r, i) =>
+          `<span><i style="background:${ROUTE_COLORS[i % ROUTE_COLORS.length]}"></i>`
+          + `<b>Van ${r.vehicle_id}</b>`
+          + `<span class="route-legend-sub">${r.customer_sequence.length} stops · `
+          + `load ${r.load.toFixed(0)}</span></span>`
+        ).join('');
+
       let legendEl = document.getElementById('routeLegend');
       if (!legendEl) {
         legendEl = document.createElement('div');
         legendEl.id = 'routeLegend';
         legendEl.className = 'legend';
-        legendEl.style.position = 'absolute';
-        legendEl.style.bottom = '12px';
-        legendEl.style.left = '12px';
-        legendEl.style.background = '#0E1424';
-        legendEl.style.padding = '8px 14px';
-        legendEl.style.borderRadius = '6px';
-        legendEl.style.border = '2px solid #000';
-        legendEl.style.boxShadow = '3px 3px 0px #000';
         document.getElementById('mapWrap').appendChild(legendEl);
       }
       legendEl.innerHTML = legendHtml;
+      legendEl.hidden = false;
     }
 
     // Update clock in live ticker
