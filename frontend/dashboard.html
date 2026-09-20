@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuantaRoute — Quantum-Inspired Intelligent Traffic Route Optimization Platform</title>
+  <title>MargdarshaQ — Quantum-Inspired Intelligent Traffic Route Optimization Platform</title>
 
   <!-- Modern Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3205,9 +3205,9 @@
     <!-- Header -->
     <header>
       <div class="brand">
-        <div class="mark">Ψ</div>
+        <img src="logo.png?v=5" style="height: 56px; width: auto; object-fit: contain; margin-right: 4px;" />
         <div>
-          <h1>QuantaRoute <span
+          <h1>MargdarshaQ <span
               style="font-size:12px; font-weight:700; color:var(--neo-mint); padding:2px 8px; border-radius:4px; background:rgba(0,245,212,0.12); border:1px solid rgba(0,245,212,0.3); letter-spacing:0.5px; margin-left:6px;">ENTERPRISE</span>
           </h1>
           <small>Quantum-Inspired Multi-Vehicle Traffic Optimization Platform</small>
@@ -4045,6 +4045,7 @@
     <div class="ai-chips-wrap">
       <div class="ai-chips-label">SUGGESTED EXPLAINERS:</div>
       <div class="ai-chips-row" id="aiChipsRow">
+        <button class="ai-chip" onclick="handleChipClick('plan_route', '🚗 Plan a Route')">🚗 Plan a Route</button>
         <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why is QPSO better here?')">⚛️ Why is QPSO better here?</button>
         <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does this chart show?')">📈 What does this chart show?</button>
       </div>
@@ -7790,7 +7791,7 @@
       if (!state.network) return;
       const coords = nodeCoordMap(state);
 
-      if (state.network.is_geo) {
+      if (state.network.is_geo || state.viewMode === 'control') {
         // Routes get their own layer so the picked nodes underneath stay visible
         // and stay clickable.
         state.routeLayer.clearLayers();
@@ -8022,11 +8023,17 @@
       container.scrollTop = container.scrollHeight;
 
       const ctx = buildAssistantContext();
+      if (window.lastServerContext) {
+        ctx.slot_filling_active = window.lastServerContext.slot_filling_active;
+        ctx.collected_params = window.lastServerContext.collected_params;
+        ctx.current_prompt = window.lastServerContext.current_prompt;
+      }
+      
       let replyMd = '';
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         
         const res = await api('/api/assistant/chat', {
           method: 'POST',
@@ -8035,6 +8042,18 @@
         });
         clearTimeout(timeoutId);
         replyMd = res.reply;
+        if (res.context) {
+          window.lastServerContext = res.context;
+        }
+        if (res.map_action) {
+          state.network = res.map_action.network;
+          state.vrp = res.map_action.vrp;
+          state.optimizedSolution = res.map_action.solution;
+          state.viewMode = 'control'; // switch to control room
+          switchView('control');
+          renderControlNetwork();
+          drawRoutes(state.optimizedSolution.routes);
+        }
       } catch (err) {
         console.warn('Backend assistant API unreachable, using resilient offline reasoning engine:', err);
         replyMd = `*⚠️ The AI backend is currently slow or unreachable. Falling back to the offline engine.* \n\n` + 
