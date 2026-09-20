@@ -158,7 +158,7 @@ class OpenRouterProvider(LLMProvider):
                 "Authorization": f"Bearer {self.api_key}",
                 # OpenRouter uses these for attribution on its dashboard.
                 "HTTP-Referer": "https://sih-26137.vercel.app",
-                "X-Title": "QuantaRoute SIH26137",
+                "X-Title": "MargdarshaQ SIH26137",
             },
         )
         if not res:

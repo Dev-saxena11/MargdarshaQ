@@ -4019,7 +4019,7 @@
       <div class="ai-header-left">
         <div class="ai-avatar">Ψ</div>
         <div>
-          <div class="ai-title">QuantaRoute AI Copilot <span class="ai-status-pill">ACTIVE</span></div>
+          <div class="ai-title">MargdarshaQ AI Copilot <span class="ai-status-pill">ACTIVE</span></div>
           <div class="ai-subtitle">Real-time intelligent routing & traffic analytics</div>
         </div>
       </div>
@@ -6516,6 +6516,7 @@
         });
 
         state.network = net;
+        state.controlAreaKey = key;
         state.vrp = null;
         state.selectedDepot = null;
         state.selectedStops = [];
@@ -8023,6 +8024,10 @@
 
       return {
         scenario_name: scenName,
+        // What the user has clicked in the control room. The assistant asks for
+        // a depot and stops by handing over to the map, so these are its answer.
+        selected_depot: (state.selectedDepot === undefined) ? null : state.selectedDepot,
+        selected_stops: (state.selectedStops || []).slice(),
         num_nodes: state.network ? pick(state.network.num_nodes, state.network.nodes && state.network.nodes.length) : null,
         num_customers: state.vrp && state.vrp.customers ? state.vrp.customers.length : null,
         num_vehicles: state.vrp ? pick(state.vrp.n_vehicles) : null,
@@ -8082,6 +8087,28 @@
     function handleChipClick(chipKey, label) {
       appendAssistantMessage('user', label);
       queryAssistant(label, chipKey);
+    }
+
+    // The chips row was fixed HTML, so the follow-ups the assistant offers
+    // mid-conversation ("Done picking", "Yes, plan it", "Cancel") never
+    // appeared and had to be typed instead. It now shows whatever the last
+    // reply suggested, and falls back to the standing explainers.
+    const DEFAULT_AI_CHIPS = [
+      ['plan_route', '🚗 Plan a Route'],
+      ['why_qpso', '⚛️ Why is QPSO better here?'],
+      ['explain_conv', '📈 What does this chart show?'],
+    ];
+
+    function renderAssistantChips(chips) {
+      const row = document.getElementById('aiChipsRow');
+      if (!row) return;
+      const list = (chips && chips.length)
+        ? chips.map(c => ['', c])
+        : DEFAULT_AI_CHIPS;
+      row.innerHTML = list.map(([key, label]) =>
+        `<button class="ai-chip" onclick="handleChipClick(${JSON.stringify(key)},`
+        + ` ${JSON.stringify(label)})">${label}</button>`
+      ).join('');
     }
 
     function sendAssistantMessage() {
@@ -8152,15 +8179,8 @@
         if (res.context) {
           window.lastServerContext = res.context;
         }
-        if (res.map_action) {
-          state.network = res.map_action.network;
-          state.vrp = res.map_action.vrp;
-          state.optimizedSolution = res.map_action.solution;
-          state.viewMode = 'control'; // switch to control room
-          switchView('control');
-          renderControlNetwork();
-          drawRoutes(state.optimizedSolution.routes);
-        }
+        renderAssistantChips(res.suggested_chips);
+        if (res.map_action) await applyAssistantMapAction(res.map_action);
       } catch (err) {
         console.warn('Backend assistant API unreachable, using resilient offline reasoning engine:', err);
         replyMd = `*⚠️ The AI backend is currently slow or unreachable. Falling back to the offline engine.* \n\n` + 
@@ -8171,6 +8191,35 @@
       }
 
       appendAssistantMessage('assistant', renderAssistantMarkdown(replyMd));
+    }
+
+    // The assistant drives the map in two ways: it hands over so the user can
+    // click a depot and stops, or it delivers a finished plan to draw.
+    async function applyAssistantMapAction(action) {
+      switchView('control');
+      await new Promise(r => setTimeout(r, 80));   // let the map get its size
+
+      if (action.kind === 'open_picker') {
+        // Load the area the assistant is planning on, unless it is already up.
+        const want = action.network_name || CONTROL_ROOM_DEFAULT_AREA;
+        if (!state.network || state.controlAreaKey !== want) {
+          await loadCuratedIntoControlRoom(want);
+        }
+        setPlanMode('manual');
+        setPickMode(state.selectedDepot === null ? 'depot' : 'stops');
+        setMapPrompt('The assistant is waiting — click the <b>depot</b>, then each '
+          + '<b>stop</b>, then tell it <b>done</b>.');
+        return;
+      }
+
+      if (action.network) state.network = action.network;
+      if (action.vrp) state.vrp = action.vrp;
+      if (action.solution) {
+        state.optimizedSolution = action.solution;
+        state.baselineSolution = null;
+      }
+      renderControlNetwork();
+      if (state.optimizedSolution) drawRoutes(state.optimizedSolution.routes);
     }
 
     function renderAssistantMarkdown(md) {
@@ -8367,7 +8416,7 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
 
       const ctx = buildAssistantContext();
       const welcomeHtml = `
-    <h3>👋 QuantaRoute AI Copilot Active</h3>
+    <h3>👋 MargdarshaQ AI Copilot Active</h3>
     <p>I am your embedded AI routing assistant. I provide instant, context-aware traffic intelligence, analyzing multi-vehicle dispatch routes, quantum tunneling mechanisms, and bottleneck avoidance metrics in real time.</p>
     <p><b>Active Context:</b> <code>${ctx.scenario_name}</code>${ctx.delay_saved_pct != null
           ? ` (measured <b>-${ctx.delay_saved_pct.toFixed(1)}% delay reduction</b> vs ${ctx.baseline_algo || 'baseline'}).`

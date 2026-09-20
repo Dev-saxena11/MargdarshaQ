@@ -312,6 +312,11 @@ class AssistantContext(BaseModel):
     slot_filling_active: bool = Field(False, description="True if a multi-turn parameter collection is in progress")
     collected_params: Dict[str, Any] = Field(default_factory=dict, description="VRP configuration parameters collected so far")
     current_prompt: Optional[str] = Field(None, description="The specific parameter currently being asked for")
+    # What the user has actually clicked on the map. The assistant asks for the
+    # depot and the stops by handing over to the map rather than by asking for
+    # node ids, which nobody outside this codebase knows.
+    selected_depot: Optional[int] = Field(None, description="Depot node the user clicked on the map")
+    selected_stops: List[int] = Field(default_factory=list, description="Stop nodes the user clicked on the map")
 
 
 class AssistantChatRequest(BaseModel):

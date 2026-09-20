@@ -1,7 +1,7 @@
 """
 assistant.py
 ------------
-In-dashboard AI Assistant Explainer for QuantaRoute Intelligent Traffic Platform.
+In-dashboard AI Assistant Explainer for MargdarshaQ Intelligent Traffic Platform.
 
 Provides context-grounded natural language explanations for:
   1. Solve and benchmark results (time saved, delay avoided, fuel cut, SLA).
@@ -28,7 +28,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Dict, Any, Optional
+import time
+from typing import Dict, Any, List, Optional
 
 from app.models.schemas import (
     AssistantContext,
@@ -50,6 +51,13 @@ SUGGESTED_CHIPS = [
     "🎯 Are time windows respected?",
     "🚗 Plan a Route",
 ]
+
+# The MVP plans on one city. Conversational planning used to build a synthetic
+# graph of its own, so the route it produced was on streets that existed
+# nowhere else in the app — not the map the user had been looking at. It now
+# plans on the shipped Bareilly network, the same one the control room opens.
+MVP_NETWORK = "bareilly"
+MVP_AREA_LABEL = "Bareilly City, Uttar Pradesh"
 
 # Shown instead of performance numbers whenever no comparison run has been
 # executed yet. The assistant must never invent metrics — a plausible-looking
@@ -148,199 +156,273 @@ class AIAssistantExplainer:
         )
 
     def _handle_slot_filling(self, msg: str, ctx: AssistantContext) -> AssistantChatResponse:
-        # Define the parameters we need to collect
-        params = [
-            {"key": "horizon", "prompt": "How much time do you want this delivery plan completed in? (in minutes, e.g. 480 for 8 hours)", "type": "int"},
-            {"key": "n_vehicles", "prompt": "How many vehicles do you have available?", "type": "int"},
-            {"key": "n_customers", "prompt": "How many stops/customers does this route need to cover?", "type": "int"},
-            {"key": "depot", "prompt": "Where is the depot/starting point? (node id, typically 0)", "type": "int"},
-        ]
+        """
+        Conversational route planning for someone who does not know what a node
+        id is.
+
+        Two things it deliberately does not do. It does not ask for a depot or a
+        stop by number — it hands over to the map and waits, because "which
+        junction is node 4731" is not a question a dispatcher can answer. And it
+        does not invent a road network: the plan is built on the Bareilly map
+        that ships with the app, so the route the user is shown is on the same
+        streets as everything else on screen.
+        """
+        text = (msg or "").strip()
+        low = text.lower()
+
+        if low in {"cancel", "stop", "quit", "nevermind", "never mind"}:
+            return self._slot_cancel(ctx)
 
         if not ctx.slot_filling_active:
             ctx.slot_filling_active = True
             ctx.collected_params = {}
-            ctx.current_prompt = params[0]["key"]
+            ctx.current_prompt = "horizon"
             return AssistantChatResponse(
-                reply=f"Sure, let's plan a route! {params[0]['prompt']}",
-                suggested_chips=["Cancel"],
-                context=ctx
+                reply=(
+                    f"Let's plan a delivery round on **{MVP_AREA_LABEL}**.\n\n"
+                    "First: **how long is the shift**, in minutes? "
+                    "(8 hours is 480.)"
+                ),
+                suggested_chips=["480 minutes", "Cancel"],
+                context=ctx,
             )
 
-        if msg.lower() in ["cancel", "stop", "quit"]:
-            ctx.slot_filling_active = False
-            ctx.collected_params = {}
-            ctx.current_prompt = None
+        step = ctx.current_prompt
+
+        if step == "horizon":
+            value = self._extract_int(text, "horizon")
+            if value is None or value < 1:
+                return self._slot_retry(ctx, "How long is the shift, in minutes? (8 hours is 480.)",
+                                        ["480 minutes", "Cancel"])
+            ctx.collected_params["horizon"] = value
+            ctx.current_prompt = "n_vehicles"
             return AssistantChatResponse(
-                reply="Route planning cancelled. Let me know if you need anything else.",
-                suggested_chips=SUGGESTED_CHIPS,
-                context=ctx
+                reply=f"{value} minutes. **How many vans** do you have available?",
+                suggested_chips=["3 vans", "Cancel"],
+                context=ctx,
             )
 
-        provider = get_provider()
-        
-        # Check if the user is trying to correct a parameter (e.g., "change vehicles to 5")
-        if "change" in msg or "update" in msg:
-            k = None
-            if "vehicle" in msg:
-                k = "n_vehicles"
-            elif "customer" in msg or "stop" in msg:
-                k = "n_customers"
-            elif "time" in msg or "budget" in msg or "horizon" in msg:
-                k = "horizon"
-            elif "depot" in msg or "start" in msg:
-                k = "depot"
-            
-            matches = re.findall(r'\d+', msg)
-            if k and matches:
-                ctx.collected_params[k] = int(matches[0])
-                ctx.current_prompt = None
-                return AssistantChatResponse(
-                    reply=f"Updated {k} to {ctx.collected_params[k]}. Let's continue.",
-                    suggested_chips=["Cancel"],
-                    context=ctx
-                )
+        if step == "n_vehicles":
+            value = self._extract_int(text, "n_vehicles")
+            if value is None or value < 1:
+                return self._slot_retry(ctx, "How many vans do you have available?",
+                                        ["3 vans", "Cancel"])
+            ctx.collected_params["n_vehicles"] = value
+            ctx.current_prompt = "await_map"
+            return self._slot_ask_for_map(ctx, first_time=True)
 
-        if ctx.current_prompt == "confirm":
-            if "yes" in msg or "yep" in msg or "sure" in msg or "ok" in msg:
-                ctx.current_prompt = "solve"
-            elif "no" in msg or "wait" in msg:
-                return AssistantChatResponse(
-                    reply="Okay, which parameter would you like to change? (e.g., 'change vehicles to 5')",
-                    suggested_chips=["Cancel"],
-                    context=ctx
-                )
-            else:
-                return AssistantChatResponse(
-                    reply="Please reply with 'yes' to proceed or tell me what to change.",
-                    suggested_chips=["Yes, proceed", "Cancel"],
-                    context=ctx
-                )
-        elif ctx.current_prompt:
-            # Extract the value from msg using LLM
-            extracted_val = None
-            if provider:
-                sys_prompt = (
-                    f"Extract the integer value for the parameter '{ctx.current_prompt}' from the user's message. "
-                    "Return ONLY the integer number. If it cannot be found, return 'None'."
-                )
-                raw_val = provider.complete(system_prompt=sys_prompt, user_prompt=msg, max_tokens=10)
-                if raw_val:
-                    try:
-                        extracted_val = int(re.search(r'\d+', raw_val).group())
-                    except Exception:
-                        pass
-            
-            # Fallback to simple regex if LLM fails or is absent
-            if extracted_val is None:
-                matches = re.findall(r'\d+', msg)
-                if matches:
-                    extracted_val = int(matches[0])
-
-            if extracted_val is not None:
-                ctx.collected_params[ctx.current_prompt] = extracted_val
-                ctx.current_prompt = None
-            else:
-                # Could not extract, ask again
-                current_p = next((p for p in params if p["key"] == ctx.current_prompt), params[0])
-                return AssistantChatResponse(
-                    reply=f"I didn't catch that. {current_p['prompt']}",
-                    suggested_chips=["Cancel"],
-                    context=ctx
-                )
-
-        # Determine next missing parameter
-        for p in params:
-            if p["key"] not in ctx.collected_params:
-                ctx.current_prompt = p["key"]
-                return AssistantChatResponse(
-                    reply=f"Got it. Next: {p['prompt']}",
-                    suggested_chips=["Cancel"],
-                    context=ctx
-                )
-
-        if ctx.current_prompt != "solve":
+        if step == "await_map":
+            depot = ctx.selected_depot
+            stops = list(ctx.selected_stops or [])
+            if depot is None or not stops:
+                return self._slot_ask_for_map(ctx, first_time=False)
+            ctx.collected_params["depot"] = depot
+            ctx.collected_params["stops"] = stops
             ctx.current_prompt = "confirm"
-            confirm_msg = (
-                "Great! I have all the details needed:\n"
-                f"- **Time Budget:** {ctx.collected_params.get('horizon')} mins\n"
-                f"- **Available Vehicles:** {ctx.collected_params.get('n_vehicles')}\n"
-                f"- **Customers/Stops:** {ctx.collected_params.get('n_customers')}\n"
-                f"- **Depot Node:** {ctx.collected_params.get('depot')}\n\n"
-                "Should I go ahead and generate the route plan? (Reply 'yes' to proceed or tell me what to change)"
-            )
             return AssistantChatResponse(
-                reply=confirm_msg,
-                suggested_chips=["Yes, proceed", "Cancel"],
-                context=ctx
+                reply=(
+                    "Here is the round I will plan:\n\n"
+                    f"- **Area:** {MVP_AREA_LABEL}\n"
+                    f"- **Shift:** {ctx.collected_params['horizon']} minutes\n"
+                    f"- **Vans available:** {ctx.collected_params['n_vehicles']}\n"
+                    f"- **Stops you picked:** {len(stops)}\n\n"
+                    "Shall I plan it?"
+                ),
+                suggested_chips=["Yes, plan it", "Change the stops", "Cancel"],
+                context=ctx,
             )
 
-        # All parameters collected and confirmed, generate and solve
-        try:
-            # Generate VRP
-            network_id = "synthetic_1" # Default network id or fetch from existing active context if any
-            # Note: A real app would get the active network ID from the frontend or context
-            # Let's generate a quick synthetic graph if one doesn't exist
-            from app.core.graph_model import generate_synthetic_city_graph
-            n_customers = ctx.collected_params.get("n_customers", 10)
-            net = generate_synthetic_city_graph(n_nodes=max(30, n_customers + 10))
-            network_id = store.put_network(net, is_geo=False)
+        if step == "confirm":
+            if "stop" in low or "map" in low or "pick" in low:
+                ctx.current_prompt = "await_map"
+                return self._slot_ask_for_map(ctx, first_time=False)
+            changed = self._apply_correction(low, ctx)
+            if changed:
+                return AssistantChatResponse(
+                    reply=f"Updated — {changed}. Shall I plan it now?",
+                    suggested_chips=["Yes, plan it", "Cancel"],
+                    context=ctx,
+                )
+            if not any(w in low for w in ("yes", "yep", "yeah", "ok", "okay", "sure", "plan", "go", "proceed")):
+                return AssistantChatResponse(
+                    reply="Reply **yes** to plan it, or tell me what to change "
+                          "(for example \"change vans to 5\" or \"change the stops\").",
+                    suggested_chips=["Yes, plan it", "Change the stops", "Cancel"],
+                    context=ctx,
+                )
+            return self._slot_solve(ctx)
 
+        # Unknown state — start again rather than stall in it.
+        return self._slot_cancel(ctx)
+
+    # ---- slot-filling helpers ---------------------------------------------
+
+    def _slot_cancel(self, ctx: AssistantContext) -> AssistantChatResponse:
+        ctx.slot_filling_active = False
+        ctx.collected_params = {}
+        ctx.current_prompt = None
+        return AssistantChatResponse(
+            reply="Route planning cancelled. Ask me anything else whenever you like.",
+            suggested_chips=SUGGESTED_CHIPS,
+            context=ctx,
+        )
+
+    def _slot_retry(self, ctx: AssistantContext, prompt: str,
+                    chips: List[str]) -> AssistantChatResponse:
+        return AssistantChatResponse(
+            reply=f"Sorry, I didn't catch a number there. {prompt}",
+            suggested_chips=chips,
+            context=ctx,
+        )
+
+    def _slot_ask_for_map(self, ctx: AssistantContext, first_time: bool) -> AssistantChatResponse:
+        """
+        Hands over to the map and waits. `open_picker` tells the frontend to
+        show the Bareilly network in the control room with stop-picking on; the
+        user's clicks come back on the next turn as selected_depot/selected_stops.
+        """
+        reply = (
+            "Now show me the round on the map.\n\n"
+            "1. Click the **depot** — where the vans start and finish.\n"
+            "2. Click every **stop** they have to serve.\n"
+            "3. Come back and say **done**.\n\n"
+            "I'll wait."
+        ) if first_time else (
+            "I don't have a depot and at least one stop yet.\n\n"
+            "On the map: click the **depot** first, then each **stop**, "
+            "then say **done**."
+        )
+        return AssistantChatResponse(
+            reply=reply,
+            suggested_chips=["Done picking", "Cancel"],
+            context=ctx,
+            map_action={"kind": "open_picker", "network_name": MVP_NETWORK},
+        )
+
+    def _apply_correction(self, low: str, ctx: AssistantContext) -> Optional[str]:
+        """'change vans to 5' -> updates the slot. Returns what changed, or None."""
+        if not any(w in low for w in ("change", "update", "make it", "set")):
+            return None
+        numbers = re.findall(r"\d+", low)
+        if not numbers:
+            return None
+        value = int(numbers[-1])
+        if any(w in low for w in ("van", "vehicle", "truck")):
+            ctx.collected_params["n_vehicles"] = value
+            return f"{value} vans"
+        if any(w in low for w in ("shift", "time", "minute", "horizon", "hour")):
+            ctx.collected_params["horizon"] = value
+            return f"a {value} minute shift"
+        return None
+
+    def _extract_int(self, text: str, field: str) -> Optional[int]:
+        """
+        Plain digits first. An LLM call per numeric answer is a round trip and a
+        bill for something a regex already does, so the provider is only asked
+        when the regex finds nothing ("four vans").
+        """
+        match = re.search(r"\d+", text or "")
+        if match:
+            try:
+                return int(match.group())
+            except ValueError:
+                pass
+        provider = get_provider()
+        if not provider:
+            return None
+        try:
+            raw = provider.complete(
+                system_prompt=(
+                    f"Extract the integer value for '{field}' from the message. "
+                    "Reply with digits only, or None."
+                ),
+                user_prompt=text, max_tokens=8,
+            )
+            found = re.search(r"\d+", raw or "")
+            return int(found.group()) if found else None
+        except Exception:
+            return None
+
+    def _slot_solve(self, ctx: AssistantContext) -> AssistantChatResponse:
+        """Builds and solves the round on the shipped Bareilly network."""
+        try:
+            from app.api.routes import _build_solve_response, _network_payload
+            from app.core.cached_network import load_cached_network
+
+            horizon = float(ctx.collected_params["horizon"])
+            stops = list(ctx.collected_params["stops"])
+            depot = int(ctx.collected_params["depot"])
+            vans = int(ctx.collected_params["n_vehicles"])
+
+            net = load_cached_network(MVP_NETWORK, congestion_seed=42)
+            network_id = store.put_network(net, is_geo=True)
+
+            # Delivery windows cannot outlast the shift they sit in; the API
+            # rejects the instance outright if they do.
+            window_max = min(180.0, horizon)
             problem = generate_synthetic_vrp(
                 net=net,
-                n_customers=ctx.collected_params["n_customers"],
-                depot=ctx.collected_params["depot"],
-                vehicle_capacity=100.0,
-                n_vehicles=ctx.collected_params["n_vehicles"],
+                n_customers=len(stops),
+                customer_nodes=stops,
+                depot=depot,
+                vehicle_capacity=80.0,
+                n_vehicles=vans,
                 demand_range=(5.0, 20.0),
-                horizon=ctx.collected_params["horizon"],
-                window_length_range=(60.0, 180.0),
+                horizon=horizon,
+                window_length_range=(min(60.0, window_max), window_max),
                 service_time=10.0,
                 seed=42,
-                time_dependent=False,
-                bucket_minutes=30.0,
             )
             vrp_id = store.put_vrp(network_id, problem)
 
-            # Solve VRP with slightly faster settings for the chatbot response
-            opt = QPSOVRPOptimizer(problem, n_particles=20, max_iter=30, seed=42, use_local_search=True)
+            started = time.perf_counter()
+            opt = QPSOVRPOptimizer(problem, n_particles=30, max_iter=60,
+                                   seed=42, use_local_search=True)
             result = opt.optimize()
+            runtime_ms = (time.perf_counter() - started) * 1000
+            best = result.best_solution
 
             ctx.slot_filling_active = False
             ctx.current_prompt = None
             ctx.collected_params = {}
-            ctx.optimized_time = round(result.best_solution.total_time, 2)
-            ctx.optimized_dist = round(result.best_solution.total_distance, 2)
-            ctx.num_vehicles = len([r for r in result.best_solution.routes if r])
-            
-            reply = (
-                f"✅ **Route Planned Successfully!**\n\n"
-                f"I've generated and solved the route plan based on your requirements.\n"
-                f"- **Total Time:** {ctx.optimized_time} min\n"
-                f"- **Total Distance:** {ctx.optimized_dist} km\n"
-                f"- **Vehicles Used:** {ctx.num_vehicles} out of {problem.n_vehicles}\n\n"
-                "The Engineer's Control Room and map have been automatically updated."
+            ctx.optimized_time = round(best.total_time, 2)
+            ctx.optimized_dist = round(best.total_distance, 2)
+            used = len([r for r in best.routes if r])
+            ctx.num_vehicles = used
+
+            solution = _build_solve_response(
+                problem, best, result.convergence_curve,
+                result.n_evaluations, "QPSO", runtime_ms,
             )
-            from app.api.routes import _network_payload, _build_solve_response
             nodes, edges = _network_payload(net)
-            
-            sol_response = _build_solve_response(
-                problem, result.best_solution, result.convergence_curve, 
-                result.n_evaluations, "QPSO", 100.0
+
+            late = "" if best.feasible else (
+                "\n\n⚠️ Not every stop can be reached inside its delivery window "
+                "with this shift and fleet — try a longer shift or another van."
             )
-            
+            reply = (
+                "✅ **Planned.**\n\n"
+                f"- **Stops:** {len(stops)}\n"
+                f"- **Vans used:** {used} of {vans}\n"
+                f"- **Total time:** {ctx.optimized_time} min\n"
+                f"- **Total distance:** {ctx.optimized_dist} km\n\n"
+                "The routes are on the map in the control room." + late
+            )
+
             return AssistantChatResponse(
                 reply=reply,
                 suggested_chips=SUGGESTED_CHIPS,
                 context=ctx,
                 map_action={
+                    "kind": "solution",
                     "network": {
                         "network_id": network_id,
                         "num_nodes": net.num_nodes(),
                         "num_edges": len(edges),
-                        "is_geo": False,
+                        "is_geo": True,
                         "nodes": [n.model_dump() for n in nodes],
                         "edges": [e.model_dump() for e in edges],
-                        "area_label": "Synthetic City"
+                        "area_label": MVP_AREA_LABEL,
                     },
                     "vrp": {
                         "vrp_id": vrp_id,
@@ -348,19 +430,27 @@ class AIAssistantExplainer:
                         "depot": problem.depot,
                         "n_vehicles": problem.n_vehicles,
                         "vehicle_capacity": problem.vehicle_capacity,
-                        "customers": [{"node_id": c.node_id, "demand": c.demand, "ready_time": c.ready_time, "due_time": c.due_time, "service_time": c.service_time} for c in problem.customers],
-                        "time_dependent": problem.time_dependent
+                        "total_demand": sum(c.demand for c in problem.customers),
+                        "customers": [
+                            {
+                                "node_id": c.node_id, "demand": c.demand,
+                                "ready_time": c.ready_time, "due_time": c.due_time,
+                                "service_time": c.service_time,
+                            } for c in problem.customers
+                        ],
                     },
-                    "solution": sol_response.model_dump()
-                }
+                    "solution": solution.model_dump(),
+                },
             )
         except Exception as e:
-            logger.error(f"Slot filling solve error: {e}")
+            logger.exception("Conversational route planning failed")
             ctx.slot_filling_active = False
+            ctx.current_prompt = None
+            ctx.collected_params = {}
             return AssistantChatResponse(
-                reply=f"Oops, something went wrong while generating the route: {e}",
+                reply=f"I couldn't plan that round: {e}",
                 suggested_chips=SUGGESTED_CHIPS,
-                context=ctx
+                context=ctx,
             )
 
     def _get_or_create_story_card(self, ctx: AssistantContext) -> str:
@@ -694,7 +784,7 @@ class AIAssistantExplainer:
 
         if not _has_comparison_results(ctx):
             return (
-                f"### 💡 QuantaRoute AI Copilot\n\n"
+                f"### 💡 MargdarshaQ AI Copilot\n\n"
                 f"No optimization run has been executed yet, so I have no measured results "
                 f"to summarise for **{scenario}**.\n\n"
                 f"Run a **Solve** or **Compare** to get grounded numbers, or ask me about "
@@ -709,7 +799,7 @@ class AIAssistantExplainer:
             else "- **Feasibility**: not reported for this run.\n"
         )
         return (
-            f"### 💡 QuantaRoute AI Copilot — {scenario}\n\n"
+            f"### 💡 MargdarshaQ AI Copilot — {scenario}\n\n"
             f"Active monitoring for **{scenario}**:\n"
             f"- **Performance**: **{_fmt(ctx.time_saved_pct, '%')}** time reduction and "
             f"**{_fmt(ctx.delay_saved_pct, '%')}** of congestion delay avoided versus "
@@ -747,7 +837,7 @@ class AIAssistantExplainer:
             logger.debug("RAG passage retrieval failed in _call_external_llm: %s", e)
 
         system_parts = [
-            "You are QuantaRoute AI Copilot, an assistant for a quantum-inspired "
+            "You are MargdarshaQ AI Copilot, an assistant for a quantum-inspired "
             "(QPSO) traffic route optimization platform.",
             f"SESSION CONTEXT: {story_card}",
         ]

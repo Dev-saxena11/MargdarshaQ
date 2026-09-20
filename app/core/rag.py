@@ -1,7 +1,7 @@
 """
 rag.py
 ------
-Self-contained Retrieval-Augmented Generation (RAG) engine for QuantaRoute.
+Self-contained Retrieval-Augmented Generation (RAG) engine for MargdarshaQ.
 
 Grounds the chatbot / AI assistant in the project's authoritative documentation:
   - README.md
@@ -361,7 +361,7 @@ class RAGKnowledgeEngine:
             return ChatResponse(
                 reply=(
                     "I don't have relevant information on that topic in the project documentation. "
-                    "I am specialized in the QuantaRoute platform: the QPSO algorithm, CVRPTW formulation, "
+                    "I am specialized in the MargdarshaQ platform: the QPSO algorithm, CVRPTW formulation, "
                     "dynamic traffic rerouting, benchmark results, and system architecture."
                 ),
                 sources=[],
@@ -445,7 +445,7 @@ class RAGKnowledgeEngine:
                 )
 
         system_parts = [
-            "You are QuantaRoute AI Copilot, a technical assistant for a quantum-inspired (QPSO) "
+            "You are MargdarshaQ AI Copilot, a technical assistant for a quantum-inspired (QPSO) "
             "traffic route optimization platform presented to hackathon judges.",
             "PROJECT DOCUMENTATION RETRIEVAL CONTEXT:\n" + retrieved_context,
             session_note,
@@ -490,7 +490,7 @@ class RAGKnowledgeEngine:
         if any(w in q_lower for w in ["quantum hardware", "real quantum", "hardware"]):
             return (
                 f"{header}"
-                "QuantaRoute utilizes a **quantum-inspired** metaheuristic (QPSO) running on classical hardware, "
+                "MargdarshaQ utilizes a **quantum-inspired** metaheuristic (QPSO) running on classical hardware, "
                 "not execution on physical quantum processors (QPU).\n\n"
                 "- **Algorithm**: Quantum-Behaved Particle Swarm Optimization (QPSO) simulates quantum tunneling "
                 "via a delta-potential-well wave-function update rule on classical CPUs.\n"

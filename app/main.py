@@ -1,7 +1,7 @@
 """
 main.py
 --------
-FastAPI application entrypoint for QuantaRoute ENTERPRISE: Quantum-Inspired Intelligent
+FastAPI application entrypoint for MargdarshaQ ENTERPRISE: Quantum-Inspired Intelligent
 Traffic Route Optimization.
 
 Run with:
@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router
 
 app = FastAPI(
-    title="QuantaRoute ENTERPRISE - Quantum-Inspired Traffic Route Optimization",
+    title="MargdarshaQ ENTERPRISE - Quantum-Inspired Traffic Route Optimization",
     description=(
         "Quantum-inspired metaheuristic (QPSO) framework for solving "
         "large-scale Vehicle Routing Problems (VRP) under traffic congestion, "
@@ -90,7 +90,7 @@ async def validation_exception_handler(request, exc):
 @app.get("/")
 def root():
     return {
-        "project": "QuantaRoute ENTERPRISE",
+        "project": "MargdarshaQ ENTERPRISE",
         "status": "running",
         "docs": "/docs",
     }
