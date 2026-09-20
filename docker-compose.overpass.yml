@@ -1,0 +1,108 @@
+# Local Overpass API instance
+# ===========================
+# Why: the public Overpass endpoints (overpass-api.de and friends) are shared and
+# rate-limited by IP. Measured against this project, the same bounding box came
+# back in 44s, then 169s, then as a plain 502 — all within one hour. That is an
+# unacceptable dependency for a live judged demo. A local instance answers the
+# same query in well under a second and nobody else's traffic counts against it.
+#
+# Usage
+# -----
+#   1. Pick an extract and put it in .env  (see OSM_EXTRACT_URL below)
+#   2. docker compose -f docker-compose.overpass.yml up -d
+#   3. Watch the import:  docker compose -f docker-compose.overpass.yml logs -f
+#   4. When it is serving: python scripts/check_overpass.py
+#   5. Set OVERPASS_URL=http://localhost:12345/api/interpreter in .env
+#
+# The first start downloads the extract and builds the database. This takes
+# minutes for a city extract and a couple of hours for India-wide. Do it the day
+# before the event, not on the morning of it. Subsequent starts are instant —
+# the built database lives in the named volume below.
+#
+# NOTE: the OVERPASS_* variable names below follow the wiktorn/overpass-api
+# image's documented contract. If the image has changed them, `docker compose
+# logs` will say so within the first minute — which is exactly why step 3 above
+# is to watch the log, and why you should do a throwaway run with a small city
+# extract before committing to a multi-hour country import.
+
+services:
+  overpass:
+    image: wiktorn/overpass-api:latest
+    container_name: sih26137-overpass
+    restart: unless-stopped
+    ports:
+      # Host 12345 -> container 80. The app then talks to
+      # http://localhost:12345/api/interpreter
+      - "${OVERPASS_PORT:-12345}:80"
+    environment:
+      # init = download the extract and build the database from scratch.
+      # After a successful build this is ignored; the volume already holds a db.
+      OVERPASS_MODE: init
+
+      # The regional extract to import. Set OSM_EXTRACT_URL in .env — see the
+      # size/time table in DEPLOYMENT.md before choosing. Defaults to the zone
+      # containing Bareilly, which is the district the control room opens on.
+      #
+      # Geofabrik's India zones are not the compass directions they sound like:
+      # Bareilly is in Uttar Pradesh, which sits in central-zone, NOT
+      # northern-zone. Importing the wrong zone is near-invisible — a box outside
+      # the extract returns zero elements, which falls back to the public API
+      # silently, which is the exact failure this whole file exists to prevent.
+      # Verify with the .poly boundary before trusting a zone name.
+      OVERPASS_PLANET_URL: ${OSM_EXTRACT_URL:-https://download.geofabrik.de/asia/india/central-zone-latest.osm.pbf}
+
+      # The image expects a .osm.bz2 planet file and downloads whatever URL it
+      # is given to that name. Geofabrik serves .osm.pbf, which is several times
+      # smaller and faster to transfer, so it is converted in place before the
+      # import reads it. Dropping this line with a .pbf URL is the single most
+      # likely way to waste an evening.
+      OVERPASS_PLANET_PREPROCESS: 'mv /db/planet.osm.bz2 /db/planet.osm.pbf && osmium cat -o /db/planet.osm.bz2 /db/planet.osm.pbf && rm /db/planet.osm.pbf'
+
+      # No attic/metadata. This project only ever asks for current highway
+      # geometry and tags, and metadata roughly doubles both the import time and
+      # the disk footprint for data we never read.
+      OVERPASS_META: "no"
+
+      # Areas are used by Overpass's area/geocoding features. This project sends
+      # bounding boxes only (see build_query in app/core/overpass_network.py),
+      # and area generation is a long extra pass, so it stays off.
+      OVERPASS_USE_AREAS: "false"
+
+      # Parallelism for the rules load step. Raise on a machine with more cores
+      # and RAM to spare; lower it if the import gets OOM-killed.
+      OVERPASS_RULES_LOAD: "10"
+
+      # Keep serving after the import finishes rather than exiting.
+      OVERPASS_STOP_AFTER_INIT: "false"
+
+      # Ceiling on a single query, in seconds. The app asks for [timeout:120]
+      # (see fetch_overpass), so this must be at least that or large boxes get
+      # refused by the server rather than answered slowly.
+      OVERPASS_MAX_TIMEOUT: "300"
+    volumes:
+      # The built database. Named rather than a bind mount so it survives
+      # `docker compose down` — losing this means repeating the whole import.
+      - overpass_db:/db
+    post_start:
+      # The image creates /db as 0700 owned by `overpass`, but serves queries
+      # through fcgiwrap running as `nginx` (see supervisord.conf). nginx cannot
+      # traverse into 0700 to reach the dispatcher socket at
+      # /db/db/osm3s_osm_base, so every query comes back as the XML error
+      # "runtime error: open64: 13 Permission denied". The container still
+      # answers on port 80 and nginx still logs 200s, so this looks healthy from
+      # outside while serving nothing usable. o+x makes the directory traversable
+      # without granting read access to its contents.
+      - command: ["chmod", "o+x", "/db"]
+        user: root
+    healthcheck:
+      # A trivial query that exercises the actual interpreter endpoint, so the
+      # container is only "healthy" once it can really answer, not merely once
+      # the web server is listening. start_period covers the long import.
+      test: ["CMD-SHELL", "wget -q -O- 'http://localhost/api/interpreter?data=[out:json];out count;' | grep -q count || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 3h
+
+volumes:
+  overpass_db:

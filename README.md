@@ -141,6 +141,27 @@ it there and re-run, and the dashboard, the report and the tests all follow.
 Figures are signed: where the optimiser drives further to arrive sooner, the
 report says so rather than showing a zero.
 
+## Fast OSM lookups for a live demo
+
+Drawing a boundary on the map queries the public Overpass API, which is shared
+and rate-limited by IP — the same box measured 44s, then 169s, then a plain 502
+inside one hour. For anything judged, run Overpass locally instead:
+
+```bash
+docker compose -f docker-compose.overpass.yml up -d     # first run imports; slow
+python scripts/check_overpass.py --compare              # confirm it's being used
+```
+
+Then set `OVERPASS_URL=http://localhost:12345/api/interpreter` in `.env` and the
+same query returns in under a second. Leaving the variable unset keeps the
+previous public-mirror behaviour, and a local instance that isn't running falls
+back to it automatically rather than failing.
+
+The import needs 8–16 GB RAM, up to 30 GB of disk, and anywhere from minutes to
+two hours depending on how much of India you pull — **run it the day before the
+event, not the morning of it.** Full runbook, extract-size tradeoffs and
+hardware notes: [DEPLOYMENT.md](DEPLOYMENT.md#running-a-local-overpass-instance-for-live-demos).
+
 ## Deploying
 
 Backend and frontend deploy to **different platforms** (Render for the backend,
@@ -177,15 +198,20 @@ sih26137/
 │   │   ├── benchmark.py              # Benchmarking suite (shortest-path)
 │   │   ├── benchmark_vrp.py          # Benchmarking suite (VRP) — convergence, scalability, robustness
 │   │   ├── osm_network.py            # Real OpenStreetMap network loader (osmnx)
+│   │   ├── overpass_network.py       # Direct Overpass loader for drawn boundaries (local instance or public mirrors)
 │   │   └── store.py                  # In-memory store for API state (network_id/vrp_id -> objects)
 │   ├── models/
 │   │   └── schemas.py                # Pydantic request/response models
 │   ├── api/
 │   │   └── routes.py                 # FastAPI endpoints
 │   └── main.py                       # FastAPI app entrypoint
+├── scripts/
+│   ├── build_osm_cache.py            # Pre-download a city network to data/networks/
+│   └── check_overpass.py             # Preflight: which Overpass endpoint will the demo use?
 ├── frontend/
 │   └── dashboard.html                # Standalone visualization dashboard (map + charts + controls)
 ├── data/                             # Generated plots land here
+├── docker-compose.overpass.yml       # Local Overpass instance, for fast/reliable demo lookups
 ├── requirements.txt
 └── README.md
 ```

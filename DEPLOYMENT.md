@@ -96,6 +96,11 @@ deploying via the `render.yaml` Blueprint):
 
 `PORT` is injected automatically by Render — do not set it yourself.
 
+`OVERPASS_URL` is deliberately **not** set on Render: the local Overpass instance
+it points at is something you run on the demo laptop, and the free tier has
+neither the RAM nor the disk for it. See
+[Running a local Overpass instance](#running-a-local-overpass-instance-for-live-demos).
+
 **Set API keys in the Render dashboard only — never in a committed file.**
 `.env` is gitignored; [`.env.example`](.env.example) holds placeholders. See
 [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md) for the full assistant setup.
@@ -180,10 +185,116 @@ Overpass API directly, so it needs no geospatial dependencies.
 Map data is © OpenStreetMap contributors, licensed ODbL. The attribution is
 stored in the cache file and shown on the dashboard maps; keep it there.
 
+### Running a local Overpass instance (for live demos)
+
+The cache above covers the networks we chose in advance. The *draw your own
+boundary* feature cannot be cached, because the whole point is that the judge
+picks the box — and that path still goes to the public Overpass mirrors, with
+the 44s / 169s / 502 behaviour described above. Running Overpass locally removes
+that risk: the same query comes back in well under a second, and no other
+tenant's traffic can throttle it.
+
+**This is for the demo machine, not for Render.** The free tier has neither the
+RAM nor the disk for it, and the deployed backend should keep using the public
+mirrors. The local instance is something you run on the laptop driving the demo.
+
+#### Hardware requirements
+
+| Resource | Needed | Notes |
+|---|---|---|
+| RAM | 8 GB minimum, 16 GB comfortable | The import is the peak. If it gets OOM-killed, lower `OVERPASS_RULES_LOAD` in the compose file. |
+| Disk | 20–30 GB free for India-wide | A city extract needs a couple of GB. The built database is several times the size of the `.osm.pbf` it came from. |
+| Time | Minutes to 2+ hours | Entirely dependent on extract size — see the table below. |
+
+The time row is the one that catches people out. **Do the import the day before
+the event, not the morning of it.** Once built it lives in a Docker volume and
+subsequent starts are instant.
+
+#### Choosing an extract
+
+Pick the smallest extract that covers everywhere a judge might plausibly draw.
+
+| Extract | Size | Import | Use when |
+|---|---|---|---|
+| City / district | ~50–200 MB | Minutes | The case study is locked to one city and the demo stays there. |
+| Single state / zone | ~200–600 MB | ~15–40 min | Recommended default. `central-zone` (335 MB) covers Bareilly, which is what the control room opens on. |
+| India-wide | ~1.3 GB | 2 h+ | Only if the demo genuinely roams the country. |
+
+Browse extracts at [download.geofabrik.de/asia/india.html](https://download.geofabrik.de/asia/india.html).
+
+**Geofabrik's India zones are administrative, not compass directions.** Bareilly
+is in northern India but Uttar Pradesh belongs to `central-zone`; Delhi is in
+`northern-zone`; Bengaluru and Hyderabad are in `southern-zone`. Picking by the
+name alone is how you end up importing 335 MB that does not contain the city you
+are demoing — and because a box outside the extract returns zero elements and
+falls back to the public API silently, nothing will tell you. If in doubt, test
+the coordinates against the zone's `.poly` file before starting the import, and
+confirm afterwards with `scripts/check_overpass.py`.
+
+The five networks in `data/networks/` span five states, so covering all of them
+from one extract means either India-wide or merging several zone extracts with
+`osmium merge` beforehand.
+
+#### Runbook
+
+```bash
+# 1. Choose the extract (in .env)
+OSM_EXTRACT_URL=https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf
+
+# 2. Start it. First run downloads and imports; this is the slow part.
+docker compose -f docker-compose.overpass.yml up -d
+
+# 3. Watch the import. Config mistakes show up here within the first minute.
+docker compose -f docker-compose.overpass.yml logs -f
+
+# 4. Once it is serving, point the app at it (in .env)
+OVERPASS_URL=http://localhost:12345/api/interpreter
+
+# 5. Confirm — this is the step that matters
+python scripts/check_overpass.py --compare
+```
+
+Do a throwaway run with a small city extract first. A typo in the compose file
+costs you a minute that way and two hours the other way.
+
+#### How it behaves when it isn't running
+
+| Variable | Default | Effect |
+|---|---|---|
+| `OVERPASS_URL` | unset | Unset means the public mirrors, exactly as before. Setting it makes the local instance first choice. |
+| `OVERPASS_PUBLIC_FALLBACK` | on | A local instance that fails falls through to the public mirrors, so forgetting Docker costs latency rather than the feature. Set to `off` in rehearsal to make misconfiguration loud. |
+| `OVERPASS_LOCAL_TIMEOUT` | `20` | Seconds before giving up on a wedged local instance. A healthy one answers in under a second. |
+
+Two details worth knowing. An **empty** response from the local instance is
+treated as a failure and falls through to the public mirrors, not as "no roads
+here" — because a box outside the imported region returns exactly the same empty
+result as genuine farmland, and reporting the first as the second would be wrong
+in a way nobody would catch on stage. And the fallback is silent by design,
+which is why `scripts/check_overpass.py` exists: run it before the demo, or you
+will never notice you're back on the public API until it's slow in front of
+judges.
+
+#### If every query comes back "Permission denied"
+
+Symptom: the container is up, `docker logs` shows nginx returning `200`, but any
+real query returns XML containing
+`runtime error: open64: 13 Permission denied /db/db//osm3s_osm_base`.
+
+Cause: the image creates `/db` as `0700` owned by `overpass`, but serves queries
+through `fcgiwrap` running as the `nginx` user, which then cannot traverse into
+`/db` to reach the dispatcher socket. The compose file fixes this with a
+`post_start` hook that runs `chmod o+x /db`, which grants traversal without
+granting read access to the database.
+
+This one is worth knowing because it looks healthy from the outside: the port is
+open, nginx logs success, and only the response body says otherwise — which the
+silent public-API fallback then hides completely.
+
 ### Load order at demo time
 
 1. `POST /api/network/from_cache` — the committed network, ~20 ms
-2. `POST /api/network/from_osm` — a live download, if no cache exists
+2. `POST /api/network/from_osm` — a live download; sub-second against a local
+   Overpass instance, seconds-to-minutes against the public mirrors
 3. the synthetic city, with an on-screen notice, if neither is available
 
 ## Frontend: Vercel (or Netlify)

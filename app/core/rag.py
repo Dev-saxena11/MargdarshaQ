@@ -456,7 +456,7 @@ class RAGKnowledgeEngine:
             "3. If referencing algorithm mechanics (e.g. delta potential well, jump cap, 2-opt, CVRPTW), quote "
             "the mathematical principles accurately from the context.\n"
             "4. Keep explanations concise, professional, and well-structured with clear bullet points.\n"
-            "5. If the provided context is insufficient to answer the question, state that clearly.",
+            "5. If the provided context is insufficient to answer the question, do not speculate. Instead, explicitly state: 'I don't have that info'.",
         ]
 
         return provider.complete(

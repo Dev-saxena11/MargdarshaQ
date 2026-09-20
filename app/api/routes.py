@@ -11,13 +11,19 @@ Workflow:
 """
 
 from __future__ import annotations
+import json
+import os
 import time
+from functools import lru_cache
+from typing import Optional
+
 import numpy as np
 from fastapi import APIRouter, HTTPException
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
 from app.core.overpass_network import load_overpass_network
+from app.core.offline_osm import load_offline_network, available_coverage
 from app.core.cached_network import (
     load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
 )
@@ -119,6 +125,31 @@ def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get
         raise HTTPException(status_code=400, detail="Provide either `place` or all four bbox bounds (north/south/east/west).")
 
     if has_bbox:
+        # A box inside a city we ship offline is clipped from the committed
+        # graph. Same OpenStreetMap geometry Overpass would have returned, but
+        # in milliseconds and with no network call — which is the whole point on
+        # a deployed backend that cannot reach a local Overpass instance.
+        try:
+            net, meta = load_offline_network(
+                north=req.north, south=req.south, east=req.east, west=req.west,
+                max_nodes=req.max_nodes, congestion_seed=req.seed,
+            )
+        except LookupError:
+            pass                      # not covered — ask Overpass below
+        except ValueError as e:
+            # Covered, but the box holds too little road. Overpass would say the
+            # same thing more slowly.
+            raise HTTPException(status_code=400, detail=str(e))
+        else:
+            network_id = store.put_network(net, is_geo=True)
+            nodes, edges = _network_payload(net)
+            return NetworkResponse(
+                network_id=network_id, num_nodes=net.num_nodes(),
+                num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
+                attribution=meta.get("attribution"),
+                area_label=meta.get("area_label"),
+            )
+
         try:
             net, meta = load_overpass_network(
                 north=req.north, south=req.south, east=req.east, west=req.west,
@@ -167,6 +198,17 @@ def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get
 def list_cached_networks():
     """Real OSM networks shipped with the app, loadable without touching the internet."""
     return {"networks": available_networks()}
+
+
+@router.get("/network/offline-coverage")
+def list_offline_coverage():
+    """
+    Cities whose full road graph ships with the app, so a boundary drawn inside
+    one is served from disk instead of Overpass. The map draws these extents so
+    the fast area is visible before someone drags a box, rather than being
+    discovered by waiting 88 seconds for the slow one.
+    """
+    return {"coverage": available_coverage()}
 
 
 @router.post("/network/from_cache", response_model=NetworkResponse)
@@ -228,6 +270,7 @@ def generate_vrp(req: VRPGenerateRequest, user_id: str = Depends(get_current_use
             service_time=req.service_time, seed=req.seed,
             time_dependent=req.time_dependent, bucket_minutes=req.bucket_minutes,
             customer_nodes=req.customer_nodes,
+            require_all_vehicles=req.require_all_vehicles,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -413,6 +456,40 @@ def solve_vrp(req: VRPSolveRequest, user_id: str = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 ALL_ALGORITHMS = ["greedy", "qpso", "ga", "sa", "standard_pso"]
+
+_BENCHMARK_MATRIX_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "benchmarks", "algorithm_matrix.json",
+)
+
+
+@lru_cache(maxsize=1)
+def _read_benchmark_matrix() -> Optional[dict]:
+    if not os.path.isfile(_BENCHMARK_MATRIX_PATH):
+        return None
+    with open(_BENCHMARK_MATRIX_PATH, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@router.get("/benchmark/matrix")
+def get_benchmark_matrix():
+    """
+    Every solver's result on every shipped city, computed ahead of time by
+    scripts/build_benchmark_matrix.py.
+
+    Precomputed rather than solved per request: 25 solves is a minute of a judge
+    watching a spinner to produce numbers that never change, because every
+    instance is built from a fixed seed. The config used is returned alongside
+    the results so the claim can be checked rather than taken on trust.
+    """
+    doc = _read_benchmark_matrix()
+    if doc is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No benchmark matrix on disk. Build one with: "
+                   "python scripts/build_benchmark_matrix.py",
+        )
+    return doc
 
 
 @router.post("/benchmark/run", response_model=BenchmarkResponse)

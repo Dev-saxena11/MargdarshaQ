@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuantaRoute — Quantum-Inspired Intelligent Traffic Route Optimization Platform</title>
+  <title>MargdarshaQ — Quantum-Inspired Intelligent Traffic Route Optimization Platform</title>
 
   <!-- Modern Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2298,6 +2298,153 @@
       color: var(--neo-mint);
     }
 
+    /* ---- the 5x5 benchmark matrix on the Executive Overview ---- */
+    .bench-matrix-section {
+      background: var(--card-bg);
+      border: 2px solid var(--border-neo);
+      box-shadow: var(--neo-shadow);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin: 0 auto 22px;
+      max-width: 1180px;
+      width: 100%;
+    }
+
+    .bench-matrix-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .bench-matrix-head h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text-main);
+    }
+
+    .bench-matrix-head p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 620px;
+      line-height: 1.5;
+    }
+
+    .bench-metric-toggle {
+      display: flex;
+      gap: 0;
+      border: 2px solid var(--border-neo);
+      border-radius: 6px;
+      overflow: hidden;
+      flex: none;
+    }
+
+    .bench-metric-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 12px;
+      cursor: pointer;
+    }
+
+    .bench-metric-btn.active {
+      background: var(--neo-mint);
+      color: #04121A;
+    }
+
+    .bench-matrix-wrap {
+      overflow-x: auto;
+    }
+
+    .bench-matrix-loading {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 18px 0;
+    }
+
+    table.bench-matrix {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: 'Space Grotesk', sans-serif;
+      min-width: 720px;
+    }
+
+    table.bench-matrix th,
+    table.bench-matrix td {
+      padding: 9px 10px;
+      text-align: right;
+      border-bottom: 1px solid var(--border-soft, rgba(148, 163, 184, 0.18));
+      white-space: nowrap;
+    }
+
+    table.bench-matrix th:first-child,
+    table.bench-matrix td:first-child {
+      text-align: left;
+      white-space: normal;
+    }
+
+    table.bench-matrix thead th {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border-neo);
+    }
+
+    table.bench-matrix .scenario-name {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    table.bench-matrix .scenario-sub {
+      display: block;
+      font-weight: 400;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    table.bench-matrix td.is-best {
+      background: rgba(0, 245, 212, 0.14);
+      color: var(--text-main);
+      font-weight: 800;
+      border-radius: 4px;
+    }
+
+    table.bench-matrix td.is-infeasible {
+      color: var(--neo-amber, #F59E0B);
+    }
+
+    table.bench-matrix td.is-infeasible::after {
+      content: ' ✕';
+      font-size: 10px;
+    }
+
+    .bench-matrix-verdict {
+      font-size: 12.5px;
+      color: var(--text-main);
+      background: rgba(0, 245, 212, 0.08);
+      border-left: 3px solid var(--neo-mint);
+      padding: 9px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .bench-matrix-foot {
+      margin-top: 10px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -2318,6 +2465,59 @@
       height: 4px;
       display: inline-block;
       border-radius: 2px;
+    }
+
+    /* Which colour on the map is which van. Top-right of the map: the prompt
+       owns the top-centre and the playback transport owns the bottom, and an
+       earlier version of this sat under both with no z-index at all, which on
+       a Leaflet map (whose panes carry z-index 400-700) means underneath the
+       roads. */
+    #routeLegend {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 520;
+      max-height: calc(100% - 120px);
+      overflow-y: auto;
+      display: block;
+      margin: 0;
+      background: var(--card-bg);
+      border: 2px solid var(--border-neo);
+      box-shadow: var(--neo-shadow-sm);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    #routeLegend .route-legend-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    #routeLegend span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-main);
+      padding: 2px 0;
+      white-space: nowrap;
+    }
+
+    #routeLegend i {
+      width: 16px;
+      height: 5px;
+      border-radius: 2px;
+      flex: none;
+    }
+
+    #routeLegend .route-legend-sub {
+      color: var(--text-muted);
+      font-weight: 400;
     }
 
     /* =========================================================================
@@ -2640,6 +2840,7 @@
       flex-direction: column;
       gap: 16px;
       background: transparent;
+      scroll-behavior: smooth;
     }
 
     .ai-messages-container::-webkit-scrollbar {
@@ -2873,27 +3074,27 @@
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .ai-input-footer input {
+    .ai-input-footer input, .ai-input-footer textarea {
       flex: 1;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(255, 255, 255, 0.14);
       color: #FFFFFF;
       padding: 11px 16px;
-      border-radius: 22px;
-      font-size: 12.5px;
+      border-radius: 6px;
+      font-size: 13px;
       font-family: 'Inter', sans-serif;
       outline: none;
-      backdrop-filter: blur(8px);
-      transition: all .22s ease;
+      transition: all .15s ease;
+      resize: none;
     }
 
-    .ai-input-footer input:focus {
+    .ai-input-footer input:focus, .ai-input-footer textarea:focus {
       border-color: rgba(0, 245, 212, 0.75);
       box-shadow: 0 0 16px rgba(0, 245, 212, 0.25), inset 0 0 6px rgba(0, 245, 212, 0.1);
       background: rgba(255, 255, 255, 0.07);
     }
 
-    .ai-input-footer input::placeholder {
+    .ai-input-footer input::placeholder, .ai-input-footer textarea::placeholder {
       color: rgba(148, 163, 184, 0.65);
     }
 
@@ -2920,12 +3121,76 @@
       box-shadow: 0 6px 24px rgba(123, 92, 255, 0.55);
       border-color: rgba(0, 245, 212, 0.6);
     }
+    /* ----------------------------------------------------------------------- */
+    /* PROGRESS BAR / SPINNER OVERLAY */
+    /* ----------------------------------------------------------------------- */
+    #globalProgressOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+    .progress-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      padding: 24px 32px;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0,245,212,0.1);
+      width: 400px;
+      text-align: center;
+    }
+    .progress-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--neo-mint);
+      margin-bottom: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .progress-msg {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 20px;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--neo-purple), var(--neo-mint));
+      transition: width 0.3s ease;
+    }
+    .spinner-ring {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      margin-bottom: 12px;
+      border: 3px solid rgba(0, 245, 212, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--neo-mint);
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
-
+  <!-- Auth Overlay -->
   <div id="authOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
     <div style="background:#1e1e1e; padding:30px; border-radius:8px; width:300px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
       <h2 style="margin-top:0;">Secure Session</h2>
@@ -2938,14 +3203,25 @@
     </div>
   </div>
 
+  <!-- Progress Bar Overlay -->
+  <div id="globalProgressOverlay">
+    <div class="progress-box">
+      <div class="spinner-ring"></div>
+      <div class="progress-title" id="progressTitle">Working...</div>
+      <div class="progress-msg" id="progressMsg">Please wait while the operation completes.</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="progressBarFill"></div>
+      </div>
+    </div>
+  </div>
   <div id="app">
 
     <!-- Header -->
     <header>
       <div class="brand">
-        <div class="mark">Ψ</div>
+        <img src="logo.png?v=5" style="height: 56px; width: auto; object-fit: contain; margin-right: 4px;" />
         <div>
-          <h1>QuantaRoute <span
+          <h1>MargdarshaQ <span
               style="font-size:12px; font-weight:700; color:var(--neo-mint); padding:2px 8px; border-radius:4px; background:rgba(0,245,212,0.12); border:1px solid rgba(0,245,212,0.3); letter-spacing:0.5px; margin-left:6px;">ENTERPRISE</span>
           </h1>
           <small>Quantum-Inspired Multi-Vehicle Traffic Optimization Platform</small>
@@ -3037,6 +3313,42 @@
                not be a silent one in front of an audience. -->
             <div id="judgeStatus" class="judge-status" hidden></div>
           </div>
+        </div>
+
+        <!-- =================================================================
+           The benchmark. Leads the page because it is the claim: five solvers,
+           five real city networks, one table. Precomputed and committed (see
+           scripts/build_benchmark_matrix.py) so it is on screen immediately
+           and needs no internet — every instance is seeded, so solving it live
+           would spend a minute to print the same numbers.
+           ================================================================= -->
+        <div class="bench-matrix-section" id="benchMatrixSection">
+          <div class="bench-matrix-head">
+            <div>
+              <h3>Five algorithms, five cities, one table</h3>
+              <p>
+                Every solver run against the same instance on each district's real road
+                network — same stops, same vans, same traffic, same seed. Lower is better
+                on every measure here.
+              </p>
+            </div>
+            <div class="bench-metric-toggle" id="benchMetricToggle">
+              <button class="bench-metric-btn active" data-metric="fitness"
+                onclick="setBenchMetric('fitness')">Fitness</button>
+              <button class="bench-metric-btn" data-metric="time_min"
+                onclick="setBenchMetric('time_min')">Fleet time</button>
+              <button class="bench-metric-btn" data-metric="distance_km"
+                onclick="setBenchMetric('distance_km')">Distance</button>
+              <button class="bench-metric-btn" data-metric="runtime_ms"
+                onclick="setBenchMetric('runtime_ms')">Solve time</button>
+            </div>
+          </div>
+
+          <div id="benchMatrixVerdict" class="bench-matrix-verdict" hidden></div>
+          <div id="benchMatrixWrap" class="bench-matrix-wrap">
+            <div class="bench-matrix-loading">Loading benchmark…</div>
+          </div>
+          <div id="benchMatrixFoot" class="bench-matrix-foot" hidden></div>
         </div>
 
         <!-- =================================================================
@@ -3438,11 +3750,13 @@
           <!-- LEFT: network + VRP generation -->
           <div class="col">
             <section>
-              <h2>1. Draw Your Study Area</h2>
+              <h2>1. Choose Your Study Area</h2>
               <p class="step-hint">
-                Pan the map to anywhere in the world, then drag a box around the district you
-                want to route through. The real road network inside that box is pulled from
-                OpenStreetMap — one-way streets included.
+                Bareilly is loaded and ready — go straight to step 2 to work on it. To route
+                somewhere else, drag a box around any district. Inside the dashed purple
+                outline the whole city ships with the app, so the roads appear instantly with
+                no internet; outside it they are pulled live from OpenStreetMap, which can
+                take a minute. One-way streets included either way.
               </p>
 
               <button class="primary" id="btnDrawBoundary" onclick="startBoundaryDraw()">
@@ -3450,6 +3764,9 @@
               </button>
               <button class="secondary" id="btnClearBoundary" onclick="clearBoundary()" disabled>
                 Clear boundary
+              </button>
+              <button class="secondary" id="btnHomeArea" onclick="loadDefaultArea()">
+                ↩︎ Back to Bareilly
               </button>
 
               <div class="row2" style="margin-top:10px;">
@@ -3464,15 +3781,45 @@
             </section>
 
             <section>
-              <h2>2. Pick Depot &amp; Stops</h2>
+              <h2>2. Place Depot &amp; Stops</h2>
               <p class="step-hint">
-                Click a junction on the map to place the depot, then click the stops the fleet has
-                to serve. Click a chosen stop again to drop it.
+                Mark the depot and the stops on the map yourself, or tell the system how many
+                you want and let it place them.
               </p>
 
               <div class="seg">
-                <button id="segPickDepot" onclick="setPickMode('depot')" disabled>🏁 Set depot</button>
-                <button id="segPickStops" onclick="setPickMode('stops')" disabled>📍 Add stops</button>
+                <button id="segPlanManual" onclick="setPlanMode('manual')" disabled>✋ I'll mark them</button>
+                <button id="segPlanAuto" onclick="setPlanMode('auto')" disabled>⚙️ Generate them</button>
+              </div>
+
+              <div id="planManualPanel" style="display:none; margin-top:10px;">
+                <div class="seg">
+                  <button id="segPickDepot" onclick="setPickMode('depot')" disabled>🏁 Set depot</button>
+                  <button id="segPickStops" onclick="setPickMode('stops')" disabled>📍 Add stops</button>
+                </div>
+                <p class="step-hint" style="margin-top:8px;">
+                  Click a junction to place the depot, then click each stop the fleet has to
+                  serve. Click a chosen stop again to drop it.
+                </p>
+              </div>
+
+              <div id="planAutoPanel" style="display:none; margin-top:10px;">
+                <div class="row2">
+                  <div>
+                    <label>How many stops</label>
+                    <input id="autoStopCount" type="number" value="12" min="1" max="60">
+                  </div>
+                  <div>
+                    <label>Depot</label>
+                    <select id="autoDepotMode">
+                      <option value="central">Place it for me</option>
+                      <option value="manual">I'll click it myself</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="secondary" id="btnRandomStops" onclick="pickRandomStops()" disabled>
+                  🎲 Generate depot &amp; stops
+                </button>
               </div>
 
               <div class="pick-summary" id="pickSummary">
@@ -3480,24 +3827,37 @@
                 <div class="stat-line"><span>Stops selected</span><span id="pickStopCount">0</span></div>
               </div>
 
-              <button class="secondary" id="btnRandomStops" onclick="pickRandomStops()" disabled>
-                🎲 Scatter 12 stops for me
-              </button>
               <button class="secondary" id="btnClearPicks" onclick="clearPicks()" disabled>
                 Clear selection
               </button>
 
               <div class="row2" style="margin-top:12px;">
                 <div><label>Vehicle capacity</label><input id="capacity" type="number" value="80"></div>
-                <div><label>Seed</label><input id="vrp_seed" type="number" value="1"></div>
+                <div>
+                  <label>How many vans</label>
+                  <input id="n_vehicles" type="number" min="1" max="60" placeholder="auto">
+                </div>
+              </div>
+              <p class="step-hint" style="margin:-2px 0 6px;">
+                Leave vans blank and the fleet is sized from total demand. Set it to see how
+                the same stops are covered with fewer or more vehicles.
+              </p>
+              <div class="chk" style="margin-bottom:10px;">
+                <input type="checkbox" id="require_all_vehicles">
+                <label style="margin:0;">Send every van out (don't leave any parked)</label>
               </div>
               <div class="row2">
                 <div><label>Demand min</label><input id="demand_min" type="number" value="5"></div>
                 <div><label>Demand max</label><input id="demand_max" type="number" value="20"></div>
               </div>
-              <label>Horizon (min)</label>
-              <input id="horizon" type="number" value="480"
-                oninput="if(document.getElementById('time_dependent').checked) renderTrafficProfile();">
+              <div class="row2">
+                <div>
+                  <label>Horizon (min)</label>
+                  <input id="horizon" type="number" value="480"
+                    oninput="if(document.getElementById('time_dependent').checked) renderTrafficProfile();">
+                </div>
+                <div><label>Seed</label><input id="vrp_seed" type="number" value="1"></div>
+              </div>
 
               <div class="chk" style="margin-top:10px;">
                 <input type="checkbox" id="time_dependent" onchange="onTimeDependentToggle()">
@@ -3558,7 +3918,7 @@
             <section>
               <h2>3. Metaheuristic Solver</h2>
               <label>Algorithm</label>
-              <select id="algorithm">
+              <select id="algorithm" onchange="syncSoloButtonLabel()">
                 <option value="qpso">QPSO (Quantum Hybrid)</option>
                 <option value="ga">Genetic Algorithm</option>
                 <option value="sa">Simulated Annealing</option>
@@ -3579,26 +3939,21 @@
             <section>
               <h2>4. Run the Shift</h2>
               <p class="step-hint">
-                Drive both plans across the same day, on one clock. The usual method and ours
-                leave the depot together — watch where they diverge.
+                Drive the plan across the day on one clock. Race the usual method against
+                ours to see where they diverge, or watch a single algorithm drive its own
+                plan with nothing else on the map.
               </p>
 
               <button class="primary" id="btnSimBuild" onclick="simPrepare()" disabled>
                 🏁 Build the race
               </button>
+              <button class="secondary" id="btnSimSolo" onclick="simPrepareSolo()" disabled>
+                ▶ Watch QPSO drive alone
+              </button>
 
-              <div class="sim-legend" id="simLegend" hidden>
-                <div class="sim-legend-row">
-                  <span class="sim-swatch is-usual"></span>
-                  <span>Usual method</span>
-                  <b id="simUsualDone">0</b>
-                </div>
-                <div class="sim-legend-row">
-                  <span class="sim-swatch is-ours"></span>
-                  <span>Our method</span>
-                  <b id="simOursDone">0</b>
-                </div>
-              </div>
+              <!-- One row per fleet on the clock, built in simRenderLegend:
+                   two for the race, one when a single algorithm is run. -->
+              <div class="sim-legend" id="simLegend" hidden></div>
 
               <div class="sim-kpis" id="simKpis" hidden>
                 <div class="stat-line"><span>Clock</span><span class="mono" id="simClock">06:00</span></div>
@@ -3699,16 +4054,9 @@
     <div class="ai-chips-wrap">
       <div class="ai-chips-label">SUGGESTED EXPLAINERS:</div>
       <div class="ai-chips-row" id="aiChipsRow">
-        <button class="ai-chip" onclick="handleChipClick('explain_route', '⚡ Explain this route & savings')">⚡ Explain
-          Route</button>
-        <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why did Quantum QPSO win?')">⚛️ Why QPSO
-          Won</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_map', '🗺️ Explain the map & traffic colors')">🗺️ Map
-          & Traffic</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does convergence chart show?')">📈
-          Convergence</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_tw', '🎯 Are time windows respected?')">🎯 Did
-          deliveries arrive on time?</button>
+        <button class="ai-chip" onclick="handleChipClick('plan_route', '🚗 Plan a Route')">🚗 Plan a Route</button>
+        <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why is QPSO better here?')">⚛️ Why is QPSO better here?</button>
+        <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does this chart show?')">📈 What does this chart show?</button>
       </div>
     </div>
 
@@ -3719,8 +4067,8 @@
 
     <!-- Chat Input Footer -->
     <div class="ai-input-footer">
-      <input type="text" id="aiInput" placeholder="Ask about routes, algorithms, or traffic..."
-        onkeydown="if(event.key==='Enter') sendAssistantMessage()">
+      <textarea id="aiInput" rows="1" placeholder="Ask about routes, algorithms, or traffic..."
+        onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }"></textarea>
       <button id="aiBtnSend" class="ai-btn-send" onclick="sendAssistantMessage()">
         <span>Ask</span>
         <span>➔</span>
@@ -3747,8 +4095,11 @@
       // Map-driven instance builder (veroviz-style): draw a boundary, then
       // click the stops you want inside it.
       drawMode: null,        // null | 'boundary' | 'depot' | 'stops'
+      planMode: 'manual',    // 'manual' (click them) | 'auto' (system places them)
       bounds: null,          // {north, south, east, west} of the drawn boundary
       boundaryLayer: null,   // rectangle drawn on the map
+      offlineCoverage: [],   // cities whose full road graph ships with the app
+      coverageLayer: null,   // their extents, outlined on the map
       nodeLayer: null,       // clickable node markers
       selectedDepot: null,
       selectedStops: [],
@@ -3778,6 +4129,37 @@
       judgeRouteAfter: null,
       judgeMarkerAfter: null,
     };
+
+    // ---------------------------------------------------------------------------
+    // Loading State Management
+    // ---------------------------------------------------------------------------
+    let _isGlobalLoading = false;
+
+    function setLoadingState(isLoading, message = "Working...", progressPct = null) {
+      _isGlobalLoading = isLoading;
+      const overlay = document.getElementById('globalProgressOverlay');
+      if (overlay) overlay.style.display = isLoading ? 'flex' : 'none';
+      
+      if (isLoading) {
+        const titleEl = document.getElementById('progressTitle');
+        if (titleEl) titleEl.textContent = message;
+        
+        const fillEl = document.getElementById('progressBarFill');
+        if (fillEl) {
+          if (progressPct !== null) {
+            fillEl.style.width = Math.min(100, Math.max(0, progressPct)) + '%';
+          } else {
+            fillEl.style.width = '100%';
+          }
+        }
+      }
+      
+      // Disable core action buttons to prevent double-submits
+      ['btnJudgeRun', 'btnDynamicRun', 'btnBench', 'btnSolve', 'btnGenSynthetic', 'btnGenReal', 'judgePreset'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = isLoading;
+      });
+    }
 
     var ROUTE_COLORS = ['#0284C7', '#7C3AED', '#059669', '#D97706', '#DB2777', '#2563EB', '#DC2626'];
     var VAN_COLORS = ROUTE_COLORS;
@@ -3925,6 +4307,8 @@
           if (state.network) {
             renderControlNetwork();
             if (state.optimizedSolution) drawRoutes(state.optimizedSolution.routes);
+          } else {
+            bootstrapControlRoom();
           }
         }, 60);
       }
@@ -4155,10 +4539,146 @@
         why: 'IT-park grid with tight one-way loops and heavy shift-change surges twice a day.',
         stops: 14,
       },
+      {
+        key: 'bareilly',
+        name: 'Bareilly City, Uttar Pradesh',
+        lat: 28.3670, lon: 79.4304,
+        why: 'A tier-2 city road system — mixed arterial and lane hierarchy, few one-ways, and the kind of network most Indian municipal fleets actually run on.',
+        stops: 14,
+      },
     ];
+
+    // The control room opens on Bareilly: it ships pre-cached, so the workspace
+    // has real roads on it the moment the screen is opened rather than an empty
+    // world map waiting for someone to know where to drag a box.
+    const CONTROL_ROOM_DEFAULT_AREA = 'bareilly';
 
     function areaByKey(key) {
       return CURATED_AREAS.find(a => a.key === key) || CURATED_AREAS[0];
+    }
+
+    // ---- The 5x5 benchmark matrix ------------------------------------------
+    // Precomputed by scripts/build_benchmark_matrix.py and served from disk.
+    const BENCH_METRICS = {
+      fitness:     { label: 'Fitness',    unit: '',     digits: 1 },
+      time_min:    { label: 'Fleet time', unit: ' min', digits: 0 },
+      distance_km: { label: 'Distance',   unit: ' km',  digits: 1 },
+      runtime_ms:  { label: 'Solve time', unit: ' ms',  digits: 0 },
+    };
+    let benchMatrix = null;
+    let benchMetric = 'fitness';
+
+    async function loadBenchmarkMatrix() {
+      const wrap = document.getElementById('benchMatrixWrap');
+      try {
+        benchMatrix = await api('/api/benchmark/matrix');
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        wrap.innerHTML = '<div class="bench-matrix-loading">Benchmark not available: '
+          + detail + '</div>';
+        return;
+      }
+      renderBenchmarkMatrix();
+    }
+
+    function setBenchMetric(metric) {
+      benchMetric = metric;
+      for (const b of document.querySelectorAll('.bench-metric-btn')) {
+        b.classList.toggle('active', b.dataset.metric === metric);
+      }
+      renderBenchmarkMatrix();
+    }
+
+    function renderBenchmarkMatrix() {
+      if (!benchMatrix) return;
+      const spec = BENCH_METRICS[benchMetric];
+      const algos = benchMatrix.algorithms;
+      const shortName = {
+        greedy: 'Greedy NN', qpso: 'QPSO', ga: 'Genetic', sa: 'Annealing',
+        standard_pso: 'Standard PSO',
+      };
+
+      // "Best" always means best among the plans that actually meet every
+      // delivery window. A quicker plan that turns up late is not a better
+      // plan, and highlighting one as the winner would be the kind of chart
+      // that wins a demo and loses a pilot.
+      const rows = benchMatrix.scenarios.map(s => {
+        const byAlgo = Object.fromEntries(s.results.map(r => [r.algorithm, r]));
+        const feasible = s.results.filter(r => r.feasible);
+        const pool = feasible.length ? feasible : s.results;
+        const bestVal = Math.min(...pool.map(r => r[benchMetric]));
+
+        const cells = algos.map(a => {
+          const r = byAlgo[a];
+          if (!r) return '<td>—</td>';
+          const isBest = r[benchMetric] === bestVal && (r.feasible || !feasible.length);
+          const cls = [isBest ? 'is-best' : '', r.feasible ? '' : 'is-infeasible']
+            .filter(Boolean).join(' ');
+          const title = r.feasible ? r.label
+            : r.label + ' — misses at least one delivery window';
+          return `<td class="${cls}" title="${title}">`
+            + r[benchMetric].toFixed(spec.digits) + spec.unit + '</td>';
+        }).join('');
+
+        return `<tr><td><span class="scenario-name">${s.label}</span>`
+          + `<span class="scenario-sub">${s.junctions} junctions · ${s.stops} stops · `
+          + `${s.vehicles} vans · ${s.feasible_count}/${s.results.length} solvers feasible`
+          + `</span></td>${cells}</tr>`;
+      }).join('');
+
+      document.getElementById('benchMatrixWrap').innerHTML =
+        '<table class="bench-matrix"><thead><tr><th>District</th>'
+        + algos.map(a => `<th>${shortName[a] || a}</th>`).join('')
+        + `</tr></thead><tbody>${rows}</tbody></table>`;
+
+      // Counted on the same feasible-first basis as the highlight, and on the
+      // metric actually being shown — a verdict quoting fitness while the table
+      // shows distance is how a reader learns not to trust the table.
+      const wins = {};
+      for (const s of benchMatrix.scenarios) {
+        const feas = s.results.filter(r => r.feasible);
+        const pool = feas.length ? feas : s.results;
+        const bv = Math.min(...pool.map(r => r[benchMetric]));
+        const w = pool.find(r => r[benchMetric] === bv);
+        if (w) wins[w.algorithm] = (wins[w.algorithm] || 0) + 1;
+      }
+      const total = benchMatrix.scenarios.length;
+      const top = Object.entries(wins).sort((a, b) => b[1] - a[1])[0];
+      const nice = { greedy: 'Greedy nearest-neighbour', qpso: 'QPSO', ga: 'The genetic algorithm',
+                     sa: 'Simulated annealing', standard_pso: 'Standard PSO' };
+
+      let body;
+      if (benchMetric === 'runtime_ms') {
+        body = 'Greedy is fastest to compute because it does not search at all — it takes the '
+          + 'nearest stop each time. That is the point: it costs nothing and produces the '
+          + 'worst day for the fleet. Solve time is paid once by a dispatcher; fleet time is '
+          + 'paid every day by every van.';
+      } else if (benchMetric === 'distance_km') {
+        body = 'Shortest distance is not the same as the best plan. Greedy often wins here by '
+          + 'chaining nearby stops, then loses badly on fleet time because those short hops '
+          + 'run straight into congestion and miss delivery windows.';
+      } else {
+        body = 'Where QPSO does not win, it is because it broke a delivery window to save '
+          + 'driving — those runs are marked ✕ and cannot win, however good their numbers look.';
+      }
+
+      const verdict = document.getElementById('benchMatrixVerdict');
+      verdict.innerHTML =
+        `<b>${nice[top[0]] || top[0]} wins ${top[1]} of ${total} districts on `
+        + `${spec.label.toLowerCase()}.</b> ` + body;
+      verdict.hidden = false;
+
+      const cfg = benchMatrix.config || {};
+      const foot = document.getElementById('benchMatrixFoot');
+      foot.innerHTML =
+        `Run ${benchMatrix.generated_at} · ${cfg.n_particles} particles · `
+        + `${cfg.max_iter} iterations · seed ${cfg.seed} · `
+        + `${cfg.vehicle_capacity} capacity · ${cfg.horizon_min} min horizon. `
+        + 'Every instance is seeded, so re-running <code>scripts/build_benchmark_matrix.py</code> '
+        + 'on unchanged code reproduces this table exactly. Greedy solves in ~0 ms because '
+        + 'it does not search — it takes the nearest stop each time, which is the habit '
+        + 'the rest of the table is measured against.';
+      foot.hidden = false;
     }
 
     function renderAreaPicker() {
@@ -4246,6 +4766,28 @@
       renderJudgeComparison();
     }
 
+    async function runBenchmarkSequentially(vrp_id, max_iter, seed) {
+      const algos = [
+        { key: 'greedy', name: 'Greedy Nearest-Neighbor' },
+        { key: 'qpso', name: 'QPSO (Quantum-Inspired)' },
+        { key: 'ga', name: 'Genetic Algorithm' },
+        { key: 'sa', name: 'Simulated Annealing' },
+        { key: 'standard_pso', name: 'Standard PSO' }
+      ];
+      let results = [];
+      for (let i = 0; i < algos.length; i++) {
+        setLoadingState(true, `Running algorithm ${i + 1} of 5: ${algos[i].name}...`, (i / algos.length) * 100);
+        const bench = await api('/api/benchmark/run', {
+          method: 'POST',
+          body: JSON.stringify({ vrp_id, max_iter, seed, algorithms: [algos[i].key] })
+        });
+        if (bench.results && bench.results.length > 0) {
+          results.push(bench.results[0]);
+        }
+      }
+      return results;
+    }
+
     // -------------------------------------------------------------------------
     // One click: every algorithm on the selected district
     //
@@ -4258,6 +4800,7 @@
       const btns = ['btnBenchmarkAll', 'btnAlgoCompare'].map(id => document.getElementById(id)).filter(Boolean);
       const labels = btns.map(b => b.innerHTML);
       btns.forEach(b => { b.disabled = true; b.innerHTML = '<span>⏳</span> Running all five…'; });
+      setLoadingState(true, 'Initializing network comparison...', 0);
 
       const grid = document.getElementById('algoCompareGrid');
       if (grid) grid.innerHTML = '<div class="compare-empty">Solving the same delivery round with every algorithm…</div>';
@@ -4279,6 +4822,7 @@
 
         const area = areaByKey(execState.areaKey);
         setJudgeStatus('Planning routes across ' + area.name + '…');
+        setLoadingState(true, `Comparing QPSO vs Baseline on ${area.name}...`, null);
 
         const comp = await api('/api/vrp/compare', {
           method: 'POST',
@@ -4294,16 +4838,13 @@
         renderJudgeComparison();
 
         setJudgeStatus('Running GA, Simulated Annealing, PSO and greedy on the same instance…');
-        const bench = await api('/api/benchmark/run', {
-          method: 'POST',
-          body: JSON.stringify({ vrp_id: execState.vrp.vrp_id, max_iter: 150, seed: 1 }),
-        });
+        const results = await runBenchmarkSequentially(execState.vrp.vrp_id, 150, 1);
 
-        execState.benchmarkResults = bench.results;
-        renderAlgorithmComparison(bench.results);
-        renderBenchResultsTable(bench.results);
-        drawLandingConvergence(bench.results);
-        renderWhyQpsoWins(bench.results);
+        execState.benchmarkResults = results;
+        renderAlgorithmComparison(results);
+        renderBenchResultsTable(results);
+        drawLandingConvergence(results);
+        renderWhyQpsoWins(results);
         setJudgeStatus(null);
         if (typeof syncAssistantContext === 'function') syncAssistantContext();
       } catch (err) {
@@ -4312,6 +4853,7 @@
         if (grid) grid.innerHTML = '<div class="compare-empty">The benchmark could not be run — '
           + 'the API may be asleep. Try again in a moment.</div>';
       } finally {
+        setLoadingState(false);
         btns.forEach((b, i) => { b.disabled = false; b.innerHTML = labels[i]; });
       }
     }
@@ -5547,11 +6089,16 @@
         const weight = jam ? 3.2 : busy ? 2.4 : 1.5;
         const opacity = jam ? 0.85 : busy ? 0.62 : 0.38;
 
+        // The road graph is decoration — nothing binds a click or a tooltip to
+        // it. Leaflet paths are interactive by default though, and this layer
+        // sits in a pane above the pickable junctions, so leaving it that way
+        // meant every click meant for a junction landed on a road instead and
+        // picking a depot or a stop by hand simply did not work.
         // White casing halo for contrast against map tiles
         L.polyline([[a.y, a.x], [b.y, b.x]], {
           ...pOpts,
           color: '#FFFFFF', weight: weight + 2, opacity: jam ? 0.75 : 0.45,
-          lineCap: 'round', lineJoin: 'round'
+          lineCap: 'round', lineJoin: 'round', interactive: false
         }).addTo(layerGroup);
 
         // Colored road segment
@@ -5559,7 +6106,7 @@
           ...pOpts,
           color, weight, opacity,
           lineCap: 'round', lineJoin: 'round',
-          dashArray: jam ? '6, 4' : null
+          dashArray: jam ? '6, 4' : null, interactive: false
         }).addTo(layerGroup);
 
         // Directional arrow at 62% of the segment
@@ -5587,7 +6134,7 @@
           L.circleMarker([pt.y, pt.x], {
             ...pOpts,
             radius: 2.2, color: '#FFFFFF', fillColor: '#475569',
-            fillOpacity: 0.6, weight: 0.8
+            fillOpacity: 0.6, weight: 0.8, interactive: false
           }).addTo(layerGroup);
         }
       }
@@ -5788,12 +6335,15 @@
         ? ' <button onclick="cancelMapMode()">cancel</button>' : '');
     }
 
-    // The control-room map exists from the start, with no network loaded, because
-    // the first thing to do on it is pan the world and draw a boundary.
+    // The control-room map opens over Bareilly rather than the whole country.
+    // The pre-cached network is loaded onto it (see bootstrapControlRoom), so the
+    // first thing on screen is a real road network to work on; panning out and
+    // drawing a boundary elsewhere still works exactly as before.
     function ensureControlMap() {
       if (state.map) return state.map;
 
-      state.map = L.map('leafletMap', { zoomControl: true }).setView([20.5937, 78.9629], 5);
+      const home = areaByKey(CONTROL_ROOM_DEFAULT_AREA);
+      state.map = L.map('leafletMap', { zoomControl: true }).setView([home.lat, home.lon], 13);
       L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
@@ -5805,12 +6355,19 @@
       if (!state.map.getPane('vehicleRoutePane')) {
         state.map.createPane('vehicleRoutePane').style.zIndex = 450;
       }
+      // Above the road graph and the solved routes. These are the only things
+      // on the map that are meant to be clicked, so nothing drawn later should
+      // be able to cover them.
+      if (!state.map.getPane('pickNodePane')) {
+        state.map.createPane('pickNodePane').style.zIndex = 460;
+      }
 
       state.roadLayer = L.layerGroup().addTo(state.map);
       state.nodeLayer = L.layerGroup().addTo(state.map);
       state.routeLayer = L.layerGroup().addTo(state.map);
 
       attachBoundaryDrawing(state.map);
+      loadOfflineCoverage();
       return state.map;
     }
 
@@ -5913,22 +6470,32 @@
       const btn = document.getElementById('btnLoadArea');
       btn.disabled = true;
       const label = btn.textContent;
-      btn.textContent = 'DOWNLOADING ROADS…';
 
-      // A fixed "this can take a minute" gives no sign of life, and OpenStreetMap
-      // is slow often enough that a still screen reads as a hung one. Counting
-      // up says the wait is real and being waited on, and names the thing the
-      // page is waiting for rather than blaming itself.
+      // Inside a shipped city this is a disk read, not a download. Counting
+      // seconds at someone whose answer arrives in 40ms makes a fast path look
+      // slow, and naming OpenStreetMap would be a lie — nothing leaves the page.
+      const offline = bboxIsOffline(state.bounds);
+      btn.textContent = offline ? 'READING OFFLINE MAP…' : 'DOWNLOADING ROADS…';
+
+      // Outside one, a fixed "this can take a minute" gives no sign of life, and
+      // OpenStreetMap is slow often enough that a still screen reads as a hung
+      // one. Counting up says the wait is real and being waited on, and names
+      // the thing the page is waiting for rather than blaming itself.
       const started = Date.now();
       const area = ((state.bounds.north - state.bounds.south) * 111
         * (state.bounds.east - state.bounds.west) * 111 * Math.cos(state.bounds.north * Math.PI / 180));
-      const tick = setInterval(() => {
-        const secs = Math.round((Date.now() - started) / 1000);
-        setMapPrompt('Fetching roads from OpenStreetMap — ' + secs + 's'
-          + (secs > 20 ? ' · their servers are busy, still trying' : '')
-          + (area > 150 && secs > 8 ? ' · a smaller box would be quicker' : ''));
-      }, 1000);
-      setMapPrompt('Fetching roads from OpenStreetMap — 0s');
+      let tick = null;
+      if (offline) {
+        setMapPrompt('Clipping the roads from the offline map…');
+      } else {
+        tick = setInterval(() => {
+          const secs = Math.round((Date.now() - started) / 1000);
+          setMapPrompt('Fetching roads from OpenStreetMap — ' + secs + 's'
+            + (secs > 20 ? ' · their servers are busy, still trying' : '')
+            + (area > 150 && secs > 8 ? ' · a smaller box would be quicker' : ''));
+        }, 1000);
+        setMapPrompt('Fetching roads from OpenStreetMap — 0s');
+      }
 
       try {
         const net = await api('/api/network/from_osm', {
@@ -5948,25 +6515,29 @@
         state.selectedStops = [];
         state.baselineSolution = null;
         state.optimizedSolution = null;
+        hideRouteLegend();
 
         document.getElementById('netInfo').innerHTML =
           '<div class="stat-line"><span>Junctions / streets</span><span>'
           + net.num_nodes + ' / ' + net.num_edges + '</span></div>'
           + '<div class="stat-line"><span>Source</span><span>'
-          + (net.attribution || 'OpenStreetMap') + '</span></div>';
+          + (offline ? 'Offline map — ' + (net.area_label || 'shipped with the app')
+                     : (net.attribution || 'OpenStreetMap')) + '</span></div>';
 
         document.getElementById('emptyHint').style.display = 'none';
-        for (const id of ['segPickDepot', 'segPickStops', 'btnRandomStops', 'btnClearPicks']) {
+        for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
+                          'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
         document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
         document.getElementById('btnSimBuild').disabled = true;
+        document.getElementById('btnSimSolo').disabled = true;
         simReset();
 
         renderControlNetwork();
-        setPickMode('depot');
+        setPlanMode(state.planMode || 'manual');
       } catch (e) {
         // Say what actually went wrong. This used to assert rate-limiting for
         // every failure, which sent people away from a boundary that was merely
@@ -6017,6 +6588,7 @@
         state.selectedStops = [];
         state.baselineSolution = null;
         state.optimizedSolution = null;
+        hideRouteLegend();
 
         document.getElementById('netInfo').innerHTML =
           '<div class="stat-line"><span>Junctions / streets</span><span>'
@@ -6024,23 +6596,116 @@
           + '<div class="stat-line"><span>Area</span><span>' + (net.area_label || area.name) + '</span></div>';
 
         document.getElementById('emptyHint').style.display = 'none';
-        for (const id of ['segPickDepot', 'segPickStops', 'btnRandomStops', 'btnClearPicks']) {
+        for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
+                          'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
         document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
         document.getElementById('btnSimBuild').disabled = true;
+        document.getElementById('btnSimSolo').disabled = true;
         simReset();
 
         renderControlNetwork();
-        setPickMode('depot');
+        setPlanMode(state.planMode || 'manual');
       } catch (e) {
-        setMapPrompt('Could not load that district either: ' + e.message, { warn: true });
+        setMapPrompt('Could not load ' + area.name + ': ' + e.message
+          + ' You can still draw a boundary anywhere on the map.', { warn: true });
       }
     }
 
+    // Opens the control room on the pre-cached default district so there is a
+    // real network to work with immediately. Tried once: if the backend is down
+    // the room still works as a draw-a-boundary workspace, and retrying on every
+    // tab switch would just replace the error with the same error.
+    let controlRoomBootstrapped = false;
+    async function bootstrapControlRoom() {
+      if (controlRoomBootstrapped || state.network) return;
+      controlRoomBootstrapped = true;
+      await loadCuratedIntoControlRoom(CONTROL_ROOM_DEFAULT_AREA);
+    }
+
+    // The way back after drawing a boundary somewhere else.
+    async function loadDefaultArea() {
+      clearBoundary();
+      await loadCuratedIntoControlRoom(CONTROL_ROOM_DEFAULT_AREA);
+    }
+
+    // Cities whose whole road graph ships with the app. A box drawn inside one
+    // is clipped from disk in milliseconds; anywhere else goes to Overpass and
+    // can take a minute or more. Drawing the extents makes that difference
+    // visible before someone commits to a box, rather than after.
+    async function loadOfflineCoverage() {
+      let cov;
+      try {
+        cov = (await api('/api/network/offline-coverage')).coverage || [];
+      } catch (e) {
+        return;                       // older backend — the map still works
+      }
+      state.offlineCoverage = cov;
+      if (!state.map || !cov.length) return;
+
+      state.coverageLayer = state.coverageLayer || L.layerGroup().addTo(state.map);
+      state.coverageLayer.clearLayers();
+      for (const c of cov) {
+        const e = c.extent;
+        if (!e) continue;
+        L.rectangle([[e.south, e.west], [e.north, e.east]], {
+          color: '#7C3AED', weight: 1.5, dashArray: '4 5',
+          fill: false, interactive: false,
+        }).bindTooltip('Offline map — drawing here is instant', { sticky: true })
+          .addTo(state.coverageLayer);
+      }
+    }
+
+    function bboxIsOffline(b) {
+      if (!b) return false;
+      return (state.offlineCoverage || []).some(c => {
+        const e = c.extent;
+        return e && b.south >= e.south && b.north <= e.north
+          && b.west >= e.west && b.east <= e.east;
+      });
+    }
+
     // ---- Picking the depot and the stops ------------------------------------
+
+    // Manual or generated. Both paths write the same selectedDepot/selectedStops,
+    // so everything downstream — building the instance, solving, the simulator —
+    // cannot tell which was used.
+    function setPlanMode(mode) {
+      if (!state.network) return;
+      state.planMode = mode;
+      document.getElementById('segPlanManual').classList.toggle('active', mode === 'manual');
+      document.getElementById('segPlanAuto').classList.toggle('active', mode === 'auto');
+      document.getElementById('planManualPanel').style.display = mode === 'manual' ? '' : 'none';
+      document.getElementById('planAutoPanel').style.display = mode === 'auto' ? '' : 'none';
+
+      if (mode === 'manual') {
+        setPickMode(state.selectedDepot === null ? 'depot' : 'stops');
+      } else {
+        setDrawMode(null);
+        setMapPrompt('Set how many stops you want, then press '
+          + '<b>Generate depot &amp; stops</b>.');
+      }
+    }
+
+    // The junction closest to the middle of the network. A depot wants to be
+    // central — putting it in a corner (which is what taking the first node did)
+    // makes every route start with the same long run inwards and flatters any
+    // solver that is merely undoing that.
+    function centralNodeId(nodes) {
+      const lat = nodes.reduce((s, n) => s + n.y, 0) / nodes.length;
+      const lon = nodes.reduce((s, n) => s + n.x, 0) / nodes.length;
+      const scale = Math.cos(lat * Math.PI / 180);
+      let best = nodes[0].id, bestD = Infinity;
+      for (const n of nodes) {
+        const d = Math.pow(n.y - lat, 2) + Math.pow((n.x - lon) * scale, 2);
+        if (d < bestD) { bestD = d; best = n.id; }
+      }
+      return best;
+    }
+
     function setPickMode(mode) {
       if (!state.network) return;
       setDrawMode(mode);
@@ -6055,7 +6720,15 @@
         state.selectedDepot = nodeId;
         // The depot cannot also be a stop.
         state.selectedStops = state.selectedStops.filter(n => n !== nodeId);
-        setPickMode('stops');
+        // Rolling straight on to stop-picking is the point in manual mode. In
+        // generated mode the stops are the machine's job, so stop here rather
+        // than dropping the user into a picking mode they did not ask for.
+        if (state.planMode === 'auto') {
+          setDrawMode(null);
+          setMapPrompt('Depot set. Press <b>Generate depot &amp; stops</b> to place the stops.');
+        } else {
+          setPickMode('stops');
+        }
       } else if (state.drawMode === 'stops') {
         if (nodeId === state.selectedDepot) return;
         const at = state.selectedStops.indexOf(nodeId);
@@ -6068,23 +6741,38 @@
       updatePickUI();
     }
 
-    // Scatters stops for someone who wants a quick run rather than a hand-built
-    // instance. Spread across the network rather than clustered, so the routes
-    // are worth looking at.
+    // Places the depot and the requested number of stops. Stepping through the
+    // node list rather than sampling at random spreads the stops over the whole
+    // network instead of clustering them, and keeps a given network and count
+    // reproducible — the same demo twice running gives the same picture.
     function pickRandomStops() {
       if (!state.network) return;
       const nodes = state.network.nodes;
-      if (!state.selectedDepot) state.selectedDepot = nodes[0].id;
+      const asked = +document.getElementById('autoStopCount').value || 12;
+      const want = Math.max(1, Math.min(asked, nodes.length - 1));
+
+      if (document.getElementById('autoDepotMode').value === 'central') {
+        state.selectedDepot = centralNodeId(nodes);
+      }
 
       const pool = nodes.filter(n => n.id !== state.selectedDepot);
-      const step = Math.max(1, Math.floor(pool.length / 12));
+      const step = Math.max(1, Math.floor(pool.length / want));
       const picks = [];
-      for (let i = 0; i < pool.length && picks.length < 12; i += step) picks.push(pool[i].id);
+      for (let i = 0; i < pool.length && picks.length < want; i += step) picks.push(pool[i].id);
 
       state.selectedStops = picks;
       renderPickableNodes();
       updatePickUI();
-      setMapPrompt('Scattered ' + picks.length + ' stops. Adjust them by clicking, or build the instance.');
+
+      if (state.selectedDepot === null) {
+        setPickMode('depot');
+        setMapPrompt('Placed ' + picks.length + ' stops. Now <b>click the junction</b> '
+          + 'the vans should start and finish at.', { cancel: true });
+        return;
+      }
+      setMapPrompt('Placed a depot and ' + picks.length + ' stops'
+        + (want < asked ? ' (this network only has ' + nodes.length + ' junctions)' : '')
+        + '. Adjust them by clicking, or build the instance.');
     }
 
     function clearPicks() {
@@ -6092,8 +6780,16 @@
       state.selectedStops = [];
       state.vrp = null;
       if (state.routeLayer) state.routeLayer.clearLayers();
+      hideRouteLegend();
       renderPickableNodes();
       updatePickUI();
+    }
+
+    // The legend names colours that are on the map right now. Once the routes
+    // are gone it is a key to nothing, so it goes with them.
+    function hideRouteLegend() {
+      const el = document.getElementById('routeLegend');
+      if (el) el.hidden = true;
     }
 
     function updatePickUI() {
@@ -6135,6 +6831,7 @@
         const isDepot = n.id === state.selectedDepot;
         const isStop = stopSet.has(n.id);
         const marker = L.circleMarker([n.y, n.x], {
+          pane: state.map.getPane('pickNodePane') ? 'pickNodePane' : undefined,
           radius: isDepot ? 8 : isStop ? 6 : 3,
           color: isDepot ? '#EA580C' : isStop ? '#FFFFFF' : '#475569',
           weight: isDepot ? 3 : isStop ? 2 : 0,
@@ -6372,8 +7069,82 @@
       }
     }
 
-    // Compiles both fleets and lays out every layer the playback touches.
+    // Short names for the algorithm picked in step 3, for the button and the
+    // playback legend. The <select> carries the long ones.
+    const ALGO_SHORT = {
+      qpso: 'QPSO', ga: 'the genetic algorithm', sa: 'simulated annealing',
+      standard_pso: 'standard PSO', greedy: 'greedy nearest-neighbour',
+    };
+
+    function syncSoloButtonLabel() {
+      const sel = document.getElementById('algorithm');
+      const btn = document.getElementById('btnSimSolo');
+      if (!sel || !btn) return;
+      btn.innerHTML = '▶ Watch ' + (ALGO_SHORT[sel.value] || sel.value) + ' drive alone';
+    }
+
+    // Runs the algorithm chosen in step 3 and plays back its plan on its own.
+    // The race answers "is ours better"; this answers "what does this one
+    // actually do", which is the question you cannot get at while two fleets
+    // are moving over each other on the same streets.
+    async function simPrepareSolo() {
+      if (!state.vrp) return;
+      const algo = document.getElementById('algorithm').value;
+      const name = ALGO_SHORT[algo] || algo;
+      const btn = document.getElementById('btnSimSolo');
+      const label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Solving…';
+      setMapPrompt('Solving with ' + name + '…');
+
+      try {
+        const solution = await api('/api/vrp/solve', {
+          method: 'POST',
+          body: JSON.stringify({
+            vrp_id: state.vrp.vrp_id,
+            algorithm: algo,
+            n_particles: +document.getElementById('n_particles').value || 50,
+            max_iter: +document.getElementById('max_iter').value || 150,
+            seed: 1,
+            use_local_search: document.getElementById('use_local_search').checked,
+          }),
+        });
+
+        // The solo run is this screen's only plan, so it also becomes the one
+        // the route layer and the bottleneck re-plan work from. Clearing the
+        // baseline stops the race's verdict line claiming a comparison that is
+        // no longer on the map.
+        state.optimizedSolution = solution;
+        state.baselineSolution = null;
+        sim.incident = null;
+        simBuildFleets([{
+          key: 'solo',
+          label: (solution.algorithm || name),
+          colors: SIM_OURS_COLORS,
+          solution,
+        }]);
+        simSeek(0);
+        simPlay();
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        setMapPrompt('Could not run ' + name + ': ' + detail, { warn: true });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = label;
+      }
+    }
+
+    // The two-plan race. A thin wrapper now that the playback takes any number
+    // of fleets, so watching one algorithm on its own runs the same machinery.
     function simBuildFromSolutions(baseline, optimized) {
+      simBuildFleets([
+        { key: 'usual', label: 'Usual method', colors: SIM_USUAL_COLORS, solution: baseline },
+        { key: 'ours', label: 'Our method', colors: SIM_OURS_COLORS, solution: optimized },
+      ]);
+    }
+
+    // Compiles each fleet and lays out every layer the playback touches.
+    function simBuildFleets(specs) {
       const costs = simEdgeCosts(state);
       const timeDependent = !!(document.getElementById('time_dependent') || {}).checked;
       const opts = {
@@ -6382,18 +7153,11 @@
         notBefore: sim.incident ? sim.incident.start_time : null,
       };
 
-      sim.fleets = [
-        {
-          key: 'usual', label: 'Usual method', colors: SIM_USUAL_COLORS,
-          vehicles: simBuildFleet(baseline, state, costs, opts),
-          delivered: 0, late: 0, delay: 0,
-        },
-        {
-          key: 'ours', label: 'Our method', colors: SIM_OURS_COLORS,
-          vehicles: simBuildFleet(optimized, state, costs, opts),
-          delivered: 0, late: 0, delay: 0,
-        },
-      ];
+      sim.fleets = specs.map(spec => ({
+        key: spec.key, label: spec.label, colors: spec.colors,
+        vehicles: simBuildFleet(spec.solution, state, costs, opts),
+        delivered: 0, late: 0, delay: 0,
+      }));
 
       ensureControlMap();
       const coords = nodeCoordMap(state);
@@ -6461,13 +7225,29 @@
       sim.horizon = Math.max(1, ...sim.fleets.flatMap(f => f.vehicles.map(v => v.endTime)));
       sim.ready = true;
 
+      simRenderLegend();
       document.getElementById('simTransport').hidden = false;
       document.getElementById('simLegend').hidden = false;
       document.getElementById('simKpis').hidden = false;
       document.getElementById('simIncidentPanel').hidden = false;
       document.getElementById('btnDynamicRun').disabled = false;
       document.getElementById('simTransportEnd').textContent = tdClock(TD_PROFILE.dayStartMin + sim.horizon);
-      setMapPrompt('Both fleets leave the depot together. Watch where they diverge.');
+      setMapPrompt(sim.fleets.length > 1
+        ? 'Both fleets leave the depot together. Watch where they diverge.'
+        : sim.fleets[0].label + ' is driving its plan. '
+          + sim.fleets[0].vehicles.length + ' vans out.');
+    }
+
+    // One row per fleet, so the same legend serves the two-plan race and a
+    // single algorithm running on its own.
+    function simRenderLegend() {
+      document.getElementById('simLegend').innerHTML = sim.fleets.map(f =>
+        '<div class="sim-legend-row">'
+        + `<span class="sim-swatch" style="background:${f.colors[0]}"></span>`
+        + `<span>${f.label}</span>`
+        + `<b id="simDone_${f.key}">0 stops</b>`
+        + '</div>'
+      ).join('');
     }
 
     // ---- Playback -----------------------------------------------------------
@@ -6612,10 +7392,10 @@
       lateEl.textContent = late;
       lateEl.className = late ? 'feas-no' : 'feas-yes';
 
-      const usual = sim.fleets.find(f => f.key === 'usual');
-      const ours = sim.fleets.find(f => f.key === 'ours');
-      document.getElementById('simUsualDone').textContent = usual ? usual.delivered + ' stops' : '—';
-      document.getElementById('simOursDone').textContent = ours ? ours.delivered + ' stops' : '—';
+      for (const fleet of sim.fleets) {
+        const el = document.getElementById('simDone_' + fleet.key);
+        if (el) el.textContent = fleet.delivered + ' stops';
+      }
 
       const scrub = document.getElementById('simScrub');
       if (document.activeElement !== scrub) {
@@ -6624,6 +7404,17 @@
     }
 
     function simVerdict() {
+      // A single fleet has nothing to be compared against, so it reports its
+      // own day instead of an empty string where a verdict should be.
+      if (sim.fleets.length === 1) {
+        const f = sim.fleets[0];
+        const last = Math.max(...f.vehicles.map(v => v.endTime));
+        return f.label + ' delivered ' + f.delivered + ' of ' + sim.totalStops
+          + ' stops with ' + f.vehicles.length + ' vans, last one home after '
+          + last.toFixed(0) + ' min'
+          + (f.late ? ', ' + f.late + ' outside their window.' : ', all on time.');
+      }
+
       const usual = sim.fleets.find(f => f.key === 'usual');
       const ours = sim.fleets.find(f => f.key === 'ours');
       if (!usual || !ours) return '';
@@ -6668,6 +7459,11 @@
       const at = sim.clock;
       setMapPrompt('Closing a road at ' + tdClock(TD_PROFILE.dayStartMin + at) + ' and re-planning…');
 
+      // A solo run re-plans with the algorithm being watched, not with QPSO —
+      // switching solvers behind a label that says "simulated annealing" would
+      // credit the wrong one for reacting well.
+      const soloLabel = sim.fleets.length === 1 ? sim.fleets[0].label : null;
+
       try {
         const dyn = await api('/api/vrp/solve-dynamic', {
           method: 'POST',
@@ -6675,7 +7471,7 @@
             vrp_id: state.vrp.vrp_id,
             incident_factor: +document.getElementById('incident_severity').value || 4.0,
             trigger_time_min: at,
-            algorithm: 'qpso',
+            algorithm: soloLabel ? document.getElementById('algorithm').value : 'qpso',
             n_particles: +document.getElementById('n_particles').value || 50,
             max_iter: +document.getElementById('max_iter').value || 150,
             seed: 1,
@@ -6708,7 +7504,17 @@
 
         sim.incident = dyn.incident || null;
         state.dynamicResult = dyn;
-        simBuildFromSolutions(state.baselineSolution, dyn.dynamic_rerouted_solution);
+        if (soloLabel) {
+          // A solo run has no unreacting method to keep alongside it, so the
+          // single fleet simply takes the re-planned solution. Rebuilding it
+          // as a race here would invent a baseline that was never on screen.
+          simBuildFleets([{
+            key: 'solo', label: soloLabel, colors: SIM_OURS_COLORS,
+            solution: dyn.dynamic_rerouted_solution,
+          }]);
+        } else {
+          simBuildFromSolutions(state.baselineSolution, dyn.dynamic_rerouted_solution);
+        }
         simSeek(at);
         simShowRetasking(wasAt);
 
@@ -6806,10 +7612,26 @@
       const btn = document.getElementById('btnGenVRP');
       btn.disabled = true; btn.textContent = 'GENERATING…';
       try {
+        // Delivery windows have to fit inside the shift. They used to be fixed
+        // at 60-180 minutes while the horizon next to them was editable, so
+        // typing anything under 180 there produced a 422 from the backend —
+        // a validation error about numbers the user never chose.
+        const horizon = Math.max(1, +document.getElementById('horizon').value || 480);
+        const windowMax = Math.min(180, horizon);
+        const windowMin = Math.min(60, windowMax);
+
+        // Blank means "size the fleet from total demand", which is what the
+        // backend does when n_vehicles is absent. Sending 0 or null instead
+        // would be a request for a fleet of no vans.
+        const vansRaw = document.getElementById('n_vehicles').value.trim();
+        const vans = vansRaw === '' ? null : Math.max(1, Math.round(+vansRaw));
+
         const vrp = await api('/api/vrp/generate', {
           method: 'POST',
           body: JSON.stringify({
             network_id: state.network.network_id,
+            ...(vans ? { n_vehicles: vans } : {}),
+            require_all_vehicles: document.getElementById('require_all_vehicles').checked,
             // The stops are the ones clicked on the map, not a random draw.
             customer_nodes: state.selectedStops,
             n_customers: state.selectedStops.length,
@@ -6817,8 +7639,9 @@
             vehicle_capacity: +document.getElementById('capacity').value,
             demand_min: +document.getElementById('demand_min').value,
             demand_max: +document.getElementById('demand_max').value,
-            horizon: +document.getElementById('horizon').value,
-            window_length_min: 60, window_length_max: 180, service_time: 10,
+            horizon: horizon,
+            window_length_min: windowMin, window_length_max: windowMax,
+            service_time: 10,
             seed: +document.getElementById('vrp_seed').value,
             time_dependent: document.getElementById('time_dependent').checked,
             bucket_minutes: +document.getElementById('bucket_minutes').value || 30,
@@ -6833,6 +7656,7 @@
         document.getElementById('btnSolve').disabled = false;
         document.getElementById('btnBench').disabled = false;
         document.getElementById('btnSimBuild').disabled = false;
+        document.getElementById('btnSimSolo').disabled = false;
         cancelMapMode();
         setMapPrompt('Instance ready — ' + vrp.customers.length + ' stops, '
           + vrp.n_vehicles + ' vans. Solve it from the right-hand panel.');
@@ -6850,6 +7674,7 @@
     async function solveVRP() {
       const btn = document.getElementById('btnSolve');
       btn.disabled = true; btn.textContent = 'SOLVING…';
+      setLoadingState(true, 'Running Solver...', null);
       try {
         const algo = document.getElementById('algorithm').value;
         const result = await api('/api/vrp/solve', {
@@ -6874,6 +7699,7 @@
       } catch (e) {
         alert('Solve failed: ' + e.message);
       } finally {
+        setLoadingState(false);
         btn.disabled = false; btn.textContent = 'Solve';
       }
     }
@@ -6898,40 +7724,36 @@
     async function runBenchmark() {
       const btn = document.getElementById('btnBench');
       btn.disabled = true; btn.textContent = 'RUNNING 5-ALGO BENCHMARK…';
+      setLoadingState(true, 'Starting 5-Algorithm Benchmark...', 0);
       try {
-        const bench = await api('/api/benchmark/run', {
-          method: 'POST',
-          body: JSON.stringify({
-            vrp_id: state.vrp.vrp_id,
-            max_iter: +document.getElementById('max_iter').value,
-            seed: 1,
-          }),
-        });
-        // Retained so the AI assistant can cite the measured ranking instead of
-        // asserting a fixed one.
-        state.benchmarkResults = bench.results;
-        renderBenchTable(bench.results);
-        drawConvergence(bench.results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
+        const maxIter = +document.getElementById('max_iter').value;
+        const results = await runBenchmarkSequentially(state.vrp.vrp_id, maxIter, 1);
+        
+        state.benchmarkResults = results;
+        renderBenchTable(results);
+        drawConvergence(results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
 
         // draw the best result's routes on the map
-        const best = bench.results.reduce((a, b) => (a.fitness < b.fitness ? a : b));
+        const best = results.reduce((a, b) => (a.fitness < b.fitness ? a : b));
         const algoKey = {
           'QPSO (Quantum-Inspired PSO)': 'qpso', 'Genetic Algorithm': 'ga',
           'Simulated Annealing': 'sa', 'Standard PSO': 'standard_pso',
           'Greedy Nearest-Neighbor': 'greedy',
         }[best.algorithm] || 'qpso';
 
+        setLoadingState(true, `Solving routes using the best algorithm (${best.algorithm})...`, null);
         const solved = await api('/api/vrp/solve', {
           method: 'POST',
           body: JSON.stringify({
             vrp_id: state.vrp.vrp_id, algorithm: algoKey,
-            n_particles: 50, max_iter: +document.getElementById('max_iter').value, seed: 1, use_local_search: true
+            n_particles: 50, max_iter: maxIter, seed: 1, use_local_search: true
           }),
         });
         drawRoutes(solved.routes);
         showResult(solved);
         state.optimizedSolution = solved;
 
+        setLoadingState(true, 'Fetching baseline greedy solution...', null);
         // fetch baseline greedy as well
         const greedySolved = await api('/api/vrp/solve', {
           method: 'POST',
@@ -6941,7 +7763,8 @@
       } catch (e) {
         alert('Benchmark failed: ' + e.message);
       } finally {
-        btn.disabled = false; btn.textContent = 'Run full benchmark';
+        setLoadingState(false);
+        btn.disabled = false; btn.textContent = 'RUN 5-ALGO BENCHMARK';
       }
     }
 
@@ -7062,11 +7885,19 @@
           }
         }
 
-        // START / DEPOT Marker Pin
+        // A map needle, tip on the junction. The old pill badge was a 130px
+        // wide label centred on the node, which covered the streets around the
+        // depot and left the actual point ambiguous — the one place on the map
+        // where every route begins and ends.
         const depotIcon = L.divIcon({
           className: 'custom-depot-pin',
-          html: `<div style="background:#0F172A; color:#FFD166; font-weight:900; font-family:'Space Grotesk',sans-serif; padding:4px 9px; border-radius:12px; border:2px solid #EA580C; box-shadow:0 3px 8px rgba(0,0,0,0.35); font-size:11px; white-space:nowrap; display:flex; align-items:center; gap:4px;"><span style="color:#EA580C;">🏁</span> START / DEPOT</div>`,
-          iconSize: [130, 26], iconAnchor: [65, 13]
+          html: `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 41 C15 41 3 22.5 3 14 A12 12 0 1 1 27 14 C27 22.5 15 41 15 41 Z"
+                    fill="#EA580C" stroke="#FFFFFF" stroke-width="2.5"
+                    stroke-linejoin="round" paint-order="stroke"/>
+              <circle cx="15" cy="14" r="5.5" fill="#FFFFFF"/>
+            </svg>`,
+          iconSize: [30, 42], iconAnchor: [15, 41]
         });
         const areaName = (ctx.network && ctx.network.area_label) ? ctx.network.area_label : 'this area';
         L.marker([depotNode.y, depotNode.x], { icon: depotIcon })
@@ -7134,7 +7965,7 @@
       if (!state.network) return;
       const coords = nodeCoordMap(state);
 
-      if (state.network.is_geo) {
+      if (state.network.is_geo || state.viewMode === 'control') {
         // Routes get their own layer so the picked nodes underneath stay visible
         // and stay clickable.
         state.routeLayer.clearLayers();
@@ -7144,7 +7975,20 @@
           const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
           const latlngs = route.full_path.map(nid => coords[nid]).filter(Boolean).map(n => [n.y, n.x]);
           if (latlngs.length > 1) {
-            L.polyline(latlngs, { color, weight: 4.5, opacity: 0.95, className: 'route-line' }).addTo(state.routeLayer);
+            // vehicleRoutePane (450) sits above roadGraphPane (410). Without it
+            // these land in the default overlay pane at 400 — underneath the
+            // congestion colouring — so the plan you are meant to be reading
+            // was drawn under the traffic it is routing through.
+            L.polyline(latlngs, {
+              pane: 'vehicleRoutePane',
+              color: '#FFFFFF', weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
+              interactive: false,
+            }).addTo(state.routeLayer);
+            L.polyline(latlngs, {
+              pane: 'vehicleRoutePane',
+              color, weight: 4.5, opacity: 1, lineCap: 'round', lineJoin: 'round',
+              className: 'route-line',
+            }).addTo(state.routeLayer);
           }
         });
       } else {
@@ -7176,26 +8020,31 @@
         });
       }
 
-      // legend
-      const legendHtml = routes.map((r, i) =>
-        `<span><i style="background:${ROUTE_COLORS[i % ROUTE_COLORS.length]}"></i><b>Vehicle ${r.vehicle_id}</b> (${r.customer_sequence.length} stops, load ${r.load.toFixed(1)})</span>`
-      ).join('');
+      // Which colour on the map is which van. The solver only returns routes
+      // that carry stops, so the fleet size comes from the instance instead —
+      // worth showing, because asking for eight vans and seeing three used is
+      // the answer to "how many do I actually need?".
+      const fleet = (state.vrp && state.vrp.n_vehicles) || routes.length;
+      const legendHtml =
+        '<div class="route-legend-title">'
+        + (fleet > routes.length ? `Vans used — ${routes.length} of ${fleet}` : 'Vans on this plan')
+        + '</div>'
+        + routes.map((r, i) =>
+          `<span><i style="background:${ROUTE_COLORS[i % ROUTE_COLORS.length]}"></i>`
+          + `<b>Van ${r.vehicle_id}</b>`
+          + `<span class="route-legend-sub">${r.customer_sequence.length} stops · `
+          + `load ${r.load.toFixed(0)}</span></span>`
+        ).join('');
+
       let legendEl = document.getElementById('routeLegend');
       if (!legendEl) {
         legendEl = document.createElement('div');
         legendEl.id = 'routeLegend';
         legendEl.className = 'legend';
-        legendEl.style.position = 'absolute';
-        legendEl.style.bottom = '12px';
-        legendEl.style.left = '12px';
-        legendEl.style.background = '#0E1424';
-        legendEl.style.padding = '8px 14px';
-        legendEl.style.borderRadius = '6px';
-        legendEl.style.border = '2px solid #000';
-        legendEl.style.boxShadow = '3px 3px 0px #000';
         document.getElementById('mapWrap').appendChild(legendEl);
       }
       legendEl.innerHTML = legendHtml;
+      legendEl.hidden = false;
     }
 
     // Update clock in live ticker
@@ -7285,9 +8134,15 @@
       }
     }
 
+    function saveChatHistory() {
+      const container = document.getElementById('aiMessagesContainer');
+      if (container) sessionStorage.setItem('aiChatHistory', container.innerHTML);
+    }
+
     function resetAssistantChat() {
       const container = document.getElementById('aiMessagesContainer');
       if (container) container.innerHTML = '';
+      sessionStorage.removeItem('aiChatHistory');
       initAssistantChat(true);
     }
 
@@ -7322,6 +8177,8 @@
   `;
       container.appendChild(msgDiv);
       container.scrollTop = container.scrollHeight;
+      
+      if (typeof saveChatHistory === 'function') saveChatHistory();
     }
 
     async function queryAssistant(message, chip = null) {
@@ -7340,17 +8197,41 @@
       container.scrollTop = container.scrollHeight;
 
       const ctx = buildAssistantContext();
+      if (window.lastServerContext) {
+        ctx.slot_filling_active = window.lastServerContext.slot_filling_active;
+        ctx.collected_params = window.lastServerContext.collected_params;
+        ctx.current_prompt = window.lastServerContext.current_prompt;
+      }
+      
       let replyMd = '';
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
         const res = await api('/api/assistant/chat', {
           method: 'POST',
           body: JSON.stringify({ message, chip, context: ctx }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         replyMd = res.reply;
+        if (res.context) {
+          window.lastServerContext = res.context;
+        }
+        if (res.map_action) {
+          state.network = res.map_action.network;
+          state.vrp = res.map_action.vrp;
+          state.optimizedSolution = res.map_action.solution;
+          state.viewMode = 'control'; // switch to control room
+          switchView('control');
+          renderControlNetwork();
+          drawRoutes(state.optimizedSolution.routes);
+        }
       } catch (err) {
         console.warn('Backend assistant API unreachable, using resilient offline reasoning engine:', err);
-        replyMd = generateClientFallbackExplanation(message, chip, ctx);
+        replyMd = `*⚠️ The AI backend is currently slow or unreachable. Falling back to the offline engine.* \n\n` + 
+                  generateClientFallbackExplanation(message, chip, ctx);
       } finally {
         const tEl = document.getElementById(typingId);
         if (tEl) tEl.remove();
@@ -7361,6 +8242,7 @@
 
     function renderAssistantMarkdown(md) {
       if (!md) return '';
+      if (typeof marked !== 'undefined') return marked.parse(md);
       let html = md;
       // Replace HTML special chars in raw text
       html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -7543,6 +8425,13 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
       if (!container) return;
       if (!force && container.children.length > 0) return;
 
+      const history = sessionStorage.getItem('aiChatHistory');
+      if (!force && history) {
+        container.innerHTML = history;
+        syncAssistantContext();
+        return;
+      }
+
       const ctx = buildAssistantContext();
       const welcomeHtml = `
     <h3>👋 QuantaRoute AI Copilot Active</h3>
@@ -7567,6 +8456,8 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // visitor sees is a real road network rather than an empty frame. If the API
     // is asleep, the stored run stands in and says so.
     renderAreaPicker();
+    loadBenchmarkMatrix();
+    syncSoloButtonLabel();
     selectArea(CURATED_AREAS[0].key, { quiet: true })
       .catch(err => {
         console.warn('Could not load the opening district, showing the stored run:', err);

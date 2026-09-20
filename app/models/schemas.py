@@ -77,6 +77,12 @@ class VRPGenerateRequest(BaseModel):
     depot: int = Field(0, description="Node id to use as the depot")
     vehicle_capacity: float = Field(100.0, gt=0)
     n_vehicles: Optional[int] = Field(None, description="If omitted, auto-computed from total demand")
+    require_all_vehicles: bool = Field(
+        False,
+        description="Treat n_vehicles as a fleet that must all be sent out rather than a "
+                    "ceiling. Off by default: parking a van the plan does not need is "
+                    "normally the better answer.",
+    )
     demand_min: float = Field(5.0)
     demand_max: float = Field(20.0)
     horizon: float = Field(480.0, description="Operating time horizon in minutes")
@@ -303,6 +309,9 @@ class AssistantContext(BaseModel):
     avg_congestion_optimized: Optional[float] = None
     benchmark_ranks: Optional[List[Dict[str, Any]]] = None
     active_view: Optional[str] = Field(None, description="Active UI view: 'judge' or 'control'")
+    slot_filling_active: bool = Field(False, description="True if a multi-turn parameter collection is in progress")
+    collected_params: Dict[str, Any] = Field(default_factory=dict, description="VRP configuration parameters collected so far")
+    current_prompt: Optional[str] = Field(None, description="The specific parameter currently being asked for")
 
 
 class AssistantChatRequest(BaseModel):
@@ -315,6 +324,8 @@ class AssistantChatResponse(BaseModel):
     reply: str = Field(..., description="Formatted markdown explanation for presentation")
     suggested_chips: List[str] = Field(default_factory=list, description="Follow-up quick action prompts")
     metrics_summary: Optional[Dict[str, Any]] = Field(None, description="Key extracted quantitative metrics for UI badges")
+    context: Optional[AssistantContext] = Field(None, description="Returned context to allow state tracking across turns")
+    map_action: Optional[Dict[str, Any]] = Field(None, description="Data payload to auto-sync the frontend map")
 
 
 # ---------------------------------------------------------------------------

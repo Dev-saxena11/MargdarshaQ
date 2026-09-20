@@ -62,6 +62,12 @@ class VRPProblem:
     # vehicle has the uniform `vehicle_capacity`.
     vehicle_capacities: Optional[List[float]] = None
 
+    # Treat n_vehicles as a fleet that must all be sent out, rather than as a
+    # ceiling. Off by default, because leaving a van parked is usually the
+    # better plan and pretending otherwise would quietly make every published
+    # benchmark figure worse. See the idle-vehicle penalty in evaluate_solution.
+    require_all_vehicles: bool = False
+
     # Time-dependent travel times. When False (the default) the problem behaves
     # exactly as it always has: one travel-time matrix, no clock, so a road
     # costs the same at 09:00 and at 14:00. When True, a matrix is precomputed
@@ -219,6 +225,7 @@ def generate_synthetic_vrp(
     time_dependent: bool = False,
     bucket_minutes: float = 30.0,
     customer_nodes: Optional[List[int]] = None,
+    require_all_vehicles: bool = False,
 ) -> VRPProblem:
     """
     Build a VRP instance on `net`.
@@ -277,6 +284,7 @@ def generate_synthetic_vrp(
         time_dependent=time_dependent,
         bucket_minutes=bucket_minutes,
         horizon_minutes=horizon,
+        require_all_vehicles=require_all_vehicles,
     )
 
 
@@ -322,6 +330,7 @@ def evaluate_solution(
     time_window_penalty_weight: float = 10.0,
     w_time: float = 0.6,
     w_distance: float = 0.4,
+    idle_vehicle_penalty_weight: float = 200.0,
 ) -> VRPSolution:
     customer_lookup = {c.node_id: c for c in problem.customers}
     total_distance = 0.0
@@ -381,11 +390,23 @@ def evaluate_solution(
             total_distance += back_d
             total_time += back_t
 
+    # Spreading the same stops over more vans costs time, so left alone the
+    # optimiser parks any van it does not need — asking for five and being
+    # shown three is the correct answer to "how many do I need". When the
+    # fleet size is a given rather than a ceiling (a depot with five drivers
+    # rostered, who are paid either way), an idle van is the thing to avoid,
+    # and this makes leaving one parked the expensive option instead.
+    idle_vehicle_penalty = 0.0
+    if getattr(problem, "require_all_vehicles", False):
+        idle = sum(1 for route in routes if not route)
+        idle_vehicle_penalty = idle * idle_vehicle_penalty_weight
+
     fitness = (
         w_time * total_time
         + w_distance * total_distance
         + capacity_penalty_weight * capacity_violation
         + time_window_penalty_weight * time_window_violation
+        + idle_vehicle_penalty
     )
 
     feasible = (capacity_violation < 1e-6) and (time_window_violation < 1e-6)
