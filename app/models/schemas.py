@@ -10,6 +10,33 @@ from typing import List, Optional, Literal, Dict, Any
 
 
 # ---------------------------------------------------------------------------
+# Authentication & User Profile
+# ---------------------------------------------------------------------------
+
+class UserCreate(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+    full_name: str
+    company_name: str
+    role: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class UserProfileStats(BaseModel):
+    full_name: str
+    company_name: str
+    role: str
+    email: str
+    operational_zones_mapped: int
+    route_plans_dispatched: int
+
+# ---------------------------------------------------------------------------
 # Network generation
 # ---------------------------------------------------------------------------
 
