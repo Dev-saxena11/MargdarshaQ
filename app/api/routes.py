@@ -51,97 +51,47 @@ from app.models.schemas import (
 import os
 import threading
 import jwt
-from jwt import PyJWKClient
+from passlib.context import CryptContext
+from datetime import datetime, timedelta, timezone
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import Depends
+from fastapi import Depends, HTTPException
+from typing import Optional
 
 security = HTTPBearer()
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 
-# Supabase signs access tokens one of two ways, and which one is not our choice.
-# Older projects use a shared secret (HS256, the "JWT secret" in the dashboard).
-# Projects on the newer API keys — the `sb_publishable_…` kind — sign with an
-# asymmetric key instead and publish only the public half, as a JWKS. Verifying
-# HS256 alone therefore rejects every token such a project ever issues, with the
-# signature failure reading as "Invalid token" — indistinguishable, from the
-# outside, from a forged one. Both are accepted here, chosen per token by the
-# algorithm in its header, so the backend follows whatever the project is on.
-_HS_ALGORITHMS = ["HS256"]
-_JWKS_ALGORITHMS = ["ES256", "RS256"]
+JWT_SECRET = os.getenv("JWT_SECRET", "supersecret-logistics-key-change-in-prod")
+ALGORITHM = "HS256"
 
-_jwks_client: Optional[PyJWKClient] = None
-_jwks_lock = threading.Lock()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
-def _jwks_client_for_project() -> Optional[PyJWKClient]:
-    """The (cached) JWKS reader for this Supabase project, or None if unset."""
-    global _jwks_client
-    if _jwks_client is None and SUPABASE_URL:
-        with _jwks_lock:
-            if _jwks_client is None:
-                # The client keeps the fetched key set for `lifespan` seconds,
-                # so this is not a round trip to Supabase on every request.
-                _jwks_client = PyJWKClient(
-                    f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json",
-                    cache_keys=True, lifespan=600, timeout=10,
-                )
-    return _jwks_client
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=7)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
+    return encoded_jwt
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     token = credentials.credentials
     try:
-        algorithm = jwt.get_unverified_header(token).get("alg", "")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    try:
-        if algorithm in _JWKS_ALGORITHMS:
-            client = _jwks_client_for_project()
-            if client is None:
-                raise HTTPException(
-                    status_code=500,
-                    detail="SUPABASE_URL is not set, so asymmetric tokens cannot be verified.",
-                )
-            signing_key = client.get_signing_key_from_jwt(token).key
-            payload = jwt.decode(
-                token, signing_key, algorithms=_JWKS_ALGORITHMS,
-                options={"verify_aud": False},
-            )
-        elif algorithm in _HS_ALGORITHMS:
-            if not SUPABASE_JWT_SECRET:
-                raise HTTPException(
-                    status_code=500,
-                    detail="SUPABASE_JWT_SECRET is not set, so tokens cannot be verified.",
-                )
-            payload = jwt.decode(
-                token, SUPABASE_JWT_SECRET, algorithms=_HS_ALGORITHMS,
-                options={"verify_aud": False},
-            )
-        else:
-            raise HTTPException(
-                status_code=401,
-                detail=f"Token signed with unsupported algorithm '{algorithm}'.",
-            )
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        return user_id
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.PyJWKClientError as e:
-        # Supabase unreachable or serving no usable key: that is our outage to
-        # report, not the caller's token to blame.
-        raise HTTPException(
-            status_code=503, detail=f"Could not read the Supabase signing keys: {e}",
-        )
-    except jwt.InvalidTokenError:
+    except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
-
-    # Everything downstream keys a user's networks and instances by this value.
-    # A token without one would silently pool those rows under NULL, where they
-    # are visible to every other token that also lacks a subject.
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token carries no user id")
-    return user_id
 
 router = APIRouter(prefix="/api")
 
@@ -779,11 +729,49 @@ def chat_status():
         status="ready" if rag_engine.chunks else "empty",
     )
 
-@router.get("/config")
-def get_config():
-    return {
-        "supabase_url": os.getenv("SUPABASE_URL", ""),
-        "supabase_anon_key": os.getenv("SUPABASE_ANON_KEY", "")
-    }
+from app.models.schemas import UserCreate, UserLogin, TokenResponse, UserProfileStats
 
+@router.post("/auth/signup", response_model=TokenResponse)
+def signup(user: UserCreate):
+    existing_user = store.get_user_by_email(user.email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    password_hash = get_password_hash(user.password)
+    user_id = store.create_user(
+        email=user.email,
+        password_hash=password_hash,
+        full_name=user.full_name,
+        company_name=user.company_name,
+        role=user.role
+    )
+    
+    access_token = create_access_token(data={"sub": user_id, "email": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/auth/login", response_model=TokenResponse)
+def login(user: UserLogin):
+    db_user = store.get_user_by_email(user.email)
+    if not db_user or not verify_password(user.password, db_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    access_token = create_access_token(data={"sub": db_user["id"], "email": db_user["email"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/profile", response_model=UserProfileStats)
+def get_profile(user_id: str = Depends(get_current_user)):
+    db_user = store.get_user_by_id(user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    stats = store.get_user_stats(user_id)
+    
+    return UserProfileStats(
+        full_name=db_user["full_name"],
+        company_name=db_user["company_name"],
+        role=db_user["role"],
+        email=db_user["email"],
+        operational_zones_mapped=stats["networks"],
+        route_plans_dispatched=stats["vrps"]
+    )
 

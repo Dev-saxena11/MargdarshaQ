@@ -50,6 +50,17 @@ def init_db():
     try:
         with conn.cursor() as cur:
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE,
+                    password_hash TEXT,
+                    full_name TEXT,
+                    company_name TEXT,
+                    role TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS networks (
                     id TEXT PRIMARY KEY,
                     user_id TEXT,
@@ -80,6 +91,80 @@ def init_db():
 
 # Run table creation on import
 init_db()
+
+def create_user(email: str, password_hash: str, full_name: str, company_name: str, role: str) -> str:
+    user_id = new_id()
+    conn = get_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO users (id, email, password_hash, full_name, company_name, role) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (user_id, email, password_hash, full_name, company_name, role)
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    return user_id
+
+def get_user_by_email(email: str) -> Optional[dict]:
+    conn = get_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, email, password_hash, full_name, company_name, role FROM users WHERE email = %s", (email,))
+                row = cur.fetchone()
+                if row:
+                    return {
+                        "id": row[0],
+                        "email": row[1],
+                        "password_hash": row[2],
+                        "full_name": row[3],
+                        "company_name": row[4],
+                        "role": row[5]
+                    }
+        finally:
+            conn.close()
+    return None
+
+def get_user_by_id(user_id: str) -> Optional[dict]:
+    conn = get_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, email, password_hash, full_name, company_name, role FROM users WHERE id = %s", (user_id,))
+                row = cur.fetchone()
+                if row:
+                    return {
+                        "id": row[0],
+                        "email": row[1],
+                        "password_hash": row[2],
+                        "full_name": row[3],
+                        "company_name": row[4],
+                        "role": row[5]
+                    }
+        finally:
+            conn.close()
+    return None
+
+def get_user_stats(user_id: str) -> dict:
+    conn = get_connection()
+    stats = {"networks": 0, "vrps": 0}
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM networks WHERE user_id = %s", (user_id,))
+                row = cur.fetchone()
+                if row:
+                    stats["networks"] = row[0]
+                
+                cur.execute("SELECT COUNT(*) FROM vrp_problems WHERE user_id = %s", (user_id,))
+                row = cur.fetchone()
+                if row:
+                    stats["vrps"] = row[0]
+        finally:
+            conn.close()
+    return stats
 
 def cleanup_old_db_entries():
     conn = get_connection()

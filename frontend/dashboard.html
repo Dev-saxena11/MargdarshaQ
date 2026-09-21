@@ -3202,28 +3202,91 @@
       }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
   <!-- Auth Overlay -->
   <div id="authOverlay"
-    style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
-    <div
-      style="background:#1e1e1e; padding:30px; border-radius:8px; width:300px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-      <h2 style="margin-top:0;">Secure Session</h2>
-      <p style="font-size:0.9em; color:#ccc;">Log in to access your isolated workspace.</p>
-      <input type="email" id="authEmail" placeholder="Email"
-        style="width:100%; padding:10px; margin-bottom:10px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
-      <input type="password" id="authPassword" placeholder="Password"
-        style="width:100%; padding:10px; margin-bottom:15px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
+    style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif; overflow-y:auto; padding: 20px;">
+    
+    <div id="loginFormContainer"
+      style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:100%; max-width: 400px; text-align:center; box-shadow: var(--neo-shadow-lg); display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <h2 style="margin-top:0; font-family: 'Space Grotesk', sans-serif;">Logistics Secure Login</h2>
+      <p style="font-size:13px; color:var(--text-sub); margin-bottom: 24px;">Log in to access your isolated workspace.</p>
+      
+      <input type="email" id="loginEmail" placeholder="Email Address"
+        style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+      <input type="password" id="loginPassword" placeholder="Password"
+        style="width:100%; padding:12px; margin-bottom:20px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+      
       <button onclick="handleLogin()"
-        style="width:100%; padding:10px; background:#00BBF9; color:#000; font-weight:bold; border:none; border-radius:4px; cursor:pointer; margin-bottom:10px;">Login</button>
+        style="width:100%; padding:12px; background:var(--neo-mint); color:#000; font-weight:700; border:2px solid var(--border-neo); border-radius:4px; cursor:pointer; margin-bottom:16px; font-family: 'Space Grotesk', sans-serif; box-shadow: var(--neo-shadow-sm); transition: transform 0.1s ease;">Log In</button>
+      
+      <div style="width: 100%; border-bottom: 1.5px solid var(--border-bold); margin: 16px 0;"></div>
+      
+      <p style="font-size:12px; color:var(--text-sub); margin-bottom: 12px;">Don't have a Logistics Profile?</p>
+      <button onclick="document.getElementById('loginFormContainer').style.display='none'; document.getElementById('signupFormContainer').style.display='flex';"
+        style="width:100%; padding:10px; background:transparent; color:var(--neo-mint); border:1.5px solid var(--neo-mint); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif;">Create Logistics Profile</button>
+      <div id="loginError" style="color:var(--neo-pink); margin-top:16px; font-size:12px; font-weight:600;"></div>
+    </div>
+
+    <div id="signupFormContainer"
+      style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:100%; max-width: 500px; text-align:center; box-shadow: var(--neo-shadow-lg); display: none; flex-direction: column; align-items: center; justify-content: center;">
+      <h2 style="margin-top:0; font-family: 'Space Grotesk', sans-serif;">Create Logistics Profile</h2>
+      <p style="font-size:13px; color:var(--text-sub); margin-bottom: 24px;">Register to plan routes and generate networks.</p>
+      
+      <div style="display:flex; gap: 12px; width: 100%;">
+        <input type="text" id="signupName" placeholder="Full Name (e.g. Rahul Sharma)"
+          style="width:50%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+        <input type="text" id="signupRole" placeholder="Role (e.g. Dispatcher)"
+          style="width:50%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+      </div>
+      
+      <input type="text" id="signupCompany" placeholder="Company or Depot (e.g. Delivery Express Hub North)"
+        style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+        
+      <input type="email" id="signupEmail" placeholder="Email Address"
+        style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+      <input type="password" id="signupPassword" placeholder="Password (min 6 chars)"
+        style="width:100%; padding:12px; margin-bottom:20px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
+      
       <button onclick="handleSignup()"
-        style="width:100%; padding:10px; background:transparent; color:#00BBF9; border:1px solid #00BBF9; border-radius:4px; cursor:pointer;">Sign
-        Up</button>
-      <div id="authError" style="color:#FF0054; margin-top:10px; font-size:0.85em;"></div>
+        style="width:100%; padding:12px; background:var(--neo-yellow); color:#000; font-weight:700; border:2px solid var(--border-neo); border-radius:4px; cursor:pointer; margin-bottom:16px; font-family: 'Space Grotesk', sans-serif; box-shadow: var(--neo-shadow-sm); transition: transform 0.1s ease;">Register & Login</button>
+      
+      <div style="width: 100%; border-bottom: 1.5px solid var(--border-bold); margin: 16px 0;"></div>
+      
+      <p style="font-size:12px; color:var(--text-sub); margin-bottom: 12px;">Already have a profile?</p>
+      <button onclick="document.getElementById('signupFormContainer').style.display='none'; document.getElementById('loginFormContainer').style.display='flex';"
+        style="width:100%; padding:10px; background:transparent; color:var(--neo-yellow); border:1.5px solid var(--neo-yellow); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif;">Back to Login</button>
+      <div id="signupError" style="color:var(--neo-pink); margin-top:16px; font-size:12px; font-weight:600;"></div>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profileModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:none; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
+    <div style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:400px; max-width:90%; position: relative; box-shadow: var(--neo-shadow-lg);">
+      <button onclick="document.getElementById('profileModal').style.display='none'" style="position:absolute; top:12px; right:16px; background:none; border:none; color:var(--text-sub); font-size:24px; cursor:pointer; font-weight:700;">&times;</button>
+      <h2 style="margin-top:0; color:var(--neo-mint); font-family: 'Space Grotesk', sans-serif;"><span id="profName"></span></h2>
+      <p style="font-size:14px; margin: 4px 0 20px 0;"><span id="profRole" style="color:var(--neo-cyan); font-weight:700;"></span> at <span id="profCompany" style="font-weight:700;"></span></p>
+      <p style="font-size:12px; color:var(--text-sub); margin-bottom:24px; font-family: 'JetBrains Mono', monospace;"><span id="profEmail"></span></p>
+      
+      <div style="background:var(--bg); border: 1.5px solid var(--border-bold); border-radius:4px; padding:16px; margin-bottom:24px;">
+        <h3 style="margin-top:0; font-size:14px; border-bottom:1.5px solid var(--border-bold); padding-bottom:12px; font-family: 'Space Grotesk', sans-serif;">Operational Statistics</h3>
+        <div style="display:flex; justify-content:space-between; margin-top:16px;">
+          <div style="text-align:center; width:45%;">
+            <div style="font-size:32px; font-weight:800; color:var(--neo-purple-light); font-family: 'Space Grotesk', sans-serif;" id="profZones">0</div>
+            <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">Operational Zones Mapped</div>
+          </div>
+          <div style="text-align:center; width:45%;">
+            <div style="font-size:32px; font-weight:800; color:var(--neo-yellow); font-family: 'Space Grotesk', sans-serif;" id="profRoutes">0</div>
+            <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">Route Plans Dispatched</div>
+          </div>
+        </div>
+      </div>
+      
+      <button onclick="handleLogout()" style="width:100%; padding:12px; background:transparent; color:var(--neo-pink); border:2px solid var(--neo-pink); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s ease;">Sign Out</button>
     </div>
   </div>
 
@@ -3274,8 +3337,8 @@
         <!-- Only shown to a guest: signing in anonymously hides the overlay, so
              without this there would be no way back to it for someone who does
              have an account. -->
-        <button id="btnSignIn" class="btn-neo-secondary" hidden
-          style="padding:6px 12px; margin-left:6px;" onclick="showAuthOverlay()">Sign in</button>
+        <button id="btnViewProfile" class="btn-neo-secondary" hidden
+          style="padding:6px 12px; margin-left:6px; border-color: var(--neo-mint); color: var(--neo-mint);" onclick="showProfile()">Profile</button>
         <button id="btnHeaderAssistant" class="btn-neo-secondary"
           style="display:inline-flex; align-items:center; gap:6px; background:#1C1538; border-color:var(--neo-purple); color:#FFFFFF; padding:6px 12px; margin-left:6px;"
           onclick="toggleAssistant()">
@@ -4252,150 +4315,151 @@
     const DEPLOYED_API_BASE = 'https://sih26137.onrender.com';
 
 
-    let supabaseClient = null;
-    let currentSession = null;
-    let isGuestSession = false;
+    let currentToken = null;
+    let isGuestSession = false; // We won't use guest sessions anymore for the custom auth, or we can if we want to add anonymous login later.
     
-    // Resolves true once the API can be called — either a session is in hand or
-    // the backend has no Supabase configured and is not asking for one. Resolves
-    // false while the login wall stands, in which case adoptSession() starts the
-    // dashboard instead, after a real sign-in.
     async function initAuth() {
-      try {
-        const confRes = await fetch(apiBase() + '/api/config');
-        const conf = await confRes.json();
-        if (!conf.supabase_url) {
-          document.getElementById('authOverlay').style.display = 'none';
-          return true;
-        }
-        supabaseClient = supabase.createClient(conf.supabase_url, conf.supabase_anon_key);
-        const { data } = await supabaseClient.auth.getSession();
-        if (data && data.session) {
-          currentSession = data.session;
-          document.getElementById('authOverlay').style.display = 'none';
-          return true;
-        }
-
-        // No session. Try signing in anonymously: that mints a real JWT with
-        // its own user id, so the visitor gets an isolated workspace with no
-        // account, no email and no waiting — and the backend needs no special
-        // case, because the token is as real as any other.
-        //
-        // This is switched on from the Supabase dashboard (Authentication >
-        // Providers > Anonymous sign-ins). While it is off the call is refused
-        // and the login overlay stands, exactly as before; turning it on takes
-        // the wall away with no further change here.
-        const anon = await supabaseClient.auth.signInAnonymously();
-        if (anon.data && anon.data.session) {
-          currentSession = anon.data.session;
-          isGuestSession = true;
-          document.getElementById('authOverlay').style.display = 'none';
-          document.getElementById('btnSignIn').hidden = false;
-          return true;
-        }
-        console.info('Anonymous sign-in unavailable, showing the login form:',
-          anon.error && anon.error.message);
-        return false;
-      } catch (e) {
-        // The config probe itself failed, so there is no wall to stand behind —
-        // let the dashboard boot and report the backend being down in its own
-        // words rather than freezing on an overlay nobody can get past.
-        console.error("Failed to init auth", e);
+      // Try to load token from localStorage
+      const token = localStorage.getItem('margdarshaq_token');
+      if (token) {
+        currentToken = token;
         document.getElementById('authOverlay').style.display = 'none';
+        document.getElementById('btnViewProfile').hidden = false;
         return true;
       }
+      
+      // No token, show auth overlay
+      document.getElementById('authOverlay').style.display = 'flex';
+      return false;
     }
 
     function showAuthOverlay() {
-      authSay('');
+      loginSay('');
+      signupSay('');
       document.getElementById('authOverlay').style.display = 'flex';
     }
     
-    function authSay(msg, isError) {
-      const el = document.getElementById('authError');
+    function loginSay(msg, isError) {
+      const el = document.getElementById('loginError');
+      el.style.color = isError ? '#FF0054' : '#9CA3AF';
+      el.innerHTML = msg;
+    }
+    
+    function signupSay(msg, isError) {
+      const el = document.getElementById('signupError');
       el.style.color = isError ? '#FF0054' : '#9CA3AF';
       el.innerHTML = msg;
     }
 
-    // Supabase reads a blank email as a request to sign in anonymously, and
-    // answers "Anonymous sign-ins are disabled" — an error about a feature
-    // nobody asked for, which says nothing about the empty box that caused it.
-    function authCredentials() {
-      const email = document.getElementById('authEmail').value.trim();
-      const password = document.getElementById('authPassword').value;
-      if (!email) { authSay('Enter your email address.', true); return null; }
-      if (!password) { authSay('Enter your password.', true); return null; }
-      return { email, password };
-    }
-
     async function handleLogin() {
-      const creds = authCredentials();
-      if (!creds) return;
-      authSay('Logging in…');
-      const { data, error } = await supabaseClient.auth.signInWithPassword(creds);
-      if (error) {
-        // The confirmation link is the usual reason a correct password is
-        // refused, so say that rather than leaving "Invalid login credentials"
-        // to imply the password was mistyped.
-        if (/confirm/i.test(error.message)) {
-          authSay('That address has not been confirmed yet. Check your inbox '
-            + 'and spam folder, or <a href="#" onclick="handleResend();return false;" '
-            + 'style="color:#00BBF9;">send the email again</a>.', true);
-        } else {
-          authSay(error.message, true);
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      
+      if (!email) { loginSay('Enter your email address.', true); return; }
+      if (!password) { loginSay('Enter your password.', true); return; }
+      
+      loginSay('Logging in…');
+      try {
+        const resp = await fetch(apiBase() + '/api/auth/login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email, password})
+        });
+        
+        const data = await resp.json();
+        if (!resp.ok) {
+          loginSay(data.detail || 'Login failed', true);
+          return;
         }
-        return;
+        
+        adoptToken(data.access_token);
+      } catch (err) {
+        loginSay('Network error during login.', true);
       }
-      adoptSession(data.session);
     }
 
-    // A real account replaces a guest one. The guest's workspace is keyed to
-    // the anonymous user id and does not follow them across, which is the point
-    // of signing in — so the room is reloaded rather than left showing data the
-    // new session cannot fetch again.
-    function adoptSession(session) {
-      currentSession = session;
-      isGuestSession = false;
-      authLapseNoted = false;
-      document.getElementById('btnSignIn').hidden = true;
+    async function handleSignup() {
+      const email = document.getElementById('signupEmail').value.trim();
+      const password = document.getElementById('signupPassword').value;
+      const full_name = document.getElementById('signupName').value.trim();
+      const company_name = document.getElementById('signupCompany').value.trim();
+      const role = document.getElementById('signupRole').value.trim();
+      
+      if (!email || !password || !full_name || !company_name || !role) { 
+        signupSay('Please fill in all fields.', true); return; 
+      }
+      if (password.length < 6) {
+        signupSay('Password must be at least 6 characters.', true); return;
+      }
+      
+      signupSay('Creating profile…');
+      try {
+        const resp = await fetch(apiBase() + '/api/auth/signup', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email, password, full_name, company_name, role})
+        });
+        
+        const data = await resp.json();
+        if (!resp.ok) {
+          signupSay(data.detail || 'Registration failed', true);
+          return;
+        }
+        
+        adoptToken(data.access_token);
+      } catch (err) {
+        signupSay('Network error during registration.', true);
+      }
+    }
+
+    function adoptToken(token) {
+      currentToken = token;
+      localStorage.setItem('margdarshaq_token', token);
+      document.getElementById('btnViewProfile').hidden = false;
       document.getElementById('authOverlay').style.display = 'none';
+      
+      // Reset state
       controlRoomBootstrapped = false;
       state.network = null;
       state.controlAreaKey = null;
       startDashboard();
       if (state.viewMode === 'control') bootstrapControlRoom();
     }
-
-    async function handleSignup() {
-      const creds = authCredentials();
-      if (!creds) return;
-      authSay('Signing up…');
-      const { data, error } = await supabaseClient.auth.signUp(creds);
-      if (error) { authSay(error.message, true); return; }
-      if (data.session) {
-        adoptSession(data.session);
-      } else {
-        authSay('Confirmation email sent to <b>' + creds.email + '</b>. Open the '
-          + 'link in it, then log in here.<br><span style="font-size:0.9em;">Not '
-          + 'arrived? Check spam, then <a href="#" onclick="handleResend();return false;" '
-          + 'style="color:#00BBF9;">send it again</a>.</span>');
-      }
+    
+    function handleLogout() {
+      currentToken = null;
+      localStorage.removeItem('margdarshaq_token');
+      document.getElementById('profileModal').style.display = 'none';
+      document.getElementById('btnViewProfile').hidden = true;
+      document.getElementById('authOverlay').style.display = 'flex';
+      document.getElementById('loginFormContainer').style.display = 'flex';
+      document.getElementById('signupFormContainer').style.display = 'none';
     }
-
-    // Supabase rate-limits confirmation emails hard, so a resend that is
-    // refused says so plainly instead of looking like it worked.
-    async function handleResend() {
-      const email = document.getElementById('authEmail').value.trim();
-      if (!email) { authSay('Enter your email address first.', true); return; }
-      authSay('Sending…');
-      const { error } = await supabaseClient.auth.resend({ type: 'signup', email });
-      if (error) {
-        authSay(/rate|limit|seconds/i.test(error.message)
-          ? 'Too many emails requested — wait a minute and try again. (' + error.message + ')'
-          : error.message, true);
-        return;
+    
+    async function showProfile() {
+      if (!currentToken) return;
+      
+      try {
+        const resp = await fetch(apiBase() + '/api/profile', {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        
+        if (resp.ok) {
+          const data = await resp.json();
+          document.getElementById('profName').textContent = data.full_name;
+          document.getElementById('profRole').textContent = data.role;
+          document.getElementById('profCompany').textContent = data.company_name;
+          document.getElementById('profEmail').textContent = data.email;
+          document.getElementById('profZones').textContent = data.operational_zones_mapped;
+          document.getElementById('profRoutes').textContent = data.route_plans_dispatched;
+          
+          document.getElementById('profileModal').style.display = 'flex';
+        } else {
+          alert("Failed to load profile details.");
+        }
+      } catch (err) {
+        console.error("Error loading profile", err);
       }
-      authSay('Sent again to <b>' + email + '</b>. Check spam as well.');
     }
 
     function isLocalHost() {
