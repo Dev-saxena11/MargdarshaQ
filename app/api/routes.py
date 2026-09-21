@@ -671,9 +671,11 @@ def get_stress_test_cached():
 # ---------------------------------------------------------------------------
 
 @router.post("/assistant/chat", response_model=AssistantChatResponse)
-def assistant_chat(req: AssistantChatRequest):
+def assistant_chat(req: AssistantChatRequest, user_id: str = Depends(get_current_user)):
     """Answers judge/user questions about current solve results, QPSO, and map."""
-    return assistant_engine.chat(req)
+    # The assistant reads the network the caller loaded and writes the instance
+    # the caller's page will solve next, so it has to do both as the caller.
+    return assistant_engine.chat(req, user_id)
 
 
 # ---------------------------------------------------------------------------

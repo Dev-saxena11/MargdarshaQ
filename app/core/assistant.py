@@ -59,11 +59,15 @@ SUGGESTED_CHIPS = [
 MVP_NETWORK = "bareilly"
 MVP_AREA_LABEL = "Bareilly City, Uttar Pradesh"
 
-# store.put_network/get_network/put_vrp now key everything by user_id, for the
-# Supabase-backed data isolation added alongside this feature. /api/assistant/chat
-# carries no auth dependency, so there is no real signed-in user in this scope —
-# using a fixed value keeps writes and reads consistent with each other without
-# pulling the conversational assistant into that auth boundary.
+# store.put_network/get_network/put_vrp key everything by user_id, for the
+# Supabase-backed data isolation added alongside this feature. The assistant
+# plans on the very network the caller loaded in the control room and hands the
+# ids it creates straight back to that same page, so it has to read and write as
+# the caller — under any other key the lookup misses, the drawn boundary is
+# silently replaced by the default city, and the ids it returns then 404 on the
+# next call the page makes with them. `chat()` takes the id the route resolved
+# from the bearer token; this stands in only for callers outside the API (the
+# provider tests), so writes and reads still agree with each other there.
 _ASSISTANT_STORE_USER = "assistant"
 
 # Shown instead of performance numbers whenever no comparison run has been
@@ -124,14 +128,16 @@ class AIAssistantExplainer:
     def __init__(self):
         self._story_card_cache: Dict[str, str] = {}
 
-    def chat(self, req: AssistantChatRequest) -> AssistantChatResponse:
+    def chat(self, req: AssistantChatRequest,
+             user_id: Optional[str] = None) -> AssistantChatResponse:
         """Process user query and return grounded AI explanation."""
         ctx = req.context or AssistantContext()
         msg = (req.message or "").strip().lower()
         chip = req.chip or ""
+        user_id = user_id or _ASSISTANT_STORE_USER
 
         if chip == "🚗 Plan a Route" or "plan a route" in msg or ctx.slot_filling_active:
-            return self._handle_slot_filling(req.message or chip, ctx)
+            return self._handle_slot_filling(req.message or chip, ctx, user_id)
 
         # Preset chips are answered by the local deterministic engine: they map
         # to fixed explanations, so spending an API call on them would buy
@@ -162,7 +168,8 @@ class AIAssistantExplainer:
             context=ctx,
         )
 
-    def _handle_slot_filling(self, msg: str, ctx: AssistantContext) -> AssistantChatResponse:
+    def _handle_slot_filling(self, msg: str, ctx: AssistantContext,
+                             user_id: str) -> AssistantChatResponse:
         """
         Conversational route planning for someone who does not know what a node
         id is.
@@ -298,7 +305,7 @@ class AIAssistantExplainer:
                     suggested_chips=["Yes, plan it", "Change the stops", "Cancel"],
                     context=ctx,
                 )
-            return self._slot_solve(ctx)
+            return self._slot_solve(ctx, user_id)
 
         # Unknown state — start again rather than stall in it.
         return self._slot_cancel(ctx)
@@ -417,7 +424,7 @@ class AIAssistantExplainer:
         except Exception:
             return None
 
-    def _slot_solve(self, ctx: AssistantContext) -> AssistantChatResponse:
+    def _slot_solve(self, ctx: AssistantContext, user_id: str) -> AssistantChatResponse:
         """Builds and solves the round on the shipped Bareilly network."""
         try:
             from app.api.routes import _build_solve_response, _network_payload
@@ -437,12 +444,12 @@ class AIAssistantExplainer:
             net = None
             if network_id:
                 try:
-                    net = store.get_network(_ASSISTANT_STORE_USER, network_id)
+                    net = store.get_network(user_id, network_id)
                 except KeyError:
                     net = None
             if net is None:
                 net = load_cached_network(MVP_NETWORK, congestion_seed=42)
-                network_id = store.put_network(_ASSISTANT_STORE_USER, net, is_geo=True)
+                network_id = store.put_network(user_id, net, is_geo=True)
 
             # Delivery windows cannot outlast the shift they sit in; the API
             # rejects the instance outright if they do.
@@ -460,7 +467,7 @@ class AIAssistantExplainer:
                 service_time=10.0,
                 seed=42,
             )
-            vrp_id = store.put_vrp(network_id, problem)
+            vrp_id = store.put_vrp(user_id, network_id, problem)
 
             started = time.perf_counter()
             opt = QPSOVRPOptimizer(problem, n_particles=30, max_iter=60,
