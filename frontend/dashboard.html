@@ -8572,11 +8572,23 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
 
     let recognition = null;
     let isRecognizing = false;
+    let isStartingRecognition = false;
     let finalTranscript = '';
+    let speechErrorMessage = '';
+    let micAudioCtx = null;
 
+    // One AudioContext for the page. Building a new one per beep leaks them
+    // until the browser's per-document limit refuses to make any more, and a
+    // context first built inside onend — which is not a user gesture — starts
+    // suspended, so that beep never sounds. Created on the click that starts
+    // recognition, it stays usable for both ends of the round trip.
     function playMicBeep(type) {
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!micAudioCtx) micAudioCtx = new Ctor();
+        if (micAudioCtx.state === 'suspended') micAudioCtx.resume();
+        const audioCtx = micAudioCtx;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
@@ -8601,12 +8613,34 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
       }
     }
 
+    // What the overlay says when recognition ends with nothing to show for it.
+    // The browser reports these as bare codes; "not-allowed" in particular is
+    // the one people actually hit, by dismissing the permission prompt once.
+    function describeSpeechError(code) {
+      switch (code) {
+        case 'not-allowed':
+        case 'service-not-allowed':
+          return 'Microphone access is blocked. Allow it for this site in your '
+            + 'browser, then try again.';
+        case 'audio-capture':
+          return 'No microphone found.';
+        case 'network':
+          return 'Voice input needs a network connection and could not reach '
+            + 'the speech service.';
+        case 'no-speech':
+        case 'aborted':
+          return '';
+        default:
+          return 'Voice input failed (' + code + ').';
+      }
+    }
+
     function toggleSpeechRecognition() {
       const overlay = document.getElementById('aiSpeechOverlay');
       const overlayText = document.getElementById('aiSpeechOverlayText');
       const aiInput = document.getElementById('aiInput');
 
-      if (isRecognizing) {
+      if (isRecognizing || isStartingRecognition) {
         if (recognition) recognition.stop();
         return;
       }
@@ -8625,7 +8659,9 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
 
         recognition.onstart = function () {
           isRecognizing = true;
+          isStartingRecognition = false;
           finalTranscript = '';
+          speechErrorMessage = '';
           overlayText.innerText = 'Listening...';
           overlay.style.display = 'flex';
           playMicBeep('start');
@@ -8649,28 +8685,48 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
         recognition.onerror = function (event) {
           console.error("Speech recognition error:", event.error);
           isRecognizing = false;
+          isStartingRecognition = false;
+          speechErrorMessage = describeSpeechError(event.error);
         };
 
         recognition.onend = function () {
           isRecognizing = false;
+          isStartingRecognition = false;
           playMicBeep('stop');
 
           if (finalTranscript.trim()) {
             overlay.style.display = 'none';
             aiInput.value = aiInput.value ? aiInput.value + ' ' + finalTranscript : finalTranscript;
-          } else {
-            overlayText.innerText = "Didn't catch that...";
-            setTimeout(() => {
-              if (!isRecognizing) overlay.style.display = 'none';
-            }, 1200);
+            aiInput.focus();
+            return;
           }
+
+          // Nothing was heard, and the overlay has to be shown rather than
+          // merely relabelled: a refused microphone fails before onstart ever
+          // runs, so there is nothing on screen at this point and the button
+          // would otherwise look simply dead, on this click and every one
+          // after it.
+          const message = speechErrorMessage;
+          speechErrorMessage = '';
+          overlayText.innerText = message || "Didn't catch that...";
+          overlay.style.display = 'flex';
+          setTimeout(() => {
+            if (!isRecognizing) overlay.style.display = 'none';
+          }, message ? 3500 : 1200);
         };
       }
 
       try {
+        isStartingRecognition = true;
         recognition.start();
       } catch (e) {
         console.error("Error starting speech recognition", e);
+        isStartingRecognition = false;
+        overlayText.innerText = 'Could not start voice input. Try again.';
+        overlay.style.display = 'flex';
+        setTimeout(() => {
+          if (!isRecognizing) overlay.style.display = 'none';
+        }, 2500);
       }
     }
 
