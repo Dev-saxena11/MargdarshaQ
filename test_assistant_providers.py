@@ -10,7 +10,22 @@ cover the logic that must hold regardless of which provider is configured.
 Run with:  python test_assistant_providers.py
 """
 
+import os
 import sys
+
+# These checks assert the offline path: with no LLM configured and nothing
+# solved yet, the assistant still answers, locally, and says there is nothing to
+# report. "No API key required" was true; what the file actually needed was no
+# API key and no database *present*, which is a different thing. Run on a
+# machine whose .env supplies either, three checks failed -- the assistant took
+# the live-provider path, and read rows somebody else had stored days ago.
+#
+# Set empty rather than deleted: the app calls load_dotenv(), which leaves an
+# existing variable alone but will happily set an absent one from .env.
+os.environ["DATABASE_URL"] = ""
+for _provider_key in ("OPENROUTER_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"):
+    os.environ[_provider_key] = ""
+os.environ.setdefault("JWT_SECRET", "test-only-secret-not-used-anywhere-real")
 
 from app.core.llm_providers import (
     OpenRouterProvider, GeminiProvider, OpenAIProvider,
