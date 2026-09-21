@@ -4256,20 +4256,24 @@
     let currentSession = null;
     let isGuestSession = false;
     
+    // Resolves true once the API can be called — either a session is in hand or
+    // the backend has no Supabase configured and is not asking for one. Resolves
+    // false while the login wall stands, in which case adoptSession() starts the
+    // dashboard instead, after a real sign-in.
     async function initAuth() {
       try {
         const confRes = await fetch(apiBase() + '/api/config');
         const conf = await confRes.json();
         if (!conf.supabase_url) {
           document.getElementById('authOverlay').style.display = 'none';
-          return;
+          return true;
         }
         supabaseClient = supabase.createClient(conf.supabase_url, conf.supabase_anon_key);
         const { data } = await supabaseClient.auth.getSession();
         if (data && data.session) {
           currentSession = data.session;
           document.getElementById('authOverlay').style.display = 'none';
-          return;
+          return true;
         }
 
         // No session. Try signing in anonymously: that mints a real JWT with
@@ -4287,12 +4291,18 @@
           isGuestSession = true;
           document.getElementById('authOverlay').style.display = 'none';
           document.getElementById('btnSignIn').hidden = false;
-          return;
+          return true;
         }
         console.info('Anonymous sign-in unavailable, showing the login form:',
           anon.error && anon.error.message);
+        return false;
       } catch (e) {
+        // The config probe itself failed, so there is no wall to stand behind —
+        // let the dashboard boot and report the backend being down in its own
+        // words rather than freezing on an overlay nobody can get past.
         console.error("Failed to init auth", e);
+        document.getElementById('authOverlay').style.display = 'none';
+        return true;
       }
     }
 
@@ -4337,7 +4347,6 @@
         return;
       }
       adoptSession(data.session);
-      checkHealth();
     }
 
     // A real account replaces a guest one. The guest's workspace is keyed to
@@ -4352,6 +4361,7 @@
       controlRoomBootstrapped = false;
       state.network = null;
       state.controlAreaKey = null;
+      startDashboard();
       if (state.viewMode === 'control') bootstrapControlRoom();
     }
 
@@ -4363,7 +4373,6 @@
       if (error) { authSay(error.message, true); return; }
       if (data.session) {
         adoptSession(data.session);
-        checkHealth();
       } else {
         authSay('Confirmation email sent to <b>' + creds.email + '</b>. Open the '
           + 'link in it, then log in here.<br><span style="font-size:0.9em;">Not '
@@ -8797,25 +8806,31 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // Initialization
     // ---------------------------------------------------------------------------
     initApiBase();   // must run before checkHealth() so it probes the right backend
-    checkHealth();
-
-    // The landing page opens on a district already loaded, so the first thing a
-    // visitor sees is a real road network rather than an empty frame. If the API
-    // is asleep, the stored run stands in and says so.
     renderAreaPicker();
-    loadBenchmarkMatrix();
     syncSoloButtonLabel();
-    selectArea(CURATED_AREAS[0].key, { quiet: true })
-      .catch(err => {
-        console.warn('Could not load the opening district, showing the stored run:', err);
-        loadOfflineFallback();
-      });
-
     setTimeout(initAssistantChat, 100);
 
-    // Run auth init on load
-    window.addEventListener('DOMContentLoaded', () => {
-      initAuth();
+    // Everything here needs the bearer token. Fired before the session is in
+    // hand, each of these calls is simply rejected, and the page settles on the
+    // offline fallback and a dead API light while a perfectly good backend sits
+    // there waiting — so the opening load waits for initAuth() to settle first.
+    function startDashboard() {
+      checkHealth();
+      loadBenchmarkMatrix();
+      // The landing page opens on a district already loaded, so the first thing
+      // a visitor sees is a real road network rather than an empty frame. If the
+      // API is asleep, the stored run stands in and says so.
+      selectArea(CURATED_AREAS[0].key, { quiet: true })
+        .catch(err => {
+          console.warn('Could not load the opening district, showing the stored run:', err);
+          loadOfflineFallback();
+        });
+    }
+
+    initAuth().then(ready => {
+      // Not ready means the login overlay is up; adoptSession() boots the
+      // dashboard once someone is actually through it.
+      if (ready) startDashboard();
     });
   </script>
 </body>
