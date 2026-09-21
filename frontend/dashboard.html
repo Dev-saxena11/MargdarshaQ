@@ -1494,7 +1494,7 @@
       background-size: 16px 16px;
     }
 
-    .map-canvas-wrap > svg {
+    .map-canvas-wrap>svg {
       width: 100%;
       height: 100%;
       display: block;
@@ -1520,7 +1520,7 @@
       font-size: 11px !important;
       border: 2px solid #CBD5E1 !important;
       border-radius: 6px !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
     }
 
     /* Directional arrow markers on road graph */
@@ -1541,8 +1541,9 @@
       border: 2px solid #334155 !important;
       border-radius: 6px !important;
       padding: 4px 10px !important;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.3) !important;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
     }
+
     .route-tooltip::before {
       border-top-color: #0F172A !important;
     }
@@ -3074,7 +3075,8 @@
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .ai-input-footer input, .ai-input-footer textarea {
+    .ai-input-footer input,
+    .ai-input-footer textarea {
       flex: 1;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -3088,13 +3090,15 @@
       resize: none;
     }
 
-    .ai-input-footer input:focus, .ai-input-footer textarea:focus {
+    .ai-input-footer input:focus,
+    .ai-input-footer textarea:focus {
       border-color: rgba(0, 245, 212, 0.75);
       box-shadow: 0 0 16px rgba(0, 245, 212, 0.25), inset 0 0 6px rgba(0, 245, 212, 0.1);
       background: rgba(255, 255, 255, 0.07);
     }
 
-    .ai-input-footer input::placeholder, .ai-input-footer textarea::placeholder {
+    .ai-input-footer input::placeholder,
+    .ai-input-footer textarea::placeholder {
       color: rgba(148, 163, 184, 0.65);
     }
 
@@ -3121,13 +3125,17 @@
       box-shadow: 0 6px 24px rgba(123, 92, 255, 0.55);
       border-color: rgba(0, 245, 212, 0.6);
     }
+
     /* ----------------------------------------------------------------------- */
     /* PROGRESS BAR / SPINNER OVERLAY */
     /* ----------------------------------------------------------------------- */
     #globalProgressOverlay {
       display: none;
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       background: rgba(10, 10, 15, 0.85);
       backdrop-filter: blur(4px);
       z-index: 9999;
@@ -3136,15 +3144,17 @@
       justify-content: center;
       color: #fff;
     }
+
     .progress-box {
       background: var(--bg-card);
       border: 1px solid var(--border-light);
       padding: 24px 32px;
       border-radius: 8px;
-      box-shadow: 0 12px 32px rgba(0,245,212,0.1);
+      box-shadow: 0 12px 32px rgba(0, 245, 212, 0.1);
       width: 400px;
       text-align: center;
     }
+
     .progress-title {
       font-size: 16px;
       font-weight: 700;
@@ -3152,25 +3162,29 @@
       margin-bottom: 8px;
       font-family: 'Space Grotesk', sans-serif;
     }
+
     .progress-msg {
       font-size: 13px;
       color: var(--text-sub);
       margin-bottom: 20px;
     }
+
     .progress-bar-container {
       width: 100%;
       height: 6px;
-      background: rgba(255,255,255,0.1);
+      background: rgba(255, 255, 255, 0.1);
       border-radius: 3px;
       overflow: hidden;
       position: relative;
     }
+
     .progress-bar-fill {
       width: 0%;
       height: 100%;
       background: linear-gradient(90deg, var(--neo-purple), var(--neo-mint));
       transition: width 0.3s ease;
     }
+
     .spinner-ring {
       display: inline-block;
       width: 24px;
@@ -3181,8 +3195,11 @@
       border-top-color: var(--neo-mint);
       animation: spin 1s ease-in-out infinite;
     }
+
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3191,14 +3208,21 @@
 
 <body>
   <!-- Auth Overlay -->
-  <div id="authOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
-    <div style="background:#1e1e1e; padding:30px; border-radius:8px; width:300px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+  <div id="authOverlay"
+    style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
+    <div
+      style="background:#1e1e1e; padding:30px; border-radius:8px; width:300px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
       <h2 style="margin-top:0;">Secure Session</h2>
       <p style="font-size:0.9em; color:#ccc;">Log in to access your isolated workspace.</p>
-      <input type="email" id="authEmail" placeholder="Email" style="width:100%; padding:10px; margin-bottom:10px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
-      <input type="password" id="authPassword" placeholder="Password" style="width:100%; padding:10px; margin-bottom:15px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
-      <button onclick="handleLogin()" style="width:100%; padding:10px; background:#00BBF9; color:#000; font-weight:bold; border:none; border-radius:4px; cursor:pointer; margin-bottom:10px;">Login</button>
-      <button onclick="handleSignup()" style="width:100%; padding:10px; background:transparent; color:#00BBF9; border:1px solid #00BBF9; border-radius:4px; cursor:pointer;">Sign Up</button>
+      <input type="email" id="authEmail" placeholder="Email"
+        style="width:100%; padding:10px; margin-bottom:10px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
+      <input type="password" id="authPassword" placeholder="Password"
+        style="width:100%; padding:10px; margin-bottom:15px; box-sizing:border-box; border:1px solid #333; border-radius:4px; background:#2c2c2c; color:white;">
+      <button onclick="handleLogin()"
+        style="width:100%; padding:10px; background:#00BBF9; color:#000; font-weight:bold; border:none; border-radius:4px; cursor:pointer; margin-bottom:10px;">Login</button>
+      <button onclick="handleSignup()"
+        style="width:100%; padding:10px; background:transparent; color:#00BBF9; border:1px solid #00BBF9; border-radius:4px; cursor:pointer;">Sign
+        Up</button>
       <div id="authError" style="color:#FF0054; margin-top:10px; font-size:0.85em;"></div>
     </div>
   </div>
@@ -3206,7 +3230,8 @@
   <!-- Progress Bar Overlay -->
   <div id="globalProgressOverlay">
     <div class="progress-box">
-      <img src="static/loading.gif" alt="Loading..." class="loading-gif" style="max-width: 120px; width: 30vw; height: auto; margin-bottom: 0.8rem; border-radius: 8px;">
+      <img src="static/loading.gif" alt="Loading..." class="loading-gif"
+        style="max-width: 120px; width: 30vw; height: auto; margin-bottom: 0.8rem; border-radius: 8px;">
       <div class="progress-title" id="progressTitle">Working...</div>
       <div class="progress-msg" id="progressMsg">Please wait while the operation completes.</div>
       <div class="progress-bar-container">
@@ -3335,12 +3360,12 @@
             <div class="bench-metric-toggle" id="benchMetricToggle">
               <button class="bench-metric-btn active" data-metric="fitness"
                 onclick="setBenchMetric('fitness')">Fitness</button>
-              <button class="bench-metric-btn" data-metric="time_min"
-                onclick="setBenchMetric('time_min')">Fleet time</button>
+              <button class="bench-metric-btn" data-metric="time_min" onclick="setBenchMetric('time_min')">Fleet
+                time</button>
               <button class="bench-metric-btn" data-metric="distance_km"
                 onclick="setBenchMetric('distance_km')">Distance</button>
-              <button class="bench-metric-btn" data-metric="runtime_ms"
-                onclick="setBenchMetric('runtime_ms')">Solve time</button>
+              <button class="bench-metric-btn" data-metric="runtime_ms" onclick="setBenchMetric('runtime_ms')">Solve
+                time</button>
             </div>
           </div>
 
@@ -3371,7 +3396,8 @@
                 a city at 9am is often the slowest one to drive, because the short way is the way
                 everyone else is also taking. What matters is time on the road through
                 <b>actual traffic</b>, and whether the customer was reached inside the slot they
-                were promised.</p>
+                were promised.
+              </p>
               <span class="term-note">Formally: a capacitated vehicle routing problem with time
                 windows (CVRPTW), priced on a congested, one-way-aware road network.</span>
             </div>
@@ -3879,7 +3905,8 @@
                 </div>
               </div>
 
-              <button class="primary" onclick="generateVRP()" id="btnGenVRP" disabled>Build instance from selection</button>
+              <button class="primary" onclick="generateVRP()" id="btnGenVRP" disabled>Build instance from
+                selection</button>
               <div id="vrpInfo" style="margin-top:10px;"></div>
             </section>
           </div>
@@ -4055,8 +4082,10 @@
       <div class="ai-chips-label">SUGGESTED EXPLAINERS:</div>
       <div class="ai-chips-row" id="aiChipsRow">
         <button class="ai-chip" onclick="handleChipClick('plan_route', '🚗 Plan a Route')">🚗 Plan a Route</button>
-        <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why is QPSO better here?')">⚛️ Why is QPSO better here?</button>
-        <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does this chart show?')">📈 What does this chart show?</button>
+        <button class="ai-chip" onclick="handleChipClick('why_qpso', '⚛️ Why is QPSO better here?')">⚛️ Why is QPSO
+          better here?</button>
+        <button class="ai-chip" onclick="handleChipClick('explain_conv', '📈 What does this chart show?')">📈 What does
+          this chart show?</button>
       </div>
     </div>
 
@@ -4066,13 +4095,60 @@
     </div>
 
     <!-- Chat Input Footer -->
-    <div class="ai-input-footer">
-      <textarea id="aiInput" rows="1" placeholder="Ask about routes, algorithms, or traffic..."
-        onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }"></textarea>
+    <div class="ai-input-footer" style="position: relative; display: flex; align-items: center; gap: 8px;">
+      <div style="position: relative; flex: 1; display: flex;">
+        <textarea id="aiInput" rows="1" placeholder="Ask about routes, algorithms, or traffic..."
+          onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }"
+          style="flex: 1; padding-right: 36px; box-sizing: border-box;"></textarea>
+        <button id="aiMicBtn" class="ai-btn-icon" onclick="toggleSpeechRecognition()" title="Voice Input"
+          style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 16px; transition: all 0.2s;">🎙️</button>
+      </div>
       <button id="aiBtnSend" class="ai-btn-send" onclick="sendAssistantMessage()">
         <span>Ask</span>
         <span>➔</span>
       </button>
+    </div>
+
+    <!-- Speech Recognition Overlay -->
+    <div id="aiSpeechOverlay"
+      style="display: none; position: absolute; inset: 0; background: rgba(10, 14, 26, 0.3); z-index: 100; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(3px); border-radius: 12px;">
+
+      <div
+        style="width: 240px; height: 240px; background: rgba(0, 187, 249, 0.15); border: 1px solid rgba(0, 187, 249, 0.4); backdrop-filter: blur(16px); border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);">
+
+        <div
+          style="font-size: 50px; color: var(--neo-cyan); animation: micPulse 1.5s infinite ease-in-out; margin-bottom: 16px;">
+          🎙️</div>
+
+        <div id="aiSpeechOverlayText"
+          style="color: var(--text-main); font-size: 14px; text-align: center; width: 85%; font-style: italic; line-height: 1.4; max-height: 60px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">
+          Listening...</div>
+
+        <button onclick="toggleSpeechRecognition()"
+          style="margin-top: 16px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text-main); padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 12px;">Stop</button>
+      </div>
+
+      <style>
+        @keyframes micPulse {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+            filter: drop-shadow(0 0 0px var(--neo-cyan));
+          }
+
+          50% {
+            transform: scale(1.15);
+            opacity: 0.9;
+            filter: drop-shadow(0 0 8px var(--neo-cyan));
+          }
+
+          100% {
+            transform: scale(1);
+            opacity: 1;
+            filter: drop-shadow(0 0 0px var(--neo-cyan));
+          }
+        }
+      </style>
     </div>
   </div>
 
@@ -4139,11 +4215,11 @@
       _isGlobalLoading = isLoading;
       const overlay = document.getElementById('globalProgressOverlay');
       if (overlay) overlay.style.display = isLoading ? 'flex' : 'none';
-      
+
       if (isLoading) {
         const titleEl = document.getElementById('progressTitle');
         if (titleEl) titleEl.textContent = message;
-        
+
         const fillEl = document.getElementById('progressBarFill');
         if (fillEl) {
           if (progressPct !== null) {
@@ -4153,7 +4229,7 @@
           }
         }
       }
-      
+
       // Disable core action buttons to prevent double-submits
       ['btnJudgeRun', 'btnDynamicRun', 'btnBench', 'btnSolve', 'btnGenSynthetic', 'btnGenReal', 'judgePreset'].forEach(id => {
         const btn = document.getElementById(id);
@@ -4170,17 +4246,17 @@
     // local uvicorn without anyone editing the field.
     const DEPLOYED_API_BASE = 'https://sih26137.onrender.com';
 
-    
+
     let supabaseClient = null;
     let currentSession = null;
-    
+
     async function initAuth() {
       try {
         const confRes = await fetch(apiBase() + '/api/config');
         const conf = await confRes.json();
         if (!conf.supabase_url) {
-            document.getElementById('authOverlay').style.display = 'none';
-            return;
+          document.getElementById('authOverlay').style.display = 'none';
+          return;
         }
         supabaseClient = supabase.createClient(conf.supabase_url, conf.supabase_anon_key);
         const { data, error } = await supabaseClient.auth.getSession();
@@ -4192,7 +4268,7 @@
         console.error("Failed to init auth", e);
       }
     }
-    
+
     async function handleLogin() {
       const e = document.getElementById('authEmail').value;
       const p = document.getElementById('authPassword').value;
@@ -4203,7 +4279,7 @@
       document.getElementById('authOverlay').style.display = 'none';
       checkHealth();
     }
-    
+
     async function handleSignup() {
       const e = document.getElementById('authEmail').value;
       const p = document.getElementById('authPassword').value;
@@ -4560,10 +4636,10 @@
     // ---- The 5x5 benchmark matrix ------------------------------------------
     // Precomputed by scripts/build_benchmark_matrix.py and served from disk.
     const BENCH_METRICS = {
-      fitness:     { label: 'Fitness',    unit: '',     digits: 1 },
-      time_min:    { label: 'Fleet time', unit: ' min', digits: 0 },
-      distance_km: { label: 'Distance',   unit: ' km',  digits: 1 },
-      runtime_ms:  { label: 'Solve time', unit: ' ms',  digits: 0 },
+      fitness: { label: 'Fitness', unit: '', digits: 1 },
+      time_min: { label: 'Fleet time', unit: ' min', digits: 0 },
+      distance_km: { label: 'Distance', unit: ' km', digits: 1 },
+      runtime_ms: { label: 'Solve time', unit: ' ms', digits: 0 },
     };
     let benchMatrix = null;
     let benchMetric = 'fitness';
@@ -4644,8 +4720,10 @@
       }
       const total = benchMatrix.scenarios.length;
       const top = Object.entries(wins).sort((a, b) => b[1] - a[1])[0];
-      const nice = { greedy: 'Greedy nearest-neighbour', qpso: 'QPSO', ga: 'The genetic algorithm',
-                     sa: 'Simulated annealing', standard_pso: 'Standard PSO' };
+      const nice = {
+        greedy: 'Greedy nearest-neighbour', qpso: 'QPSO', ga: 'The genetic algorithm',
+        sa: 'Simulated annealing', standard_pso: 'Standard PSO'
+      };
 
       let body;
       if (benchMetric === 'runtime_ms') {
@@ -6526,11 +6604,11 @@
           + net.num_nodes + ' / ' + net.num_edges + '</span></div>'
           + '<div class="stat-line"><span>Source</span><span>'
           + (offline ? 'Offline map — ' + (net.area_label || 'shipped with the app')
-                     : (net.attribution || 'OpenStreetMap')) + '</span></div>';
+            : (net.attribution || 'OpenStreetMap')) + '</span></div>';
 
         document.getElementById('emptyHint').style.display = 'none';
         for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
-                          'btnRandomStops', 'btnClearPicks']) {
+          'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
         document.getElementById('btnGenVRP').disabled = true;
@@ -6602,7 +6680,7 @@
 
         document.getElementById('emptyHint').style.display = 'none';
         for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',
-                          'btnRandomStops', 'btnClearPicks']) {
+          'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
         document.getElementById('btnGenVRP').disabled = true;
@@ -7240,7 +7318,7 @@
       setMapPrompt(sim.fleets.length > 1
         ? 'Both fleets leave the depot together. Watch where they diverge.'
         : sim.fleets[0].label + ' is driving its plan. '
-          + sim.fleets[0].vehicles.length + ' vans out.');
+        + sim.fleets[0].vehicles.length + ' vans out.');
     }
 
     // One row per fleet, so the same legend serves the two-plan race and a
@@ -7733,7 +7811,7 @@
       try {
         const maxIter = +document.getElementById('max_iter').value;
         const results = await runBenchmarkSequentially(state.vrp.vrp_id, maxIter, 1);
-        
+
         state.benchmarkResults = results;
         renderBenchTable(results);
         drawConvergence(results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
@@ -8211,7 +8289,7 @@
   `;
       container.appendChild(msgDiv);
       container.scrollTop = container.scrollHeight;
-      
+
       if (typeof saveChatHistory === 'function') saveChatHistory();
     }
 
@@ -8236,13 +8314,13 @@
         ctx.collected_params = window.lastServerContext.collected_params;
         ctx.current_prompt = window.lastServerContext.current_prompt;
       }
-      
+
       let replyMd = '';
 
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
-        
+
         const res = await api('/api/assistant/chat', {
           method: 'POST',
           body: JSON.stringify({ message, chip, context: ctx }),
@@ -8257,8 +8335,8 @@
         if (res.map_action) await applyAssistantMapAction(res.map_action);
       } catch (err) {
         console.warn('Backend assistant API unreachable, using resilient offline reasoning engine:', err);
-        replyMd = `*⚠️ The AI backend is currently slow or unreachable. Falling back to the offline engine.* \n\n` + 
-                  generateClientFallbackExplanation(message, chip, ctx);
+        replyMd = `*⚠️ The AI backend is currently slow or unreachable. Falling back to the offline engine.* \n\n` +
+          generateClientFallbackExplanation(message, chip, ctx);
       } finally {
         const tEl = document.getElementById(typingId);
         if (tEl) tEl.remove();
@@ -8490,6 +8568,110 @@ I am monitoring the active optimization run for **${ctx.scenario_name}**.
 - **Constraint Status**: ${ctx.optimized_feasible === true ? 'feasible — no violations.' : ctx.optimized_feasible === false ? '⚠️ constraints violated on this run.' : 'not reported for this run.'}
 
 Feel free to ask me to explain specific routes, quantum tunneling mechanisms, map colors, or algorithm benchmark comparisons!`;
+    }
+
+    let recognition = null;
+    let isRecognizing = false;
+    let finalTranscript = '';
+
+    function playMicBeep(type) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.type = 'sine';
+        if (type === 'start') {
+          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+        } else {
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+        }
+
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.15);
+      } catch (e) {
+        console.warn('Audio feedback not supported', e);
+      }
+    }
+
+    function toggleSpeechRecognition() {
+      const overlay = document.getElementById('aiSpeechOverlay');
+      const overlayText = document.getElementById('aiSpeechOverlayText');
+      const aiInput = document.getElementById('aiInput');
+
+      if (isRecognizing) {
+        if (recognition) recognition.stop();
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Sorry, your browser doesn't support the Web Speech API.");
+        return;
+      }
+
+      if (!recognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-IN';
+
+        recognition.onstart = function () {
+          isRecognizing = true;
+          finalTranscript = '';
+          overlayText.innerText = 'Listening...';
+          overlay.style.display = 'flex';
+          playMicBeep('start');
+        };
+
+        recognition.onresult = function (event) {
+          let interimTranscript = '';
+          let tempFinal = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              tempFinal += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          finalTranscript += tempFinal;
+          let displayText = finalTranscript + interimTranscript;
+          overlayText.innerText = displayText || 'Listening...';
+        };
+
+        recognition.onerror = function (event) {
+          console.error("Speech recognition error:", event.error);
+          isRecognizing = false;
+        };
+
+        recognition.onend = function () {
+          isRecognizing = false;
+          playMicBeep('stop');
+
+          if (finalTranscript.trim()) {
+            overlay.style.display = 'none';
+            aiInput.value = aiInput.value ? aiInput.value + ' ' + finalTranscript : finalTranscript;
+          } else {
+            overlayText.innerText = "Didn't catch that...";
+            setTimeout(() => {
+              if (!isRecognizing) overlay.style.display = 'none';
+            }, 1200);
+          }
+        };
+      }
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error("Error starting speech recognition", e);
+      }
     }
 
     function initAssistantChat(force = false) {
