@@ -26,10 +26,8 @@ import time
 sys.path.insert(0, ".")
 
 import jwt
-from cryptography.hazmat.primitives.asymmetric import ec
 
 HS_SECRET = "test-jwt-secret-not-a-real-one"
-SUPABASE_URL = "https://example-project.supabase.co"
 
 failures = []
 
@@ -40,45 +38,42 @@ def check(name, condition, detail=""):
         failures.append(name)
 
 
-# --- A project signing with an asymmetric key, as Supabase now does ---------
-_ec_key = ec.generate_private_key(ec.SECP256R1())
-_public_jwk = jwt.algorithms.ECAlgorithm.to_jwk(_ec_key.public_key(), as_dict=True)
-_public_jwk.update({"kid": "test-key", "use": "sig", "alg": "ES256"})
-
-
-class _FakeJWKSClient:
-    """Stands in for PyJWKClient so no network call is made."""
-
-    def __init__(self, *_args, **_kwargs):
-        pass
-
-    def get_signing_key_from_jwt(self, _token):
-        return jwt.PyJWK(_public_jwk, algorithm="ES256")
+def _refuses_to_start_without_jwt_secret():
+    """
+    Import the app with no JWT_SECRET and with dotenv neutralised, which is how
+    it runs on Render (no .env file on disk). It must raise rather than fall
+    back to a default: the previous fallback string was committed to this repo,
+    so a deployment that missed the variable accepted forged tokens silently.
+    """
+    import subprocess
+    env = {k: v for k, v in os.environ.items() if k != "JWT_SECRET"}
+    proc = subprocess.run(
+        [sys.executable, "-c",
+         "import dotenv; dotenv.load_dotenv = lambda *a, **k: False; "
+         "import app.main"],
+        capture_output=True, text=True, env=env, cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
+    return proc.returncode != 0 and "JWT_SECRET is not set" in (proc.stderr or "")
 
 
 def load_routes():
-    """Reimport the API under a known Supabase configuration."""
-    os.environ["SUPABASE_JWT_SECRET"] = HS_SECRET
-    os.environ["SUPABASE_URL"] = SUPABASE_URL
+    """Reimport the API under a known signing key."""
+    os.environ["JWT_SECRET"] = HS_SECRET
     for mod in [m for m in list(sys.modules) if m.startswith("app.")]:
         del sys.modules[mod]
-    routes = importlib.import_module("app.api.routes")
-    routes.PyJWKClient = _FakeJWKSClient
-    routes._jwks_client = None
-    return routes
+    return importlib.import_module("app.api.routes")
 
 
 def claims(sub="user-1234", **extra):
-    payload = {"sub": sub, "aud": "authenticated", "exp": int(time.time()) + 3600}
+    # No "aud": this API issues its own tokens and sets no audience, and
+    # get_current_user does not pass one to jwt.decode — PyJWT refuses a token
+    # that carries an audience the caller never asked about. The Supabase-era
+    # tokens this file used to build did carry one.
+    payload = {"sub": sub, "exp": int(time.time()) + 3600}
     payload.update(extra)
     if sub is None:
         payload.pop("sub")
     return payload
-
-
-def es256(**kw):
-    return jwt.encode(claims(**kw), _ec_key, algorithm="ES256",
-                      headers={"kid": "test-key"})
 
 
 def hs256(secret=HS_SECRET, **kw):
@@ -99,26 +94,25 @@ def user_for(routes, token):
 
 routes = load_routes()
 
-# The regression this file exists for.
-check("an ES256 token from a modern Supabase project is accepted",
-      user_for(routes, es256()) == "user-1234",
-      f"got {user_for(routes, es256())!r}")
-
-check("an HS256 token from a legacy project is still accepted",
+# A token this API issued is accepted, and round-trips its subject.
+check("a token issued by this API is accepted",
       user_for(routes, hs256()) == "user-1234",
       f"got {user_for(routes, hs256())!r}")
 
 check("the subject is returned as the user id, not the whole token",
-      user_for(routes, es256(sub="abc-def")) == "abc-def")
+      user_for(routes, hs256(sub="abc-def")) == "abc-def")
 
-# Forgery and staleness must still be refused.
-check("an ES256 token signed with someone else's key is refused",
-      user_for(routes, jwt.encode(claims(), ec.generate_private_key(ec.SECP256R1()),
-                                  algorithm="ES256", headers={"kid": "test-key"})) == 401)
-check("an HS256 token signed with the wrong secret is refused",
+check("create_access_token round-trips through get_current_user",
+      user_for(routes, routes.create_access_token({"sub": "user-1234"})) == "user-1234")
+
+# The signing key is the only thing standing between a visitor and any account,
+# so a token signed with anything else must be refused.
+check("a token signed with the wrong secret is refused",
       user_for(routes, hs256(secret="wrong-secret")) == 401)
+check("a token signed with the old committed fallback secret is refused",
+      user_for(routes, hs256(secret="supersecret-logistics-key-change-in-prod")) == 401)
 check("an expired token is refused",
-      user_for(routes, es256(exp=int(time.time()) - 60)) == 401)
+      user_for(routes, hs256(exp=int(time.time()) - 60)) == 401)
 check("a token that is not a token at all is refused",
       user_for(routes, "not-a-jwt") == 401)
 check("an unsigned token is refused",
@@ -127,7 +121,12 @@ check("an unsigned token is refused",
 # A token with no subject would pool every such caller's data under one empty
 # key, which is the opposite of the isolation this check exists to provide.
 check("a token carrying no subject is refused",
-      user_for(routes, es256(sub=None)) == 401)
+      user_for(routes, hs256(sub=None)) == 401)
+
+# The fallback this file's sibling commit removed: an unset JWT_SECRET must
+# stop the process, never quietly sign with a string that is in the repo.
+check("the API refuses to start with no JWT_SECRET set",
+      _refuses_to_start_without_jwt_secret())
 
 
 # --- The endpoints actually carry the dependency ---------------------------
