@@ -59,6 +59,13 @@ SUGGESTED_CHIPS = [
 MVP_NETWORK = "bareilly"
 MVP_AREA_LABEL = "Bareilly City, Uttar Pradesh"
 
+# store.put_network/get_network/put_vrp now key everything by user_id, for the
+# Supabase-backed data isolation added alongside this feature. /api/assistant/chat
+# carries no auth dependency, so there is no real signed-in user in this scope —
+# using a fixed value keeps writes and reads consistent with each other without
+# pulling the conversational assistant into that auth boundary.
+_ASSISTANT_STORE_USER = "assistant"
+
 # Shown instead of performance numbers whenever no comparison run has been
 # executed yet. The assistant must never invent metrics — a plausible-looking
 # fabricated number is indistinguishable from a measured one to the reader,
@@ -430,12 +437,12 @@ class AIAssistantExplainer:
             net = None
             if network_id:
                 try:
-                    net = store.get_network(network_id)
+                    net = store.get_network(_ASSISTANT_STORE_USER, network_id)
                 except KeyError:
                     net = None
             if net is None:
                 net = load_cached_network(MVP_NETWORK, congestion_seed=42)
-                network_id = store.put_network(net, is_geo=True)
+                network_id = store.put_network(_ASSISTANT_STORE_USER, net, is_geo=True)
 
             # Delivery windows cannot outlast the shift they sit in; the API
             # rejects the instance outright if they do.

@@ -141,7 +141,7 @@ def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get
             # same thing more slowly.
             raise HTTPException(status_code=400, detail=str(e))
         else:
-            network_id = store.put_network(net, is_geo=True)
+            network_id = store.put_network(user_id, net, is_geo=True)
             nodes, edges = _network_payload(net)
             return NetworkResponse(
                 network_id=network_id, num_nodes=net.num_nodes(),
