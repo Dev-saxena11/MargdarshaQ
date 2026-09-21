@@ -4315,12 +4315,16 @@
     const DEPLOYED_API_BASE = 'https://sih26137.onrender.com';
 
 
+    // One name for the stored token, so a rename cannot leave a reader and a
+    // writer pointing at different keys.
+    const TOKEN_STORAGE_KEY = 'margdarshaq_token';
+
     let currentToken = null;
     let isGuestSession = false; // We won't use guest sessions anymore for the custom auth, or we can if we want to add anonymous login later.
     
     async function initAuth() {
       // Try to load token from localStorage
-      const token = localStorage.getItem('margdarshaq_token');
+      const token = localStorage.getItem(TOKEN_STORAGE_KEY);
       if (token) {
         currentToken = token;
         document.getElementById('authOverlay').style.display = 'none';
@@ -4414,7 +4418,8 @@
 
     function adoptToken(token) {
       currentToken = token;
-      localStorage.setItem('margdarshaq_token', token);
+      authLapseNoted = false;
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
       document.getElementById('btnViewProfile').hidden = false;
       document.getElementById('authOverlay').style.display = 'none';
       
@@ -4428,7 +4433,7 @@
     
     function handleLogout() {
       currentToken = null;
-      localStorage.removeItem('margdarshaq_token');
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
       document.getElementById('profileModal').style.display = 'none';
       document.getElementById('btnViewProfile').hidden = true;
       document.getElementById('authOverlay').style.display = 'flex';
@@ -4476,24 +4481,22 @@
 
     function apiBase() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
 
-    // A Supabase access token is good for an hour. supabase-js renews it in the
-    // background, but a token captured once at startup is not the renewed one —
-    // so a room left open over a long demo starts answering 401 "Session
-    // expired" on every call. getSession() hands back whatever is current.
-    async function accessToken() {
-      if (!supabaseClient) return currentSession && currentSession.access_token;
+    // Read per call rather than captured once at load. localStorage is the one
+    // copy of record — a sign-in or sign-out in another tab writes it, and a
+    // token captured at startup would not be the one that is current.
+    function accessToken() {
       try {
-        const { data } = await supabaseClient.auth.getSession();
-        currentSession = (data && data.session) || null;
+        currentToken = localStorage.getItem(TOKEN_STORAGE_KEY);
       } catch (e) {
-        console.warn('Could not refresh the session, using the token in hand:', e);
+        // Private mode or blocked site data: keep whatever is in hand.
+        console.warn('Could not read the stored token, using the one in hand:', e);
       }
-      return currentSession && currentSession.access_token;
+      return currentToken;
     }
 
     async function api(path, opts = {}) {
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      const token = await accessToken();
+      const token = accessToken();
       if (token) headers['Authorization'] = 'Bearer ' + token;
       const res = await fetch(apiBase() + path, {
         ...opts,
@@ -4514,24 +4517,22 @@
     // and reopening the overlay under someone's cursor on each one is worse
     // than the error it reports.
     let authLapseNoted = false;
-    async function noteAuthLapse() {
+    function noteAuthLapse() {
       if (authLapseNoted) return;
       authLapseNoted = true;
-      currentSession = null;
+      currentToken = null;
       isGuestSession = false;
-      // A session the backend refuses is not rescued by reloading the page:
-      // supabase-js restores it from localStorage and the next call fails the
-      // same way. Dropping it makes the login form the way out rather than a
-      // thing behind a wall of identical errors.
-      if (supabaseClient) {
-        try { await supabaseClient.auth.signOut(); } catch (e) { /* already gone */ }
-      }
-      const btn = document.getElementById('btnSignIn');
+      // A token the backend refuses is not rescued by reloading the page: it is
+      // read straight back out of localStorage and the next call fails the same
+      // way. Dropping it makes the login form the way out rather than a thing
+      // behind a wall of identical errors.
+      try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch (e) { /* already gone */ }
+      const btn = document.getElementById('btnViewProfile');
       if (btn) btn.hidden = true;
       const overlay = document.getElementById('authOverlay');
       if (!overlay || overlay.style.display === 'flex') return;
       showAuthOverlay();
-      authSay('Your session has ended. Sign in again to carry on.', true);
+      loginSay('Your session has ended. Sign in again to carry on.', true);
     }
 
     // Unpacks the Error thrown by api() — "<status>: <json body>" — into the
