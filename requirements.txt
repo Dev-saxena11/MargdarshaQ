@@ -9,4 +9,4 @@ python-multipart>=0.0.9
 osmnx>=1.6.0,<2.0.0
 psycopg2-binary>=2.9.0
 python-dotenv>=1.0.0
-pyjwt>=2.8.0
+pyjwt[crypto]>=2.8.0   # [crypto] pulls in cryptography, which ES256 verification needs
