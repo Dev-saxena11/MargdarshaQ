@@ -72,6 +72,18 @@ class QPSOVRPOptimizer:
         self.local_search_passes = local_search_passes
         self._n_eval = 0
 
+    def _bounded_jump(self, u: np.ndarray) -> np.ndarray:
+        """
+        The ln(1/u) excursion term, capped at max_jump_factor.
+
+        A method rather than an expression inline in the loop so the bound can
+        be asserted on directly. Checked only through a full optimize() run it
+        is effectively untested: the convergence curve records the best
+        solution *so far*, so it cannot rise whether the cap is applied or not,
+        and removing the cap entirely leaves every end-to-end assertion passing.
+        """
+        return np.minimum(np.log(1.0 / u), self.max_jump_factor)
+
     def _eval(self, chromosome: np.ndarray) -> VRPSolution:
         self._n_eval += 1
         return evaluate_chromosome(
@@ -121,7 +133,7 @@ class QPSOVRPOptimizer:
 
             # cap the ln(1/u) excursion term (see __init__ docstring note) so a
             # single unlucky dimension can't blow up an otherwise-good solution
-            jump = np.minimum(np.log(1.0 / u), self.max_jump_factor)
+            jump = self._bounded_jump(u)
 
             positions = p_attractor + sign * alpha * np.abs(mbest - positions) * jump
             positions = np.clip(positions, 0.0, upper - 1e-9)
