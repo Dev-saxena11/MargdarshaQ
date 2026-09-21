@@ -59,7 +59,20 @@ from typing import Optional
 
 security = HTTPBearer()
 
-JWT_SECRET = os.getenv("JWT_SECRET", "supersecret-logistics-key-change-in-prod")
+# The signing key for every token this API issues and accepts. There is no
+# default: the previous fallback string was committed to this repo and to
+# .env.example, so any deployment that forgot the variable was signing and
+# verifying with a secret anyone could read off GitHub — and it started up
+# clean, so nothing anywhere said so. Refusing to boot is the only failure
+# mode that cannot be missed.
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET is not set. Generate one with "
+        "`python -c \"import secrets; print(secrets.token_urlsafe(64))\"` and set it "
+        "in the environment (Render: Environment tab). It signs every login token; "
+        "without it the API cannot tell a real token from a forged one."
+    )
 ALGORITHM = "HS256"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
