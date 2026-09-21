@@ -23,7 +23,12 @@ from app.core.vrp_problem import VRPProblem
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Stripped, because a dashboard env-var field keeps whatever was pasted into
+# it. A trailing newline lands inside the last component of the URL, so the
+# driver asks for a database whose name ends in a line break and the server
+# refuses it -- a real, reachable server turned away by one invisible
+# character, reported as the database not existing.
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
 # Keep the in-memory fallback in case DATABASE_URL is not set (e.g. for CI tests)
 _networks: Dict[Tuple[str, str], TrafficNetwork] = {}
@@ -45,7 +50,17 @@ def get_connection() -> Optional[connection]:
 def init_db():
     conn = get_connection()
     if not conn:
-        logger.warning("No DATABASE_URL set, falling back to in-memory store.")
+        # Say which of the two it is. Reporting "not set" for a URL that is set
+        # but unreachable sends you to the dashboard to re-enter a value that
+        # was already correct.
+        if DATABASE_URL:
+            logger.error(
+                "DATABASE_URL is set but the database could not be reached — "
+                "falling back to the in-memory store. Accounts created now are "
+                "NOT saved: signup will appear to work and login will always fail."
+            )
+        else:
+            logger.warning("No DATABASE_URL set, falling back to in-memory store.")
         return
     try:
         with conn.cursor() as cur:
