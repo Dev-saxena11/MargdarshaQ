@@ -3271,6 +3271,11 @@
         </div>
         <input id="apiBase" type="text" value="http://127.0.0.1:8000" spellcheck="false">
         <button class="btn-neo-secondary" style="padding:6px 12px; margin:0;" onclick="checkHealth()">check</button>
+        <!-- Only shown to a guest: signing in anonymously hides the overlay, so
+             without this there would be no way back to it for someone who does
+             have an account. -->
+        <button id="btnSignIn" class="btn-neo-secondary" hidden
+          style="padding:6px 12px; margin-left:6px;" onclick="showAuthOverlay()">Sign in</button>
         <button id="btnHeaderAssistant" class="btn-neo-secondary"
           style="display:inline-flex; align-items:center; gap:6px; background:#1C1538; border-color:var(--neo-purple); color:#FFFFFF; padding:6px 12px; margin-left:6px;"
           onclick="toggleAssistant()">
@@ -4249,50 +4254,147 @@
 
     let supabaseClient = null;
     let currentSession = null;
-
+    let isGuestSession = false;
+    
+    // Resolves true once the API can be called — either a session is in hand or
+    // the backend has no Supabase configured and is not asking for one. Resolves
+    // false while the login wall stands, in which case adoptSession() starts the
+    // dashboard instead, after a real sign-in.
     async function initAuth() {
       try {
         const confRes = await fetch(apiBase() + '/api/config');
         const conf = await confRes.json();
         if (!conf.supabase_url) {
           document.getElementById('authOverlay').style.display = 'none';
-          return;
+          return true;
         }
         supabaseClient = supabase.createClient(conf.supabase_url, conf.supabase_anon_key);
-        const { data, error } = await supabaseClient.auth.getSession();
+        const { data } = await supabaseClient.auth.getSession();
         if (data && data.session) {
           currentSession = data.session;
           document.getElementById('authOverlay').style.display = 'none';
+          return true;
         }
+
+        // No session. Try signing in anonymously: that mints a real JWT with
+        // its own user id, so the visitor gets an isolated workspace with no
+        // account, no email and no waiting — and the backend needs no special
+        // case, because the token is as real as any other.
+        //
+        // This is switched on from the Supabase dashboard (Authentication >
+        // Providers > Anonymous sign-ins). While it is off the call is refused
+        // and the login overlay stands, exactly as before; turning it on takes
+        // the wall away with no further change here.
+        const anon = await supabaseClient.auth.signInAnonymously();
+        if (anon.data && anon.data.session) {
+          currentSession = anon.data.session;
+          isGuestSession = true;
+          document.getElementById('authOverlay').style.display = 'none';
+          document.getElementById('btnSignIn').hidden = false;
+          return true;
+        }
+        console.info('Anonymous sign-in unavailable, showing the login form:',
+          anon.error && anon.error.message);
+        return false;
       } catch (e) {
+        // The config probe itself failed, so there is no wall to stand behind —
+        // let the dashboard boot and report the backend being down in its own
+        // words rather than freezing on an overlay nobody can get past.
         console.error("Failed to init auth", e);
+        document.getElementById('authOverlay').style.display = 'none';
+        return true;
       }
+    }
+
+    function showAuthOverlay() {
+      authSay('');
+      document.getElementById('authOverlay').style.display = 'flex';
+    }
+    
+    function authSay(msg, isError) {
+      const el = document.getElementById('authError');
+      el.style.color = isError ? '#FF0054' : '#9CA3AF';
+      el.innerHTML = msg;
+    }
+
+    // Supabase reads a blank email as a request to sign in anonymously, and
+    // answers "Anonymous sign-ins are disabled" — an error about a feature
+    // nobody asked for, which says nothing about the empty box that caused it.
+    function authCredentials() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      if (!email) { authSay('Enter your email address.', true); return null; }
+      if (!password) { authSay('Enter your password.', true); return null; }
+      return { email, password };
     }
 
     async function handleLogin() {
-      const e = document.getElementById('authEmail').value;
-      const p = document.getElementById('authPassword').value;
-      document.getElementById('authError').textContent = "Logging in...";
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email: e, password: p });
-      if (error) { document.getElementById('authError').textContent = error.message; return; }
-      currentSession = data.session;
+      const creds = authCredentials();
+      if (!creds) return;
+      authSay('Logging in…');
+      const { data, error } = await supabaseClient.auth.signInWithPassword(creds);
+      if (error) {
+        // The confirmation link is the usual reason a correct password is
+        // refused, so say that rather than leaving "Invalid login credentials"
+        // to imply the password was mistyped.
+        if (/confirm/i.test(error.message)) {
+          authSay('That address has not been confirmed yet. Check your inbox '
+            + 'and spam folder, or <a href="#" onclick="handleResend();return false;" '
+            + 'style="color:#00BBF9;">send the email again</a>.', true);
+        } else {
+          authSay(error.message, true);
+        }
+        return;
+      }
+      adoptSession(data.session);
+    }
+
+    // A real account replaces a guest one. The guest's workspace is keyed to
+    // the anonymous user id and does not follow them across, which is the point
+    // of signing in — so the room is reloaded rather than left showing data the
+    // new session cannot fetch again.
+    function adoptSession(session) {
+      currentSession = session;
+      isGuestSession = false;
+      document.getElementById('btnSignIn').hidden = true;
       document.getElementById('authOverlay').style.display = 'none';
-      checkHealth();
+      controlRoomBootstrapped = false;
+      state.network = null;
+      state.controlAreaKey = null;
+      startDashboard();
+      if (state.viewMode === 'control') bootstrapControlRoom();
     }
 
     async function handleSignup() {
-      const e = document.getElementById('authEmail').value;
-      const p = document.getElementById('authPassword').value;
-      document.getElementById('authError').textContent = "Signing up...";
-      const { data, error } = await supabaseClient.auth.signUp({ email: e, password: p });
-      if (error) { document.getElementById('authError').textContent = error.message; return; }
+      const creds = authCredentials();
+      if (!creds) return;
+      authSay('Signing up…');
+      const { data, error } = await supabaseClient.auth.signUp(creds);
+      if (error) { authSay(error.message, true); return; }
       if (data.session) {
-        currentSession = data.session;
-        document.getElementById('authOverlay').style.display = 'none';
-        checkHealth();
+        adoptSession(data.session);
       } else {
-        document.getElementById('authError').textContent = "Check your email for confirmation link.";
+        authSay('Confirmation email sent to <b>' + creds.email + '</b>. Open the '
+          + 'link in it, then log in here.<br><span style="font-size:0.9em;">Not '
+          + 'arrived? Check spam, then <a href="#" onclick="handleResend();return false;" '
+          + 'style="color:#00BBF9;">send it again</a>.</span>');
       }
+    }
+
+    // Supabase rate-limits confirmation emails hard, so a resend that is
+    // refused says so plainly instead of looking like it worked.
+    async function handleResend() {
+      const email = document.getElementById('authEmail').value.trim();
+      if (!email) { authSay('Enter your email address first.', true); return; }
+      authSay('Sending…');
+      const { error } = await supabaseClient.auth.resend({ type: 'signup', email });
+      if (error) {
+        authSay(/rate|limit|seconds/i.test(error.message)
+          ? 'Too many emails requested — wait a minute and try again. (' + error.message + ')'
+          : error.message, true);
+        return;
+      }
+      authSay('Sent again to <b>' + email + '</b>. Check spam as well.');
     }
 
     function isLocalHost() {
@@ -8704,25 +8806,31 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // Initialization
     // ---------------------------------------------------------------------------
     initApiBase();   // must run before checkHealth() so it probes the right backend
-    checkHealth();
-
-    // The landing page opens on a district already loaded, so the first thing a
-    // visitor sees is a real road network rather than an empty frame. If the API
-    // is asleep, the stored run stands in and says so.
     renderAreaPicker();
-    loadBenchmarkMatrix();
     syncSoloButtonLabel();
-    selectArea(CURATED_AREAS[0].key, { quiet: true })
-      .catch(err => {
-        console.warn('Could not load the opening district, showing the stored run:', err);
-        loadOfflineFallback();
-      });
-
     setTimeout(initAssistantChat, 100);
 
-    // Run auth init on load
-    window.addEventListener('DOMContentLoaded', () => {
-      initAuth();
+    // Everything here needs the bearer token. Fired before the session is in
+    // hand, each of these calls is simply rejected, and the page settles on the
+    // offline fallback and a dead API light while a perfectly good backend sits
+    // there waiting — so the opening load waits for initAuth() to settle first.
+    function startDashboard() {
+      checkHealth();
+      loadBenchmarkMatrix();
+      // The landing page opens on a district already loaded, so the first thing
+      // a visitor sees is a real road network rather than an empty frame. If the
+      // API is asleep, the stored run stands in and says so.
+      selectArea(CURATED_AREAS[0].key, { quiet: true })
+        .catch(err => {
+          console.warn('Could not load the opening district, showing the stored run:', err);
+          loadOfflineFallback();
+        });
+    }
+
+    initAuth().then(ready => {
+      // Not ready means the login overlay is up; adoptSession() boots the
+      // dashboard once someone is actually through it.
+      if (ready) startDashboard();
     });
   </script>
 </body>

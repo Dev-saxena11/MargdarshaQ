@@ -49,22 +49,99 @@ from app.models.schemas import (
 )
 
 import os
+import threading
 import jwt
+from jwt import PyJWKClient
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends
 
 security = HTTPBearer()
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+
+# Supabase signs access tokens one of two ways, and which one is not our choice.
+# Older projects use a shared secret (HS256, the "JWT secret" in the dashboard).
+# Projects on the newer API keys — the `sb_publishable_…` kind — sign with an
+# asymmetric key instead and publish only the public half, as a JWKS. Verifying
+# HS256 alone therefore rejects every token such a project ever issues, with the
+# signature failure reading as "Invalid token" — indistinguishable, from the
+# outside, from a forged one. Both are accepted here, chosen per token by the
+# algorithm in its header, so the backend follows whatever the project is on.
+_HS_ALGORITHMS = ["HS256"]
+_JWKS_ALGORITHMS = ["ES256", "RS256"]
+
+_jwks_client: Optional[PyJWKClient] = None
+_jwks_lock = threading.Lock()
+
+
+def _jwks_client_for_project() -> Optional[PyJWKClient]:
+    """The (cached) JWKS reader for this Supabase project, or None if unset."""
+    global _jwks_client
+    if _jwks_client is None and SUPABASE_URL:
+        with _jwks_lock:
+            if _jwks_client is None:
+                # The client keeps the fetched key set for `lifespan` seconds,
+                # so this is not a round trip to Supabase on every request.
+                _jwks_client = PyJWKClient(
+                    f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+                    cache_keys=True, lifespan=600, timeout=10,
+                )
+    return _jwks_client
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
-        return payload.get("sub")
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        algorithm = jwt.get_unverified_header(token).get("alg", "")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        if algorithm in _JWKS_ALGORITHMS:
+            client = _jwks_client_for_project()
+            if client is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="SUPABASE_URL is not set, so asymmetric tokens cannot be verified.",
+                )
+            signing_key = client.get_signing_key_from_jwt(token).key
+            payload = jwt.decode(
+                token, signing_key, algorithms=_JWKS_ALGORITHMS,
+                options={"verify_aud": False},
+            )
+        elif algorithm in _HS_ALGORITHMS:
+            if not SUPABASE_JWT_SECRET:
+                raise HTTPException(
+                    status_code=500,
+                    detail="SUPABASE_JWT_SECRET is not set, so tokens cannot be verified.",
+                )
+            payload = jwt.decode(
+                token, SUPABASE_JWT_SECRET, algorithms=_HS_ALGORITHMS,
+                options={"verify_aud": False},
+            )
+        else:
+            raise HTTPException(
+                status_code=401,
+                detail=f"Token signed with unsupported algorithm '{algorithm}'.",
+            )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.PyJWKClientError as e:
+        # Supabase unreachable or serving no usable key: that is our outage to
+        # report, not the caller's token to blame.
+        raise HTTPException(
+            status_code=503, detail=f"Could not read the Supabase signing keys: {e}",
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Everything downstream keys a user's networks and instances by this value.
+    # A token without one would silently pool those rows under NULL, where they
+    # are visible to every other token that also lacks a subject.
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token carries no user id")
+    return user_id
 
 router = APIRouter(prefix="/api")
 
@@ -671,9 +748,11 @@ def get_stress_test_cached():
 # ---------------------------------------------------------------------------
 
 @router.post("/assistant/chat", response_model=AssistantChatResponse)
-def assistant_chat(req: AssistantChatRequest):
+def assistant_chat(req: AssistantChatRequest, user_id: str = Depends(get_current_user)):
     """Answers judge/user questions about current solve results, QPSO, and map."""
-    return assistant_engine.chat(req)
+    # The assistant reads the network the caller loaded and writes the instance
+    # the caller's page will solve next, so it has to do both as the caller.
+    return assistant_engine.chat(req, user_id)
 
 
 # ---------------------------------------------------------------------------
