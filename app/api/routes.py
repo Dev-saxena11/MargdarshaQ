@@ -50,21 +50,109 @@ from app.models.schemas import (
 
 import os
 import jwt
+from jwt import PyJWKClient
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends
 
 security = HTTPBearer()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+
+# Supabase signs access tokens one of two ways, and which one is a property of
+# the project, not of this code:
+#
+#   HS256  the "legacy JWT secret" — one shared string, kept in
+#          SUPABASE_JWT_SECRET.
+#   ES256  an asymmetric signing key, published at the project's JWKS endpoint.
+#          Projects created (or migrated) since the JWT-signing-keys rollout use
+#          this, and there is no shared secret to copy any more.
+#
+# Verifying an ES256 token against a shared secret fails for every token a live
+# project issues, and PyJWT reports it as a plain InvalidSignatureError — so the
+# dashboard showed `401 {"detail":"Invalid token"}` on every call while looking,
+# from the outside, exactly like a mistyped secret. The algorithm is read off
+# the token header instead, and each kind is verified the way it was signed.
+
+
+@lru_cache(maxsize=1)
+def _jwk_client() -> Optional[PyJWKClient]:
+    """
+    Signing keys for this project, fetched once and cached. PyJWKClient holds the
+    set for its lifespan and refetches when an unknown `kid` turns up, so a key
+    rotation does not need a restart.
+    """
+    if not SUPABASE_URL:
+        return None
+    return PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+
+
+# The algorithms Supabase actually signs with. Anything else is refused before
+# a key is even looked up — in particular "none", which PyJWT does register and
+# which would otherwise reach the JWKS lookup and be reported as the auth
+# service being unreachable rather than as the forgery it is.
+_ALLOWED_ALGORITHMS = {"HS256", "ES256", "RS256"}
+
+
+def _signing_key(token: str, alg: str):
+    if alg not in _ALLOWED_ALGORITHMS:
+        raise HTTPException(
+            status_code=401, detail=f"Unsupported token algorithm: {alg or 'none'}",
+        )
+
+    if alg.startswith("HS"):
+        if not SUPABASE_JWT_SECRET:
+            raise HTTPException(
+                status_code=500,
+                detail="The server has no SUPABASE_JWT_SECRET set, so it cannot verify logins.",
+            )
+        return SUPABASE_JWT_SECRET
+
+    # Asymmetric algorithms need PyJWT's optional `cryptography` extra. Without
+    # it PyJWT never registers ES256 and reports "Algorithm not supported",
+    # which reads as a malformed token rather than a missing dependency.
+    if alg not in jwt.algorithms.get_default_algorithms():
+        raise HTTPException(
+            status_code=500,
+            detail=f"The server cannot verify {alg} tokens — install pyjwt[crypto].",
+        )
+    client = _jwk_client()
+    if client is None:
+        raise HTTPException(
+            status_code=500,
+            detail="The server has no SUPABASE_URL set, so it cannot verify logins.",
+        )
+    try:
+        return client.get_signing_key_from_jwt(token).key
+    except jwt.exceptions.PyJWKClientError as exc:
+        # The keys could not be fetched, or did not contain this token's kid.
+        # That is the auth service being unreachable or rotating mid-request,
+        # not a bad token — 503 invites a retry, 401 would send the visitor to
+        # the login form to fix something that was never theirs to fix.
+        raise HTTPException(
+            status_code=503, detail=f"Could not fetch the auth signing keys: {exc}",
+        )
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
-        return payload.get("sub")
+        alg = jwt.get_unverified_header(token).get("alg", "")
+        payload = jwt.decode(
+            token, _signing_key(token, alg), algorithms=[alg], options={"verify_aud": False},
+        )
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        raise HTTPException(status_code=401, detail="Session expired — sign in again.")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        # Without a subject every such caller would share one workspace, which is
+        # the opposite of what the user id is here for.
+        raise HTTPException(status_code=401, detail="Token carries no user id")
+    return user_id
+
 
 router = APIRouter(prefix="/api")
 

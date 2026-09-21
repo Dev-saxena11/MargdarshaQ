@@ -9,4 +9,7 @@ python-multipart>=0.0.9
 osmnx>=1.6.0,<2.0.0
 psycopg2-binary>=2.9.0
 python-dotenv>=1.0.0
-pyjwt>=2.8.0
+# The [crypto] extra pulls in `cryptography`, which PyJWT needs to verify the
+# ES256 tokens Supabase issues from its asymmetric signing keys. Without it
+# PyJWT does not register ES256 at all and every login is refused.
+pyjwt[crypto]>=2.8.0

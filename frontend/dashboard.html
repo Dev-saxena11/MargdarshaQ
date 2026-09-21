@@ -4271,6 +4271,7 @@
     function adoptSession(session) {
       currentSession = session;
       isGuestSession = false;
+      authLapseNoted = false;
       document.getElementById('btnSignIn').hidden = true;
       document.getElementById('authOverlay').style.display = 'none';
       controlRoomBootstrapped = false;
@@ -4326,20 +4327,62 @@
 
     function apiBase() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
 
+    // A Supabase access token is good for an hour. supabase-js renews it in the
+    // background, but a token captured once at startup is not the renewed one —
+    // so a room left open over a long demo starts answering 401 "Session
+    // expired" on every call. getSession() hands back whatever is current.
+    async function accessToken() {
+      if (!supabaseClient) return currentSession && currentSession.access_token;
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        currentSession = (data && data.session) || null;
+      } catch (e) {
+        console.warn('Could not refresh the session, using the token in hand:', e);
+      }
+      return currentSession && currentSession.access_token;
+    }
+
     async function api(path, opts = {}) {
       const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      if (currentSession && currentSession.access_token) {
-        headers['Authorization'] = 'Bearer ' + currentSession.access_token;
-      }
+      const token = await accessToken();
+      if (token) headers['Authorization'] = 'Bearer ' + token;
       const res = await fetch(apiBase() + path, {
         ...opts,
         headers,
       });
       if (!res.ok) {
         const text = await res.text();
+        // Nothing the caller does with a 401 will work until there is a session
+        // again, so put the login form back up rather than leaving every panel
+        // to report its own corner of the same failure.
+        if (res.status === 401) noteAuthLapse();
         throw new Error(`${res.status}: ${text}`);
       }
       return res.json();
+    }
+
+    // Shown once per lapse: a dozen panels can fail on the same expired token,
+    // and reopening the overlay under someone's cursor on each one is worse
+    // than the error it reports.
+    let authLapseNoted = false;
+    async function noteAuthLapse() {
+      if (authLapseNoted) return;
+      authLapseNoted = true;
+      currentSession = null;
+      isGuestSession = false;
+      // A session the backend refuses is not rescued by reloading the page:
+      // supabase-js restores it from localStorage and the next call fails the
+      // same way. Dropping it makes the login form the way out rather than a
+      // thing behind a wall of identical errors.
+      if (supabaseClient) {
+        try { await supabaseClient.auth.signOut(); } catch (e) { /* already gone */ }
+      }
+      const btn = document.getElementById('btnSignIn');
+      if (btn) btn.hidden = true;
+      const overlay = document.getElementById('authOverlay');
+      if (!overlay || overlay.style.display === 'flex') return;
+      showAuthOverlay();
+      authSay('Your session has ended. Sign in again to carry on.', true);
     }
 
     // Unpacks the Error thrown by api() — "<status>: <json body>" — into the
@@ -4354,6 +4397,11 @@
         const parsed = JSON.parse(detail);
         if (parsed && parsed.detail) detail = parsed.detail;
       } catch (_) { /* not JSON — show it as it came */ }
+      // "Not authenticated" and "Invalid token" are true, and useless to read on
+      // a map: they name the wire protocol, not the thing to do about it.
+      if (status === 401 || status === 403) {
+        detail = 'You are signed out, so the backend would not answer. Sign in and try again.';
+      }
       return { status, detail: detail || ('The backend returned ' + status + '.') };
     }
 
@@ -4942,9 +4990,14 @@
         if (typeof syncAssistantContext === 'function') syncAssistantContext();
       } catch (err) {
         console.warn('Landing benchmark failed:', err);
-        setJudgeStatus('The benchmark could not be run — the API may be waking up. Try again in a moment.', true);
+        // A cold start was asserted for every failure, so a signed-out visitor
+        // was told to wait for an API that was already awake and would have
+        // gone on refusing them all afternoon.
+        const { status, detail } = describeApiError(err);
+        const why = status ? detail : 'The API may be waking up. Try again in a moment.';
+        setJudgeStatus('The benchmark could not be run — ' + why, true);
         if (grid) grid.innerHTML = '<div class="compare-empty">The benchmark could not be run — '
-          + 'the API may be asleep. Try again in a moment.</div>';
+          + why + '</div>';
       } finally {
         setLoadingState(false);
         btns.forEach((b, i) => { b.disabled = false; b.innerHTML = labels[i]; });
