@@ -18,7 +18,7 @@ from functools import lru_cache
 from typing import Optional
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
@@ -37,6 +37,9 @@ from app.core.classical_baselines_vrp import (
     run_ga_vrp, run_sa_vrp, run_standard_pso_vrp, run_greedy_nn_vrp
 )
 from app.core.dynamic_vrp import simulate_dynamic_reroute
+from app.core.route_export import (
+    NotGeoreferenced, geojson_to_text, routes_to_geojson, routes_to_gpx,
+)
 from app.core import store
 from app.core.assistant import assistant_engine
 from app.core.rag import rag_engine
@@ -496,6 +499,65 @@ def solve_vrp(req: VRPSolveRequest, user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Solver failed to produce a solution")
 
     return _build_solve_response(problem, sol, curve, n_eval, name, runtime_ms)
+
+
+@router.post("/vrp/export")
+def export_solution(req: VRPSolveRequest, fmt: str = "geojson",
+                    user_id: str = Depends(get_current_user)):
+    """
+    Solve an instance and return the plan as GeoJSON or GPX.
+
+    A plan that only exists inside this dashboard cannot be handed to a driver.
+    This is the same solve the dashboard runs, written out in a format an
+    operator's own tools already read: GeoJSON for anything map-shaped, GPX for
+    a navigation device.
+
+    Re-solving rather than exporting a stored result keeps the file honest --
+    the geometry written out is the geometry of a solution this API just
+    produced, not of one a client might have edited on the way past.
+    """
+    fmt = fmt.lower()
+    if fmt not in ("geojson", "gpx"):
+        raise HTTPException(status_code=400,
+                            detail=f"Unknown format {fmt!r}. Use 'geojson' or 'gpx'.")
+    try:
+        problem = store.get_vrp(user_id, req.vrp_id)
+        network_id = store.get_vrp_network_id(user_id, req.vrp_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    sol, curve, n_eval, name, runtime_ms = _solve_one(
+        problem, req.algorithm, req.n_particles, req.max_iter, req.seed, req.use_local_search
+    )
+    if sol is None:
+        raise HTTPException(status_code=500, detail="Solver failed to produce a solution")
+
+    response = _build_solve_response(problem, sol, curve, n_eval, name, runtime_ms)
+    routes = [r.model_dump() if hasattr(r, "model_dump") else r.dict()
+              for r in response.routes]
+    node_xy = {n: (d["x"], d["y"]) for n, d in problem.net.graph.nodes(data=True)}
+    is_geo = store.is_geo_network(user_id, network_id)
+
+    try:
+        if fmt == "geojson":
+            body = geojson_to_text(routes_to_geojson(
+                routes, node_xy, depot=problem.depot, is_geo=is_geo,
+                properties={"algorithm": name, "total_distance_km": sol.total_distance,
+                            "total_time_min": sol.total_time, "feasible": sol.feasible},
+            ))
+            media, ext = "application/geo+json", "geojson"
+        else:
+            body = routes_to_gpx(routes, node_xy, depot=problem.depot, is_geo=is_geo)
+            media, ext = "application/gpx+xml", "gpx"
+    except NotGeoreferenced as e:
+        # A synthetic network's coordinates are grid units. Exporting them would
+        # produce a file that opens fine and is wrong, so it is refused.
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return Response(
+        content=body, media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="plan-{req.vrp_id}.{ext}"'},
+    )
 
 
 # ---------------------------------------------------------------------------
