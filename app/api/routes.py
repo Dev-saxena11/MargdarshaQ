@@ -51,6 +51,7 @@ from app.models.schemas import (
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
     VRPCompareRequest, VRPCompareResponse,
     TrafficIncidentRequest, TrafficIncidentResponse, DynamicSolveRequest, DynamicSolveResponse,
+    RoadClosureRequest, RoadClosureResponse,
     AssistantChatRequest, AssistantChatResponse,
     ChatRequest, ChatResponse, RAGStatusResponse,
 )
@@ -698,6 +699,79 @@ def compare_vrp(req: VRPCompareRequest, user_id: str = Depends(get_current_user)
 # ---------------------------------------------------------------------------
 # Dynamic Traffic & Mid-Route Re-Optimization
 # ---------------------------------------------------------------------------
+
+@router.post("/network/close_road", response_model=RoadClosureResponse)
+def close_road(req: RoadClosureRequest, user_id: str = Depends(get_current_user)):
+    """
+    Close a road, or reopen one, and re-plan around it.
+
+    A closure is not a large congestion factor. A road that is merely slow is
+    still a road: given a bad enough detour the optimiser will use it anyway,
+    which is right for a jam and wrong for a street barricaded for a festival.
+    So the edge leaves the graph and the routing has to find another way -- or
+    report that there is not one.
+
+    That last case is why `vrp_id` is worth passing. Closing a road can cut a
+    stop off entirely rather than merely make it expensive, and the scoring
+    treats an unreachable leg as a large penalty, so a plan that strands a
+    customer still returns a number and still draws on the map. It is just not
+    a plan. When an instance is named, its stops are checked and the ones now
+    unreachable are listed.
+    """
+    try:
+        net = store.get_network(user_id, req.network_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if req.reopen:
+        changed = net.reopen_road(req.u, req.v)
+        if changed == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Road ({req.u}, {req.v}) is not closed, so there is nothing to reopen.",
+            )
+        action = "reopened"
+    else:
+        if not net.graph.has_edge(req.u, req.v) and not net.graph.has_edge(req.v, req.u):
+            raise HTTPException(
+                status_code=400,
+                detail=f"No road ({req.u}, {req.v}) in network {req.network_id!r} "
+                       f"— it may already be closed.",
+            )
+        changed = net.close_road(req.u, req.v, both_directions=req.both_directions)
+        action = "closed"
+
+    # A stored instance holds distance and time matrices computed when it was
+    # built. Leaving them alone would route the fleet down a road that is no
+    # longer there, so every instance on this network is rebuilt against the
+    # graph as it now stands.
+    stranded: list = []
+    if req.vrp_id:
+        try:
+            problem = store.get_vrp(user_id, req.vrp_id)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        problem.net = net
+        problem.recompute_matrices()
+        stranded = net.unreachable_from(
+            problem.depot, [c.node_id for c in problem.customers]
+        )
+        store.put_vrp(user_id, req.network_id, problem, vrp_id=req.vrp_id)
+
+    store.put_network(user_id, net, network_id=req.network_id)
+
+    message = f"Road ({req.u}, {req.v}) {action}; {changed} direction(s) changed."
+    if stranded:
+        message += (f" {len(stranded)} stop(s) can no longer be reached from the depot, "
+                    f"so no valid plan exists until this road reopens.")
+
+    return RoadClosureResponse(
+        network_id=req.network_id, u=req.u, v=req.v,
+        closed=not req.reopen, edges_changed=changed,
+        closed_roads=[list(pair) for pair in net.closed_roads()],
+        stranded_customers=stranded, message=message,
+    )
+
 
 @router.post("/traffic/incident", response_model=TrafficIncidentResponse)
 def create_traffic_incident(req: TrafficIncidentRequest, user_id: str = Depends(get_current_user)):

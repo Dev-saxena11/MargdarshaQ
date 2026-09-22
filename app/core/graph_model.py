@@ -17,7 +17,7 @@ import random
 import numpy as np
 import networkx as nx
 from dataclasses import dataclass, field
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Iterable, Tuple, List, Optional
 
 from app.core.traffic_profile import TrafficProfile, DEFAULT_PROFILE
 
@@ -60,6 +60,11 @@ class TrafficNetwork:
     # get_edge_congestion / travel_time; without one the network behaves
     # statically, exactly as before.
     profile: TrafficProfile = field(default_factory=lambda: DEFAULT_PROFILE)
+
+    # Roads taken out of the graph by close_road, kept with their attributes so
+    # the closure can be lifted. Directed, because a one-way street has only one
+    # entry and a two-way street has two that may differ.
+    _closed_roads: List[Tuple[int, int, dict]] = field(default_factory=list)
 
     # ---------- construction helpers ----------
 
@@ -190,6 +195,80 @@ class TrafficNetwork:
             if inc.original_factor_reverse is not None and self.graph.has_edge(inc.v, inc.u):
                 self.graph[inc.v][inc.u]["congestion_factor"] = inc.original_factor_reverse
         self.incidents.clear()
+
+    # ---- road closures ------------------------------------------------
+    #
+    # A closure is not a very large congestion factor. A road that is merely
+    # slow is still a road: given a bad enough detour the optimiser will drive
+    # down it anyway, which is the right answer for a jam and the wrong one for
+    # a street that is physically barricaded for a festival. So a closure
+    # removes the edge from the graph, and the routing has to find another way
+    # or report that there isn't one.
+    #
+    # The removed edges are kept so the closure can be lifted, which is what
+    # makes "what if we shut this road" a question the dashboard can ask twice.
+
+    def close_road(self, u: int, v: int, both_directions: bool = True) -> int:
+        """
+        Make a road impassable. Returns how many directed edges were removed.
+
+        Closing an already-closed road is a no-op returning 0, so a repeated
+        click cannot corrupt the saved state and make the road unreopenable.
+        """
+        removed = 0
+        pairs = [(u, v)] + ([(v, u)] if both_directions else [])
+        for a, b in pairs:
+            if not self.graph.has_edge(a, b):
+                continue
+            self._closed_roads.append((a, b, dict(self.graph[a][b])))
+            self.graph.remove_edge(a, b)
+            removed += 1
+        return removed
+
+    def reopen_road(self, u: int, v: int) -> int:
+        """Restore a closed road, in both directions if both were closed."""
+        restored = 0
+        remaining = []
+        for a, b, attrs in self._closed_roads:
+            if {a, b} == {u, v}:
+                self.graph.add_edge(a, b, **attrs)
+                restored += 1
+            else:
+                remaining.append((a, b, attrs))
+        self._closed_roads = remaining
+        return restored
+
+    def reopen_all_roads(self) -> int:
+        restored = 0
+        for a, b, attrs in self._closed_roads:
+            self.graph.add_edge(a, b, **attrs)
+            restored += 1
+        self._closed_roads = []
+        return restored
+
+    def closed_roads(self) -> List[Tuple[int, int]]:
+        """Each closed road once, as an undirected pair."""
+        seen = []
+        for a, b, _ in self._closed_roads:
+            if (b, a) not in seen:
+                seen.append((a, b))
+        return seen
+
+    def unreachable_from(self, source: int, targets: Iterable[int]) -> List[int]:
+        """
+        Which of `targets` can no longer be reached from `source`.
+
+        Closing a road can cut a customer off entirely rather than merely make
+        it expensive. The scoring treats an unreachable leg as a large penalty,
+        so a plan stranding a customer still returns a number and still draws on
+        the map -- it is just not a plan. Callers check this and say so.
+        """
+        import networkx as nx
+
+        if source not in self.graph:
+            return [t for t in targets]
+        reached = nx.descendants(self.graph, source) | {source}
+        return [t for t in targets if t not in reached]
 
     def randomize_congestion(self, seed: Optional[int] = None,
                                low: float = 1.0, high: float = 3.0):
