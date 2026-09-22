@@ -6,6 +6,14 @@ COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.overpass.yml"
 ENV_FILE="${SCRIPT_DIR}/.env"
 DEFAULT_OVERPASS_URL="http://localhost:12345/api/interpreter"
 
+# The compose file declares the database volume `external: true`, so that an
+# import survives a compose project rename or teardown. Compose will not create
+# an external volume -- it refuses to start when one is missing -- so this
+# script has to make it first, or the single command this script exists to
+# provide fails on a clean machine. `docker volume create` is idempotent, so
+# re-running costs nothing and never touches an existing database.
+OVERPASS_DB_VOLUME="sih26137-overpass-db"
+
 region="central-zone"
 extract_url=""
 dry_run="false"
@@ -100,12 +108,20 @@ echo "Compose file: ${COMPOSE_FILE}"
 
 if [[ "${dry_run}" == "true" ]]; then
   echo "[dry-run] Would write OSM_EXTRACT_URL and OVERPASS_URL to ${ENV_FILE}"
+  echo "[dry-run] Would run: docker volume create ${OVERPASS_DB_VOLUME}"
   echo "[dry-run] Would run: docker compose -f ${COMPOSE_FILE} up -d"
   exit 0
 fi
 
 set_env_var "OSM_EXTRACT_URL" "${extract_url}"
 set_env_var "OVERPASS_URL" "${DEFAULT_OVERPASS_URL}"
+
+if docker volume inspect "${OVERPASS_DB_VOLUME}" >/dev/null 2>&1; then
+  echo "Reusing existing database volume ${OVERPASS_DB_VOLUME} (no re-import)."
+else
+  echo "Creating persistent database volume ${OVERPASS_DB_VOLUME}."
+  docker volume create "${OVERPASS_DB_VOLUME}" >/dev/null
+fi
 
 docker compose -f "${COMPOSE_FILE}" up -d
 
