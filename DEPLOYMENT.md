@@ -238,19 +238,15 @@ from one extract means either India-wide or merging several zone extracts with
 #### Runbook
 
 ```bash
-# 1. Choose the extract (in .env)
-OSM_EXTRACT_URL=https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf
+# 1. Choose and start in one step.
+#    state/zone extracts are usually ~15-40 min; India-wide is ~2+ hours.
+./setup-local-overpass.sh --region central-zone
+# ./setup-local-overpass.sh --region india
 
-# 2. Start it. First run downloads and imports; this is the slow part.
-docker compose -f docker-compose.overpass.yml up -d
+# 2. Watch the import. Config mistakes show up here within the first minute.
+docker compose -f docker-compose.overpass.yml logs -f overpass
 
-# 3. Watch the import. Config mistakes show up here within the first minute.
-docker compose -f docker-compose.overpass.yml logs -f
-
-# 4. Once it is serving, point the app at it (in .env)
-OVERPASS_URL=http://localhost:12345/api/interpreter
-
-# 5. Confirm — this is the step that matters
+# 3. Confirm — this is the step that matters
 python scripts/check_overpass.py --compare
 ```
 
