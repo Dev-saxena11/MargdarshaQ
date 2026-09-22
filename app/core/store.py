@@ -198,14 +198,25 @@ def cleanup_old_db_entries():
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
 
-def put_network(user_id: str, net: TrafficNetwork, is_geo: bool = False) -> str:
-    network_id = new_id()
+def put_network(user_id: str, net: TrafficNetwork, is_geo: bool = False,
+                network_id: Optional[str] = None) -> str:
+    """
+    Store a network, or overwrite one when `network_id` names an existing row.
+
+    Overwriting matters because the objects handed out by get_network are
+    deserialised copies when a database is configured. Anything that changes a
+    network in place -- closing a road, applying an incident -- is otherwise
+    thrown away the moment the request ends, and only on deployments that have
+    a database. That is the worst shape of bug: it works locally.
+    """
+    network_id = network_id or new_id()
     conn = get_connection()
     if conn:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO networks (id, user_id, is_geo, data) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO networks (id, user_id, is_geo, data) VALUES (%s, %s, %s, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, is_geo = EXCLUDED.is_geo",
                     (network_id, user_id, is_geo, psycopg2.Binary(pickle.dumps(net)))
                 )
             conn.commit()
@@ -255,14 +266,17 @@ def is_geo_network(user_id: str, network_id: str) -> bool:
     else:
         return _network_is_geo.get((user_id, network_id), False)
 
-def put_vrp(user_id: str, network_id: str, problem: VRPProblem) -> str:
-    vrp_id = new_id()
+def put_vrp(user_id: str, network_id: str, problem: VRPProblem,
+            vrp_id: Optional[str] = None) -> str:
+    """Store an instance, or overwrite one when `vrp_id` names an existing row."""
+    vrp_id = vrp_id or new_id()
     conn = get_connection()
     if conn:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO vrp_problems (id, user_id, network_id, data) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO vrp_problems (id, user_id, network_id, data) VALUES (%s, %s, %s, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, network_id = EXCLUDED.network_id",
                     (vrp_id, user_id, network_id, psycopg2.Binary(pickle.dumps(problem)))
                 )
             conn.commit()

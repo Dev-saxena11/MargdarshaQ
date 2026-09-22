@@ -269,6 +269,30 @@ class TrafficIncidentRequest(BaseModel):
     duration_min: Optional[float] = Field(None, description="Incident duration in minutes (None = permanent)")
 
 
+class RoadClosureRequest(BaseModel):
+    network_id: str
+    u: int
+    v: int
+    reopen: bool = Field(False, description="Lift a closure instead of applying one")
+    both_directions: bool = Field(True, description="Close the return direction too, where one exists")
+    # Optional: when given, the closure is checked against this instance's stops
+    # and depot, so a road that strands a customer is reported rather than
+    # quietly turned into a large routing penalty.
+    vrp_id: Optional[str] = Field(None, description="Check reachability for this instance's stops")
+
+
+class RoadClosureResponse(BaseModel):
+    network_id: str
+    u: int
+    v: int
+    closed: bool
+    edges_changed: int
+    closed_roads: List[List[int]] = Field(default_factory=list)
+    stranded_customers: List[int] = Field(default_factory=list,
+        description="Stops no longer reachable from the depot. Non-empty means this closure has no valid plan.")
+    message: str
+
+
 class TrafficIncidentResponse(BaseModel):
     network_id: str
     u: int

@@ -78,6 +78,8 @@ def _best_route_per_subset(
     w_time: float,
     w_distance: float,
     time_window_penalty_weight: float,
+    speed_factor: float = 1.0,
+    cost_per_km: float = 1.0,
 ) -> Dict[int, _RouteCost]:
     """
     The cheapest route for every subset of customers, over all visiting orders.
@@ -104,8 +106,8 @@ def _best_route_per_subset(
 
     def walk(mask, last, clock, dist, elapsed, tw, order, load):
         # Close the route here: drive back to the depot and price what we have.
-        back_t = travel_time(last, depot, depart_at=clock)
-        back_d = travel_distance(last, depot)
+        back_t = travel_time(last, depot, depart_at=clock) * speed_factor
+        back_d = travel_distance(last, depot) * cost_per_km
         reachable = np.isfinite(back_t)
         total_d = dist + (back_d if reachable else 0.0)
         total_t = elapsed + (back_t if reachable else 0.0)
@@ -119,8 +121,8 @@ def _best_route_per_subset(
             bit = 1 << i
             if mask & bit:
                 continue
-            t = travel_time(last, node_id[i], depart_at=clock)
-            d = travel_distance(last, node_id[i])
+            t = travel_time(last, node_id[i], depart_at=clock) * speed_factor
+            d = travel_distance(last, node_id[i]) * cost_per_km
             if not np.isfinite(t):
                 # Mirrors evaluate_solution: an unreachable leg is a heavy
                 # penalty, and the clock does not advance across it.
@@ -135,8 +137,8 @@ def _best_route_per_subset(
                  elapsed + t + wait, tw + late, order + (i,), load + demand[i])
 
     for i in range(n):
-        t = travel_time(depot, node_id[i], depart_at=0.0)
-        d = travel_distance(depot, node_id[i])
+        t = travel_time(depot, node_id[i], depart_at=0.0) * speed_factor
+        d = travel_distance(depot, node_id[i]) * cost_per_km
         if not np.isfinite(t):
             walk(1 << i, node_id[i], 0.0, 0.0, 0.0, 1000.0, (i,), demand[i])
             continue
@@ -164,8 +166,8 @@ def solve_vrp_exact(
     problem: VRPProblem,
     capacity_penalty_weight: float = 50.0,
     time_window_penalty_weight: float = 10.0,
-    w_time: float = 0.6,
-    w_distance: float = 0.4,
+    w_time: Optional[float] = None,
+    w_distance: Optional[float] = None,
     idle_vehicle_penalty_weight: float = 200.0,
     max_customers: int = EXACT_MAX_CUSTOMERS,
 ) -> VRPBenchmarkResult:
@@ -176,6 +178,14 @@ def solve_vrp_exact(
     Raises ExactSolverTooLarge past `max_customers` rather than appearing to
     hang.
     """
+    # Must resolve the same way evaluate_solution does, or "the optimum" would
+    # be the optimum of a different objective than the one the solution is
+    # finally scored against -- and the gap column would be measuring the
+    # disagreement between the two rather than the quality of any heuristic.
+    if w_time is None:
+        w_time = getattr(problem, "objective_w_time", 0.6)
+    if w_distance is None:
+        w_distance = getattr(problem, "objective_w_distance", 0.4)
     n = len(problem.customers)
     if n > max_customers:
         raise ExactSolverTooLarge(
@@ -196,9 +206,27 @@ def solve_vrp_exact(
             n_evaluations=0, convergence_curve=[empty.fitness],
         )
 
-    best_route = _best_route_per_subset(
-        problem, w_time, w_distance, time_window_penalty_weight
-    )
+    # Stage 1 is solved once per vehicle CLASS, not once overall. With a mixed
+    # fleet the cheapest ORDER for a given set of stops can differ between
+    # vehicles: a faster van arrives earlier, waits differently against the same
+    # time windows, and the penalty does not simply scale. Reusing one table
+    # across a mixed fleet would return an "optimum" that is not one, and
+    # nothing in the output would say so. A uniform fleet has exactly one class,
+    # so this costs nothing in the ordinary case.
+    classes: Dict[Tuple[float, float], List[int]] = {}
+    for v in range(problem.n_vehicles):
+        key = (problem.speed_factor_for(v), problem.cost_per_km_for(v))
+        classes.setdefault(key, []).append(v)
+
+    best_route_by_class: Dict[Tuple[float, float], Dict[int, _RouteCost]] = {
+        key: _best_route_per_subset(
+            problem, w_time, w_distance, time_window_penalty_weight,
+            speed_factor=key[0], cost_per_km=key[1],
+        )
+        for key in classes
+    }
+    class_of_vehicle = {v: key for key, members in classes.items() for v in members}
+    best_route = best_route_by_class[class_of_vehicle[0]]   # for reconstruction
 
     full = (1 << n) - 1
     requires_all = getattr(problem, "require_all_vehicles", False)
@@ -206,7 +234,7 @@ def solve_vrp_exact(
     def route_cost(mask: int, vehicle: int) -> Optional[float]:
         if mask == 0:
             return idle_vehicle_penalty_weight if requires_all else 0.0
-        entry = best_route.get(mask)
+        entry = best_route_by_class[class_of_vehicle[vehicle]].get(mask)
         if entry is None:
             return None
         over = entry.demand - problem.capacity_for(vehicle)
@@ -252,7 +280,7 @@ def solve_vrp_exact(
     remaining = full
     for v in range(n_vehicles - 1, -1, -1):
         chosen = picks[v][remaining]
-        entry = best_route.get(chosen)
+        entry = best_route_by_class[class_of_vehicle[v]].get(chosen)
         routes[v] = [problem.customers[i].node_id for i in entry.order] if entry else []
         remaining ^= chosen
 
@@ -268,7 +296,7 @@ def solve_vrp_exact(
         best_solution=solution,
         best_fitness=solution.fitness,
         runtime_sec=time.perf_counter() - t0,
-        n_evaluations=len(best_route),
+        n_evaluations=sum(len(t) for t in best_route_by_class.values()),
         convergence_curve=[solution.fitness],
     )
 
