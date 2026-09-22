@@ -164,8 +164,8 @@ def solve_vrp_exact(
     problem: VRPProblem,
     capacity_penalty_weight: float = 50.0,
     time_window_penalty_weight: float = 10.0,
-    w_time: float = 0.6,
-    w_distance: float = 0.4,
+    w_time: Optional[float] = None,
+    w_distance: Optional[float] = None,
     idle_vehicle_penalty_weight: float = 200.0,
     max_customers: int = EXACT_MAX_CUSTOMERS,
 ) -> VRPBenchmarkResult:
@@ -176,6 +176,14 @@ def solve_vrp_exact(
     Raises ExactSolverTooLarge past `max_customers` rather than appearing to
     hang.
     """
+    # Must resolve the same way evaluate_solution does, or "the optimum" would
+    # be the optimum of a different objective than the one the solution is
+    # finally scored against -- and the gap column would be measuring the
+    # disagreement between the two rather than the quality of any heuristic.
+    if w_time is None:
+        w_time = getattr(problem, "objective_w_time", 0.6)
+    if w_distance is None:
+        w_distance = getattr(problem, "objective_w_distance", 0.4)
     n = len(problem.customers)
     if n > max_customers:
         raise ExactSolverTooLarge(

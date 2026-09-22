@@ -82,6 +82,21 @@ class VRPProblem:
     bucket_minutes: float = 30.0
     horizon_minutes: float = 720.0
 
+    # How the objective trades fleet time against distance driven. These live on
+    # the problem rather than on each solver because they are a property of the
+    # question being asked, not of the method used to answer it -- and because
+    # every solver here reaches the objective through evaluate_solution, so one
+    # place is enough for all of them to agree.
+    #
+    # The defaults are this project's own: a municipal fleet cares mostly about
+    # finishing the round on time. A published benchmark may score something
+    # else -- Solomon's CVRPTW set is judged on total distance alone -- and an
+    # instance loaded from one sets these accordingly, so the optimiser is
+    # answering the question the benchmark actually asks rather than being
+    # marked against a different one.
+    objective_w_time: float = 0.6
+    objective_w_distance: float = 0.4
+
     # precomputed after __post_init__
     time_matrix: Dict[Tuple[int, int], float] = field(default_factory=dict)
     dist_matrix: Dict[Tuple[int, int], float] = field(default_factory=dict)
@@ -328,10 +343,18 @@ def evaluate_solution(
     routes: List[List[int]],
     capacity_penalty_weight: float = 50.0,
     time_window_penalty_weight: float = 10.0,
-    w_time: float = 0.6,
-    w_distance: float = 0.4,
+    w_time: Optional[float] = None,
+    w_distance: Optional[float] = None,
     idle_vehicle_penalty_weight: float = 200.0,
 ) -> VRPSolution:
+    # Unset means "whatever this instance is scored on" (see VRPProblem), which
+    # is how a benchmark instance gets judged on its own objective without every
+    # solver having to be told about it. An explicit argument still wins.
+    if w_time is None:
+        w_time = getattr(problem, "objective_w_time", 0.6)
+    if w_distance is None:
+        w_distance = getattr(problem, "objective_w_distance", 0.4)
+
     customer_lookup = {c.node_id: c for c in problem.customers}
     total_distance = 0.0
     total_time = 0.0
