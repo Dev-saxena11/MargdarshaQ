@@ -22,7 +22,11 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
-from app.core.overpass_network import load_overpass_network
+from app.core.overpass_network import (
+    load_overpass_network,
+    local_overpass_ready,
+    OVERPASS_LOADING_MESSAGE,
+)
 from app.core.offline_osm import load_offline_network, available_coverage
 from app.core.cached_network import (
     load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
@@ -191,6 +195,9 @@ def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get
             )
 
         try:
+            ready, _ = local_overpass_ready()
+            if not ready:
+                raise HTTPException(status_code=503, detail=OVERPASS_LOADING_MESSAGE)
             net, meta = load_overpass_network(
                 north=req.north, south=req.south, east=req.east, west=req.west,
                 max_nodes=req.max_nodes, congestion_seed=req.seed,
@@ -787,4 +794,3 @@ def get_profile(user_id: str = Depends(get_current_user)):
         operational_zones_mapped=stats["networks"],
         route_plans_dispatched=stats["vrps"]
     )
-

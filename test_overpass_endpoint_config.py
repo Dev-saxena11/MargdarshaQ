@@ -16,6 +16,7 @@ Runs fully offline — every endpoint is stubbed, nothing touches the network.
 Run with:  python test_overpass_endpoint_config.py
 """
 
+import importlib
 import os
 import sys
 
@@ -81,6 +82,20 @@ class Recorder:
         return any("localhost" in u for u in self.asked)
 
 
+class _FakeResp:
+    def __init__(self, text):
+        self._text = text
+
+    def read(self):
+        return self._text.encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
 def run(recorder, **kwargs):
     """fetch_overpass against a stubbed network. attempts=1 to avoid retry sleeps."""
     original = ON.ask_endpoint
@@ -89,6 +104,39 @@ def run(recorder, **kwargs):
         return ON.fetch_overpass(28.615, 77.195, 28.655, 77.245, attempts=1, **kwargs)
     finally:
         ON.ask_endpoint = original
+
+
+def check_readiness(label, fake_text=None, fake_exc=None, expected_ready=True):
+    original = ON.urllib.request.urlopen
+
+    def _fake(req, timeout=0):
+        if fake_exc is not None:
+            raise fake_exc
+        return _FakeResp(fake_text or "")
+
+    ON.urllib.request.urlopen = _fake
+    try:
+        ready, detail = ON.local_overpass_ready()
+    finally:
+        ON.urllib.request.urlopen = original
+
+    check(label + " ready flag", ready, expected_ready)
+    check(label + " detail", detail, None if expected_ready else ON.OVERPASS_LOADING_MESSAGE)
+
+
+def health_payload(ready, detail):
+    os.environ["JWT_SECRET"] = "test-secret"
+    if "app.main" in sys.modules:
+        del sys.modules["app.main"]
+    main = importlib.import_module("app.main")
+    from fastapi.testclient import TestClient
+
+    original = main.local_overpass_ready
+    main.local_overpass_ready = lambda: (ready, detail)
+    try:
+        return TestClient(main.app).get("/api/health").json()
+    finally:
+        main.local_overpass_ready = original
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +170,32 @@ set_env(OVERPASS_LOCAL_TIMEOUT="0")
 check("zero timeout -> default", ON.local_timeout(), 20)
 set_env(OVERPASS_LOCAL_TIMEOUT="-3")
 check("negative timeout -> default", ON.local_timeout(), 20)
+
+
+# ---------------------------------------------------------------------------
+# Local readiness
+# ---------------------------------------------------------------------------
+print("\nLocal readiness")
+
+set_env()
+check("no local configured -> ready", ON.local_overpass_ready(), (True, None))
+
+set_env(OVERPASS_URL=LOCAL_URL)
+check_readiness(
+    "status with available slots is ready",
+    fake_text="Rate limit: 2\n2 slots available now.\nCurrently running queries:\n",
+    expected_ready=True,
+)
+check_readiness(
+    "status without ready markers is loading",
+    fake_text="Database not available yet\n",
+    expected_ready=False,
+)
+check_readiness(
+    "status endpoint connection error is loading",
+    fake_exc=ConnectionRefusedError("refused"),
+    expected_ready=False,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +275,22 @@ check("query includes residential", "residential" in q, True)
 # The local instance's OVERPASS_MAX_TIMEOUT must cover this or big boxes are
 # refused outright rather than answered slowly.
 check("query timeout is 120", "[timeout:120]" in q, True)
+
+
+# ---------------------------------------------------------------------------
+# /api/health payload
+# ---------------------------------------------------------------------------
+print("\nHealth endpoint")
+
+healthy = health_payload(True, None)
+check("health reports ok when ready", healthy.get("status"), "ok")
+check("health includes osm ready=true", healthy.get("osm", {}).get("ready"), True)
+check("health includes osm status=ready", healthy.get("osm", {}).get("status"), "ready")
+
+loading = health_payload(False, ON.OVERPASS_LOADING_MESSAGE)
+check("health reports degraded while loading", loading.get("status"), "degraded")
+check("health includes osm ready=false", loading.get("osm", {}).get("ready"), False)
+check("health includes osm status=loading", loading.get("osm", {}).get("status"), "loading")
 
 
 print()
