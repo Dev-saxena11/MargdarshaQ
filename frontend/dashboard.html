@@ -4030,6 +4030,28 @@
               <button class="secondary" id="btnClearPicks" onclick="clearPicks()" disabled>
                 Clear selection
               </button>
+              <!--
+                Road closures. Kept beside the depot and stop pickers because it
+                is the same kind of action - changing the problem by clicking the
+                map - and because it must be a mode: the road layer sits above the
+                junctions, so making roads permanently clickable would swallow
+                every click meant for a junction.
+              -->
+              <div class="seg" style="margin-top:10px;">
+                <button id="btnCloseRoad" onclick="startCloseRoad()" disabled>
+                  &#9888; Close a road
+                </button>
+                <button id="btnReopenRoads" onclick="reopenAllRoads()" disabled>
+                  Reopen all
+                </button>
+              </div>
+              <p class="step-hint" style="margin-top:6px;">
+                Shut a street the way a festival or a burst main would, then solve
+                again to see the round rebuilt around it. Closed roads are drawn
+                greyed and dotted; click one again to reopen it.
+              </p>
+              <div id="closureSummary" class="step-hint" style="margin-top:6px;"></div>
+
 
               <div class="row2" style="margin-top:12px;">
                 <div><label>Vehicle capacity</label><input id="capacity" type="number" value="80"></div>
@@ -6556,9 +6578,17 @@
 
         const jam = e.congestion_factor >= JAM_THRESHOLD;
         const busy = e.congestion_factor > BUSY_THRESHOLD;
-        const color = jam ? '#EF4444' : busy ? '#F59E0B' : '#64748B';
-        const weight = jam ? 3.2 : busy ? 2.4 : 1.5;
-        const opacity = jam ? 0.85 : busy ? 0.62 : 0.38;
+        // A closed road is drawn as struck through rather than removed: the gap
+        // it leaves is the point, and a road that simply vanished would look
+        // like a rendering fault rather than a decision somebody made.
+        const shut = isRoadClosed(ctx, e.u, e.v);
+        const color = shut ? '#94A3B8' : jam ? '#EF4444' : busy ? '#F59E0B' : '#64748B';
+        const weight = shut ? 2.0 : jam ? 3.2 : busy ? 2.4 : 1.5;
+        const opacity = shut ? 0.9 : jam ? 0.85 : busy ? 0.62 : 0.38;
+
+        // Roads take clicks only while a closure is being chosen; see
+        // setDrawMode for why they are inert the rest of the time.
+        const clickable = ctx === state && state.drawMode === 'close';
 
         // The road graph is decoration — nothing binds a click or a tooltip to
         // it. Leaflet paths are interactive by default though, and this layer
@@ -6577,8 +6607,27 @@
           ...pOpts,
           color, weight, opacity,
           lineCap: 'round', lineJoin: 'round',
-          dashArray: jam ? '6, 4' : null, interactive: false
+          dashArray: shut ? '2, 6' : jam ? '6, 4' : null,
+          interactive: clickable,
+          // A 1.5px line is almost impossible to hit with a mouse, so the
+          // clickable version gets an invisible fat stroke around it.
+          ...(clickable ? { bubblingMouseEvents: false } : {}),
         }).addTo(layerGroup);
+
+        if (clickable) {
+          L.polyline([[a.y, a.x], [b.y, b.x]], {
+            ...pOpts, color: '#000000', weight: 14, opacity: 0,
+            interactive: true, bubblingMouseEvents: false,
+          })
+            .bindTooltip(shut
+              ? 'Closed — click to reopen'
+              : 'Click to close this road')
+            .on('click', ev => {
+              if (ev.originalEvent) L.DomEvent.stop(ev.originalEvent);
+              onRoadClick(e.u, e.v);
+            })
+            .addTo(layerGroup);
+        }
 
         // Directional arrow at 62% of the segment
         if (jam || busy || arrowsEverywhere) {
@@ -6913,12 +6962,119 @@
     }
 
     function setDrawMode(mode) {
+      const was = state.drawMode;
       state.drawMode = mode;
       const wrap = document.getElementById('mapWrap');
       wrap.classList.toggle('drawing', mode === 'boundary');
-      wrap.classList.toggle('picking', mode === 'depot' || mode === 'stops');
+      wrap.classList.toggle('picking', mode === 'depot' || mode === 'stops' || mode === 'close');
       document.getElementById('segPickDepot').classList.toggle('active', mode === 'depot');
       document.getElementById('segPickStops').classList.toggle('active', mode === 'stops');
+      const closeBtn = document.getElementById('btnCloseRoad');
+      if (closeBtn) closeBtn.classList.toggle('active', mode === 'close');
+
+      // The road layer is normally non-interactive on purpose: it sits in a pane
+      // above the junctions, so leaving it clickable meant every click meant for
+      // a junction landed on a road, and picking a depot by hand did not work.
+      // Closure mode is the one time roads must take the click, so the layer is
+      // redrawn on entering and leaving it rather than left permanently live.
+      if ((was === 'close') !== (mode === 'close') && state.network) {
+        renderControlNetwork();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Road closures
+    // -------------------------------------------------------------------------
+    // "Shut this street for a festival, what happens to the round" is the
+    // question a municipal audience actually has. The backend removes the edge
+    // rather than inflating its congestion, because a road that is merely slow
+    // is still a road and the optimiser will use it anyway given a bad enough
+    // detour.
+
+    function closureKey(u, v) {
+      // Undirected: closing a two-way street shuts both directions, and the
+      // road layer draws each direction separately, so both must match.
+      return u < v ? u + ':' + v : v + ':' + u;
+    }
+
+    function isRoadClosed(ctx, u, v) {
+      return !!(ctx && ctx.closedRoads && ctx.closedRoads.has(closureKey(u, v)));
+    }
+
+    function startCloseRoad() {
+      if (!state.network) {
+        setMapPrompt('Load a district first — there are no roads to close yet.', { warn: true });
+        return;
+      }
+      if (state.drawMode === 'close') { cancelMapMode(); return; }
+      setDrawMode('close');
+      setMapPrompt('Click a road to close it. Click a closed road to reopen it. '
+        + 'The plan is rebuilt around whatever is shut.', { cancel: true });
+    }
+
+    async function onRoadClick(u, v) {
+      if (state.drawMode !== 'close' || !state.network) return;
+      const key = closureKey(u, v);
+      state.closedRoads = state.closedRoads || new Set();
+      const reopening = state.closedRoads.has(key);
+
+      setMapPrompt((reopening ? 'Reopening' : 'Closing') + ' the road…');
+      try {
+        const res = await api('/api/network/close_road', {
+          method: 'POST',
+          body: JSON.stringify({
+            network_id: state.network.network_id,
+            u, v, reopen: reopening,
+            // Named so the backend rebuilds this instance's matrices against
+            // the graph as it now stands, and reports any stop it has cut off.
+            ...(state.vrp ? { vrp_id: state.vrp.vrp_id } : {}),
+          }),
+        });
+
+        state.closedRoads = new Set((res.closed_roads || []).map(p => closureKey(p[0], p[1])));
+        state.strandedStops = res.stranded_customers || [];
+        renderControlNetwork();
+
+        if (state.strandedStops.length) {
+          // The scoring prices an unreachable leg as a large penalty rather
+          // than refusing, so a plan stranding a stop still returns a number
+          // and still draws. Saying so is the only way anyone finds out.
+          setMapPrompt('<b>' + state.strandedStops.length + ' stop(s) can no longer be '
+            + 'reached from the depot.</b> Any plan shown until this road reopens serves '
+            + 'them only on paper. Click the road again to reopen it.',
+            { warn: true, cancel: true });
+        } else {
+          setMapPrompt((reopening ? 'Road reopened. ' : 'Road closed. ')
+            + state.closedRoads.size + ' closed in total. '
+            + (state.vrp ? 'Solve again to route around it.' : 'Build an instance to route around it.'),
+            { cancel: true });
+        }
+        updatePickUI();
+      } catch (e) {
+        const { detail } = describeApiError(e);
+        setMapPrompt('Could not change that road: ' + detail, { warn: true, cancel: true });
+      }
+    }
+
+    async function reopenAllRoads() {
+      if (!state.network || !state.closedRoads || !state.closedRoads.size) return;
+      const roads = [...state.closedRoads].map(k => k.split(':').map(Number));
+      for (const [u, v] of roads) {
+        try {
+          await api('/api/network/close_road', {
+            method: 'POST',
+            body: JSON.stringify({
+              network_id: state.network.network_id, u, v, reopen: true,
+              ...(state.vrp ? { vrp_id: state.vrp.vrp_id } : {}),
+            }),
+          });
+        } catch (e) { console.warn('Could not reopen', u, v, e); }
+      }
+      state.closedRoads = new Set();
+      state.strandedStops = [];
+      renderControlNetwork();
+      updatePickUI();
+      setMapPrompt('All roads reopened.');
     }
 
     function cancelMapMode() {
@@ -6998,6 +7154,11 @@
         state.selectedStops = [];
         state.baselineSolution = null;
         state.optimizedSolution = null;
+        // A different network has different roads, so closures from the last
+        // one are not merely stale -- their node ids may mean something else
+        // entirely, and the map would draw a road shut that nobody shut.
+        state.closedRoads = new Set();
+        state.strandedStops = [];
         hideRouteLegend();
 
         document.getElementById('netInfo').innerHTML =
@@ -7012,6 +7173,9 @@
           'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
+        // Closing a road needs only a network, so its buttons are driven
+        // from state rather than added to the list above.
+        updatePickUI();
         document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
@@ -7076,6 +7240,11 @@
         state.selectedStops = [];
         state.baselineSolution = null;
         state.optimizedSolution = null;
+        // A different network has different roads, so closures from the last
+        // one are not merely stale -- their node ids may mean something else
+        // entirely, and the map would draw a road shut that nobody shut.
+        state.closedRoads = new Set();
+        state.strandedStops = [];
         hideRouteLegend();
 
         document.getElementById('netInfo').innerHTML =
@@ -7088,6 +7257,9 @@
           'btnRandomStops', 'btnClearPicks']) {
           document.getElementById(id).disabled = false;
         }
+        // Closing a road needs only a network, so its buttons are driven
+        // from state rather than added to the list above.
+        updatePickUI();
         document.getElementById('btnGenVRP').disabled = true;
         document.getElementById('btnSolve').disabled = true;
         document.getElementById('btnBench').disabled = true;
@@ -7385,6 +7557,28 @@
       const ready = state.selectedDepot !== null && state.selectedStops.length > 0;
       document.getElementById('btnGenVRP').disabled = !ready;
       document.getElementById('btnClearPicks').disabled = state.selectedDepot === null && !state.selectedStops.length;
+
+      // Closing a road needs a network, nothing more -- it is a change to the
+      // map rather than to the selection, so it does not wait on a depot.
+      const closeBtn = document.getElementById('btnCloseRoad');
+      const reopenBtn = document.getElementById('btnReopenRoads');
+      const shut = (state.closedRoads && state.closedRoads.size) || 0;
+      if (closeBtn) closeBtn.disabled = !state.network;
+      if (reopenBtn) reopenBtn.disabled = !shut;
+
+      const summary = document.getElementById('closureSummary');
+      if (summary) {
+        if (!shut) {
+          summary.innerHTML = '';
+        } else {
+          const stranded = (state.strandedStops || []).length;
+          summary.innerHTML = '<b>' + shut + ' road' + (shut === 1 ? '' : 's') + ' closed.</b>'
+            + (stranded
+                ? ' <span style="color:#FF0054;">' + stranded + ' stop' + (stranded === 1 ? '' : 's')
+                  + ' unreachable — no valid plan exists until a road reopens.</span>'
+                : '');
+        }
+      }
     }
 
     // ---- Control-room map rendering (3 layers, same as the landing page) -----
