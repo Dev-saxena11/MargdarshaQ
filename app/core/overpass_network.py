@@ -63,6 +63,9 @@ OVERPASS_MIRRORS = [
 # Set OVERPASS_URL=http://localhost:12345/api/interpreter to switch. Leaving it
 # unset keeps the previous behaviour exactly, so this is opt-in.
 DEFAULT_LOCAL_TIMEOUT = 20
+OVERPASS_LOADING_MESSAGE = (
+    "Map data is still loading in Overpass. Please try again in a moment."
+)
 
 
 def local_overpass_url() -> Optional[str]:
@@ -108,6 +111,44 @@ def local_timeout() -> int:
     except ValueError:
         return DEFAULT_LOCAL_TIMEOUT
     return value if value > 0 else DEFAULT_LOCAL_TIMEOUT
+
+
+def _status_url(interpreter_url: str) -> str:
+    """Map .../api/interpreter to .../api/status for local readiness checks."""
+    base = interpreter_url.split("?", 1)[0].rstrip("/")
+    if base.endswith("/interpreter"):
+        return base[:-len("/interpreter")] + "/status"
+    return base + "/status"
+
+
+def local_overpass_ready() -> Tuple[bool, Optional[str]]:
+    """
+    Readiness of the configured local Overpass instance.
+
+    Returns (ready, detail). When no local instance is configured we report ready
+    because Overpass requests are not gated on local-import state in that mode.
+    """
+    local = local_overpass_url()
+    if not local:
+        return True, None
+
+    try:
+        status_url = _status_url(local)
+        req = urllib.request.Request(
+            status_url,
+            headers={"User-Agent": "SIH26137-overpass-health/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=min(local_timeout(), 5)) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except Exception:
+        return False, OVERPASS_LOADING_MESSAGE
+
+    text = raw.lower()
+    if "slot available now" in text or "slots available now" in text:
+        return True, None
+    if "currently running queries" in text and "rate limit" in text:
+        return True, None
+    return False, OVERPASS_LOADING_MESSAGE
 
 
 # Road classes worth routing a delivery van over. Ordered fastest first; the

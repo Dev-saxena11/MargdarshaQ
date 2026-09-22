@@ -4730,9 +4730,10 @@
       const dot = document.getElementById('connDot');
       const label = document.getElementById('connLabel');
       try {
-        await api('/api/health');
-        dot.classList.add('ok');
-        label.textContent = 'API ONLINE';
+        const health = await api('/api/health');
+        const osmLoading = !!(health && health.osm && health.osm.ready === false);
+        dot.classList.toggle('ok', !osmLoading);
+        label.textContent = osmLoading ? 'MAP DATA LOADING' : 'API ONLINE';
         return true;
       } catch (e) {
         dot.classList.remove('ok');
@@ -7032,8 +7033,12 @@
 
         // 400 means the box is the problem, and redrawing fixes it. Anything
         // else is OpenStreetMap or the backend, where the fallback is the way on.
-        setMapPrompt(status === 400 ? detail + ' Draw another box.' : detail + offer,
-          { warn: true });
+        if (status === 503) {
+          setMapPrompt('Map data is still loading. Try again shortly, or' + offer, { warn: true });
+        } else {
+          setMapPrompt(status === 400 ? detail + ' Draw another box.' : detail + offer,
+            { warn: true });
+        }
         console.warn('Boundary load failed:', e);
       } finally {
         clearInterval(tick);

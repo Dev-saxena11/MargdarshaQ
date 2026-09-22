@@ -9,10 +9,11 @@
 # Usage
 # -----
 #   1. Pick an extract and put it in .env  (see OSM_EXTRACT_URL below)
-#   2. docker compose -f docker-compose.overpass.yml up -d
-#   3. Watch the import:  docker compose -f docker-compose.overpass.yml logs -f
-#   4. When it is serving: python scripts/check_overpass.py
-#   5. Set OVERPASS_URL=http://localhost:12345/api/interpreter in .env
+#   2. docker volume create sih26137-overpass-db
+#   3. docker compose -f docker-compose.overpass.yml up -d
+#   4. Watch the import:  docker compose -f docker-compose.overpass.yml logs -f
+#   5. When it is serving: python scripts/check_overpass.py
+#   6. Set OVERPASS_URL=http://localhost:12345/api/interpreter in .env
 #
 # The first start downloads the extract and builds the database. This takes
 # minutes for a city extract and a couple of hours for India-wide. Do it the day
@@ -80,8 +81,8 @@ services:
       # refused by the server rather than answered slowly.
       OVERPASS_MAX_TIMEOUT: "300"
     volumes:
-      # The built database. Named rather than a bind mount so it survives
-      # `docker compose down` — losing this means repeating the whole import.
+      # The built database. Backed by an external named volume so it survives
+      # compose teardown/redeploys — losing this means repeating the whole import.
       - overpass_db:/db
     post_start:
       # The image creates /db as 0700 owned by `overpass`, but serves queries
@@ -106,3 +107,7 @@ services:
 
 volumes:
   overpass_db:
+    # Use a host-stable external volume name so the imported DB survives
+    # compose project renames/redeploys.
+    name: sih26137-overpass-db
+    external: true

@@ -30,6 +30,7 @@ import os
 #                 wrong. Cleared so the suite tests the same thing everywhere.
 #                 A test that wants the configured path should set the key
 #                 itself, via monkeypatch, and say so.
+#
 #   DATABASE_URL  store.py falls back to an in-memory store when this is unset,
 #                 which is what the suite should run against. Left alone, a
 #                 developer's .env points it at the live database: the tests
@@ -38,6 +39,7 @@ import os
 #                 because something *had* been solved, by someone else, days
 #                 ago. Cleared so the suite neither depends on nor writes to a
 #                 real database.
+#
 # Each is set to an empty string rather than deleted. store.py calls
 # load_dotenv(), which does not overwrite a variable that is already present but
 # does happily set one that is absent -- so deleting these would hand .env the
@@ -62,9 +64,16 @@ _pin_environment()
 # and the output says only "no tests ran", naming neither the file nor the
 # reason.
 #
+# test_overpass_compose_persistence.py is worth singling out: it aborts the run
+# on SUCCESS as well, because it ends in sys.exit(0), and a SystemExit raised
+# while pytest is importing a module stops collection whatever its code. So
+# "all its checks passed" and "no tests collected in the whole repo" were the
+# same run.
+#
 # If you add another, add it here as well.
 collect_ignore = [
     "test_overpass_endpoint_config.py",
     "test_auth_tokens.py",
     "test_assistant_providers.py",
+    "test_overpass_compose_persistence.py",
 ]
