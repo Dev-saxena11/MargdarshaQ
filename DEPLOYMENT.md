@@ -250,6 +250,31 @@ docker compose -f docker-compose.overpass.yml logs -f overpass
 python scripts/check_overpass.py --compare
 ```
 
+`docker-compose.overpass.yml` uses `restart: unless-stopped`, so after a host
+reboot Docker brings the container back with the existing database volume.
+
+#### Back up / restore the built Overpass volume (host deploys)
+
+If this is running on a long-lived host, snapshot the built volume after import
+so a disk move or host replacement does not force a full rebuild.
+
+```bash
+# Backup (writes a timestamped tarball under ./overpass-backups/)
+mkdir -p overpass-backups
+docker run --rm \
+  -v sih26137-overpass-db:/from \
+  -v "$PWD/overpass-backups:/to" \
+  alpine sh -c 'tar czf /to/overpass-db-$(date +%F-%H%M%S).tgz -C /from .'
+
+# Restore into the same volume name (stop compose first)
+docker compose -f docker-compose.overpass.yml down
+docker run --rm \
+  -v sih26137-overpass-db:/to \
+  -v "$PWD/overpass-backups:/from" \
+  alpine sh -c 'tar xzf /from/<backup-file>.tgz -C /to'
+docker compose -f docker-compose.overpass.yml up -d
+```
+
 Do a throwaway run with a small city extract first. A typo in the compose file
 costs you a minute that way and two hours the other way.
 
