@@ -3920,6 +3920,35 @@
         <div id="main">
           <!-- LEFT: network + VRP generation -->
           <div class="col">
+            <!--
+              The console's own five steps are the point of this screen, but they
+              are five steps before anything moves. This runs a real one end to
+              end so there is something on the map to talk about, and leaves every
+              control below exactly where it was to take over from.
+            -->
+            <section id="demoScenarioPanel">
+              <h2>Start here: run a whole district in one click</h2>
+              <p class="step-hint">
+                Loads a real city's road network, places a depot and its stops, builds the
+                delivery problem and races all five algorithms on it. A few seconds once the
+                API is awake, longer on the first call if it has gone to sleep. Everything
+                below stays editable afterwards.
+              </p>
+              <div class="row2">
+                <div>
+                  <label>District</label>
+                  <select id="demoScenarioArea"></select>
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                  <button class="primary" id="btnDemoScenario"
+                          onclick="runDemoScenario()" style="width:100%;">
+                    ▶ Run the whole thing
+                  </button>
+                </div>
+              </div>
+              <div id="demoScenarioStatus" class="step-hint" style="margin-top:10px;"></div>
+            </section>
+
             <section>
               <h2>1. Choose Your Study Area</h2>
               <p class="step-hint">
@@ -7085,6 +7114,102 @@
       await loadCuratedIntoControlRoom(CONTROL_ROOM_DEFAULT_AREA);
     }
 
+    // ---------------------------------------------------------------------------
+    // One-click demo scenario
+    // ---------------------------------------------------------------------------
+    // The console asks for five decisions before it shows anything: pick an area,
+    // load it, place a depot, place stops, build the instance, then solve. Each
+    // one is there for a reason and none of them is interesting to somebody who
+    // has not seen the thing work yet.
+    //
+    // This runs the same five steps against a real district, calling exactly the
+    // functions the buttons call rather than a scripted shortcut -- so what is on
+    // screen afterwards is a genuine run, and every control below is populated and
+    // live for anyone who wants to change something and go again.
+
+    function fillDemoScenarioPicker() {
+      const select = document.getElementById('demoScenarioArea');
+      if (!select) return;
+      select.innerHTML = CURATED_AREAS
+        .map(a => '<option value="' + a.key + '"'
+             + (a.key === CONTROL_ROOM_DEFAULT_AREA ? ' selected' : '')
+             + '>' + a.name + '</option>')
+        .join('');
+    }
+
+    function demoSay(message, isError) {
+      const el = document.getElementById('demoScenarioStatus');
+      if (!el) return;
+      el.style.color = isError ? '#FF0054' : '';
+      el.innerHTML = message || '';
+    }
+
+    async function runDemoScenario() {
+      const btn = document.getElementById('btnDemoScenario');
+      const key = (document.getElementById('demoScenarioArea') || {}).value
+                  || CONTROL_ROOM_DEFAULT_AREA;
+      const area = areaByKey(key);
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'RUNNING…';
+
+      // generateVRP and runBenchmark report their own failures and return
+      // rather than throwing, so each stage is checked by what it produced.
+      // A result left over from a previous run would pass that check and let
+      // the scenario report success on a stage that had just failed.
+      state.benchmarkResults = null;
+      state.vrp = null;
+
+      try {
+        demoSay('Loading the road network for <b>' + area.name + '</b>…');
+        await loadCuratedIntoControlRoom(key);
+        if (!state.network) {
+          throw new Error('the road network could not be loaded');
+        }
+
+        // Drive the auto-placement panel rather than reimplementing it, so the
+        // stops here are placed the same way the button places them.
+        demoSay('Placing a depot and ' + area.stops + ' stops…');
+        setPlanMode('auto');
+        document.getElementById('autoDepotMode').value = 'central';
+        document.getElementById('autoStopCount').value = area.stops;
+        state.selectedDepot = null;
+        pickRandomStops();
+        if (state.selectedDepot === null || !state.selectedStops.length) {
+          throw new Error('stops could not be placed on this network');
+        }
+
+        demoSay('Building the delivery problem…');
+        await generateVRP();
+        if (!state.vrp) {
+          throw new Error('the delivery problem could not be built');
+        }
+
+        demoSay('Racing all five algorithms…');
+        await runBenchmark();
+        if (!state.benchmarkResults) {
+          throw new Error('the benchmark did not finish');
+        }
+
+        const best = state.benchmarkResults
+          .reduce((a, b) => (a.fitness < b.fitness ? a : b));
+        demoSay('Done — <b>' + area.name + '</b>, ' + state.selectedStops.length
+          + ' stops. Best of the five was <b>' + best.algorithm + '</b>. '
+          + 'The routes are on the map and every control below is live, so you '
+          + 'can change anything and run it again.');
+      } catch (e) {
+        // generateVRP and runBenchmark report their own failures, so say what
+        // stage this stopped at rather than repeating their message.
+        const { detail } = describeApiError(e);
+        demoSay('Could not finish the run: ' + (e.message || detail)
+          + ' The steps below still work one at a time.', true);
+        console.warn('Demo scenario failed:', e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    }
+
     // The way back after drawing a boundary somewhere else.
     async function loadDefaultArea() {
       clearBoundary();
@@ -9174,6 +9299,7 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
     // ---------------------------------------------------------------------------
     initApiBase();   // must run before checkHealth() so it probes the right backend
     renderAreaPicker();
+    fillDemoScenarioPicker();
     syncSoloButtonLabel();
     setTimeout(initAssistantChat, 100);
 

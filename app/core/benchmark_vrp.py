@@ -23,10 +23,30 @@ from app.core.qpso_vrp import QPSOVRPOptimizer
 from app.core.classical_baselines_vrp import (
     run_ga_vrp, run_sa_vrp, run_standard_pso_vrp, run_greedy_nn_vrp
 )
+from app.core.exact_vrp import (
+    EXACT_MAX_CUSTOMERS, ExactSolverTooLarge, optimality_gap, solve_vrp_exact,
+)
 
 
-def run_full_vrp_benchmark(problem: VRPProblem, max_iter: int = 200, seed: int = 1) -> Dict[str, Any]:
+def run_full_vrp_benchmark(problem: VRPProblem, max_iter: int = 200, seed: int = 1,
+                           include_exact: bool = True,
+                           exact_max_customers: int = EXACT_MAX_CUSTOMERS) -> Dict[str, Any]:
+    """
+    Every algorithm on one instance.
+
+    On instances small enough to solve exactly, the proven optimum is included
+    as a baseline. Without it the table only ranks heuristics against each
+    other, which cannot answer how close to optimal the winner actually got.
+    Larger instances omit the row: the exact solver is exponential, so running
+    it there would hang rather than inform.
+    """
     results = {}
+
+    if include_exact and len(problem.customers) <= exact_max_customers:
+        try:
+            results["Exact"] = solve_vrp_exact(problem, max_customers=exact_max_customers)
+        except ExactSolverTooLarge:
+            pass
 
     results["Greedy NN"] = run_greedy_nn_vrp(problem)
 
@@ -50,8 +70,17 @@ def run_full_vrp_benchmark(problem: VRPProblem, max_iter: int = 200, seed: int =
 
 
 def print_vrp_comparison_table(results: Dict[str, Any]):
-    print(f"\n{'Algorithm':<28} {'Fitness':>10} {'Distance':>10} {'Time':>10} {'Feasible':>9} {'Runtime(ms)':>13} {'Evals':>8}")
-    print("-" * 95)
+    # The gap column only means anything when the optimum is known, so it
+    # appears only on instances the exact solver could finish. A blank column
+    # would read as "no gap", which is the opposite of "not measured".
+    optimum = None
+    if "Exact" in results:
+        exact = results["Exact"]
+        optimum = exact["best_fitness"] if isinstance(exact, dict) else exact.best_fitness
+
+    gap_header = f" {'Gap vs opt':>11}" if optimum is not None else ""
+    print(f"\n{'Algorithm':<28} {'Fitness':>10} {'Distance':>10} {'Time':>10} {'Feasible':>9} {'Runtime(ms)':>13} {'Evals':>8}{gap_header}")
+    print("-" * (95 + len(gap_header)))
     for key, r in results.items():
         if isinstance(r, dict):
             algo, fit, sol, rt, ev = r["algorithm"], r["best_fitness"], r["best_solution"], r["runtime_sec"] * 1000, r["n_evaluations"]
@@ -60,7 +89,11 @@ def print_vrp_comparison_table(results: Dict[str, Any]):
         dist = sol.total_distance if sol else float("nan")
         tme = sol.total_time if sol else float("nan")
         feas = sol.feasible if sol else False
-        print(f"{algo:<28} {fit:>10.2f} {dist:>10.2f} {tme:>10.2f} {str(feas):>9} {rt:>13.2f} {ev:>8d}")
+        gap = ""
+        if optimum is not None:
+            measured = "--" if key == "Exact" else f"{optimality_gap(fit, optimum):+.2f}%"
+            gap = f" {measured:>11}"
+        print(f"{algo:<28} {fit:>10.2f} {dist:>10.2f} {tme:>10.2f} {str(feas):>9} {rt:>13.2f} {ev:>8d}{gap}")
 
 
 def plot_vrp_convergence(results: Dict[str, Any], save_path: str):
