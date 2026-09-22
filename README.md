@@ -148,6 +148,7 @@ and rate-limited by IP — the same box measured 44s, then 169s, then a plain 50
 inside one hour. For anything judged, run Overpass locally instead:
 
 ```bash
+docker volume create sih26137-overpass-db              # create persistent DB volume once
 docker compose -f docker-compose.overpass.yml up -d     # first run imports; slow
 python scripts/check_overpass.py --compare              # confirm it's being used
 ```

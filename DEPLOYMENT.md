@@ -241,17 +241,45 @@ from one extract means either India-wide or merging several zone extracts with
 # 1. Choose the extract (in .env)
 OSM_EXTRACT_URL=https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf
 
-# 2. Start it. First run downloads and imports; this is the slow part.
+# 2. Create the persistent volume once (safe to re-run; no-op if it exists)
+docker volume create sih26137-overpass-db
+
+# 3. Start it. First run downloads and imports; this is the slow part.
 docker compose -f docker-compose.overpass.yml up -d
 
-# 3. Watch the import. Config mistakes show up here within the first minute.
+# 4. Watch the import. Config mistakes show up here within the first minute.
 docker compose -f docker-compose.overpass.yml logs -f
 
-# 4. Once it is serving, point the app at it (in .env)
+# 5. Once it is serving, point the app at it (in .env)
 OVERPASS_URL=http://localhost:12345/api/interpreter
 
-# 5. Confirm — this is the step that matters
+# 6. Confirm — this is the step that matters
 python scripts/check_overpass.py --compare
+```
+
+`docker-compose.overpass.yml` uses `restart: unless-stopped`, so after a host
+reboot Docker brings the container back with the existing database volume.
+
+#### Back up / restore the built Overpass volume (host deploys)
+
+If this is running on a long-lived host, snapshot the built volume after import
+so a disk move or host replacement does not force a full rebuild.
+
+```bash
+# Backup (writes a timestamped tarball under ./overpass-backups/)
+mkdir -p overpass-backups
+docker run --rm \
+  -v sih26137-overpass-db:/from \
+  -v "$PWD/overpass-backups:/to" \
+  alpine sh -c 'tar czf /to/overpass-db-$(date +%F-%H%M%S).tgz -C /from .'
+
+# Restore into the same volume name (stop compose first)
+docker compose -f docker-compose.overpass.yml down
+docker run --rm \
+  -v sih26137-overpass-db:/to \
+  -v "$PWD/overpass-backups:/from" \
+  alpine sh -c 'tar xzf /from/<backup-file>.tgz -C /to'
+docker compose -f docker-compose.overpass.yml up -d
 ```
 
 Do a throwaway run with a small city extract first. A typo in the compose file
