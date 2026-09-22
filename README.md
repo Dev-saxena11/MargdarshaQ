@@ -148,14 +148,16 @@ and rate-limited by IP — the same box measured 44s, then 169s, then a plain 50
 inside one hour. For anything judged, run Overpass locally instead:
 
 ```bash
-docker compose -f docker-compose.overpass.yml up -d     # first run imports; slow
+./setup-local-overpass.sh --region central-zone         # Bareilly default (~15-40 min)
+./setup-local-overpass.sh --region india                # Full India import (~2+ hours)
 python scripts/check_overpass.py --compare              # confirm it's being used
 ```
 
-Then set `OVERPASS_URL=http://localhost:12345/api/interpreter` in `.env` and the
-same query returns in under a second. Leaving the variable unset keeps the
-previous public-mirror behaviour, and a local instance that isn't running falls
-back to it automatically rather than failing.
+The setup script updates `.env` with `OSM_EXTRACT_URL` and
+`OVERPASS_URL=http://localhost:12345/api/interpreter`, then starts the local
+container. The same query returns in under a second. Leaving `OVERPASS_URL`
+unset keeps the previous public-mirror behaviour, and a local instance that
+isn't running falls back to it automatically rather than failing.
 
 The import needs 8–16 GB RAM, up to 30 GB of disk, and anywhere from minutes to
 two hours depending on how much of India you pull — **run it the day before the
