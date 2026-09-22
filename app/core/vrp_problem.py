@@ -62,6 +62,30 @@ class VRPProblem:
     # vehicle has the uniform `vehicle_capacity`.
     vehicle_capacities: Optional[List[float]] = None
 
+    # A mixed fleet. An Indian municipal round is rarely one kind of vehicle: a
+    # two-wheeler threads traffic a tempo cannot and carries almost nothing, a
+    # truck is the reverse. Capacity alone does not express that, so the two
+    # other things that differ are here too.
+    #
+    #   speed factor   multiplies travel time on every leg. Below 1.0 is faster
+    #                  than the network's base speed, above 1.0 slower. It is a
+    #                  factor rather than an absolute speed so it composes with
+    #                  the road's own limit and with congestion instead of
+    #                  overriding them -- a two-wheeler is quicker *through the
+    #                  same jam*, not quicker in free flow on a motorway.
+    #
+    #   cost per km    weights distance for that vehicle, so a truck's kilometre
+    #                  costs more than a scooter's. Relative, not currency: what
+    #                  matters to the optimiser is the ratio.
+    #
+    # Both default to None, meaning a uniform fleet and arithmetic identical to
+    # before. What they do NOT model is access restriction -- a lane a truck may
+    # not enter. That needs per-vehicle-class shortest paths, and the distance
+    # matrix here is shared across the fleet, so it is a larger change than a
+    # per-vehicle multiplier and is deliberately not pretended at.
+    vehicle_speed_factors: Optional[List[float]] = None
+    vehicle_cost_per_km: Optional[List[float]] = None
+
     # Treat n_vehicles as a fleet that must all be sent out, rather than as a
     # ceiling. Off by default, because leaving a van parked is usually the
     # better plan and pretending otherwise would quietly make every published
@@ -221,6 +245,37 @@ class VRPProblem:
             return self.vehicle_capacities[vehicle_index]
         return self.vehicle_capacity
 
+    def speed_factor_for(self, vehicle_index: int) -> float:
+        """
+        Travel-time multiplier for one vehicle. 1.0 is the network's own speed.
+        """
+        return self._per_vehicle(self.vehicle_speed_factors, vehicle_index, 1.0)
+
+    def cost_per_km_for(self, vehicle_index: int) -> float:
+        """
+        Relative cost of a kilometre driven by one vehicle. 1.0 is the default,
+        and a uniform fleet leaves the distance term exactly as it was.
+        """
+        return self._per_vehicle(self.vehicle_cost_per_km, vehicle_index, 1.0)
+
+    @staticmethod
+    def _per_vehicle(values: Optional[List[float]], index: int, default: float) -> float:
+        # Out of range falls back rather than raising: the fleet can be resized
+        # mid-replan (see dynamic_vrp), and a van with no entry should cost the
+        # ordinary amount rather than stop the solve.
+        if values is None:
+            return default
+        if 0 <= index < len(values):
+            return values[index]
+        return default
+
+    def has_mixed_fleet(self) -> bool:
+        """Whether any vehicle differs from any other in speed or running cost."""
+        return any(
+            values is not None and len(set(values)) > 1
+            for values in (self.vehicle_speed_factors, self.vehicle_cost_per_km)
+        )
+
 
 # ---------------------------------------------------------------------------
 # Synthetic VRP instance generator
@@ -372,13 +427,21 @@ def evaluate_solution(
         if route_demand > route_capacity:
             capacity_violation += (route_demand - route_capacity)
 
+        # A mixed fleet: this van's own speed and running cost. Both are 1.0 for
+        # a uniform fleet, so the arithmetic below is unchanged unless someone
+        # actually described a mixed one.
+        speed_factor = problem.speed_factor_for(v_idx)
+        cost_per_km = problem.cost_per_km_for(v_idx)
+
         # walk the route: depot -> c1 -> c2 -> ... -> depot
         current_node = problem.depot
         current_time = 0.0
         for node_id in route:
             # Priced at the moment the vehicle actually leaves, so a leg driven
             # through rush hour costs more than the same leg at midday.
-            travel_t = problem.travel_time(current_node, node_id, depart_at=current_time)
+            # The speed factor multiplies the result rather than replacing it,
+            # so a quicker vehicle is quicker *through the same traffic*.
+            travel_t = problem.travel_time(current_node, node_id, depart_at=current_time) * speed_factor
             travel_d = problem.travel_distance(current_node, node_id)
 
             if not np.isfinite(travel_t):
@@ -400,17 +463,17 @@ def evaluate_solution(
             if start_service > cust.due_time:
                 time_window_violation += (start_service - cust.due_time)
 
-            total_distance += travel_d
+            total_distance += travel_d * cost_per_km
             total_time += travel_t + wait
 
             current_time = start_service + cust.service_time
             current_node = node_id
 
         # return to depot
-        back_t = problem.travel_time(current_node, problem.depot, depart_at=current_time)
+        back_t = problem.travel_time(current_node, problem.depot, depart_at=current_time) * speed_factor
         back_d = problem.travel_distance(current_node, problem.depot)
         if np.isfinite(back_t):
-            total_distance += back_d
+            total_distance += back_d * cost_per_km
             total_time += back_t
 
     # Spreading the same stops over more vans costs time, so left alone the
