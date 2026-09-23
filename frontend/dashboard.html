@@ -4476,19 +4476,9 @@
 
     function apiBase() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
 
-    // A Supabase access token is good for an hour. supabase-js renews it in the
-    // background, but a token captured once at startup is not the renewed one —
-    // so a room left open over a long demo starts answering 401 "Session
-    // expired" on every call. getSession() hands back whatever is current.
+    // Retrieves the current JWT token from the session.
     async function accessToken() {
-      if (!supabaseClient) return currentSession && currentSession.access_token;
-      try {
-        const { data } = await supabaseClient.auth.getSession();
-        currentSession = (data && data.session) || null;
-      } catch (e) {
-        console.warn('Could not refresh the session, using the token in hand:', e);
-      }
-      return currentSession && currentSession.access_token;
+      return currentToken;
     }
 
     async function api(path, opts = {}) {
@@ -4519,19 +4509,13 @@
       authLapseNoted = true;
       currentSession = null;
       isGuestSession = false;
-      // A session the backend refuses is not rescued by reloading the page:
-      // supabase-js restores it from localStorage and the next call fails the
-      // same way. Dropping it makes the login form the way out rather than a
-      // thing behind a wall of identical errors.
-      if (supabaseClient) {
-        try { await supabaseClient.auth.signOut(); } catch (e) { /* already gone */ }
-      }
-      const btn = document.getElementById('btnSignIn');
-      if (btn) btn.hidden = true;
+      
+      handleLogout(); // Logs out and shows the overlay
+      
       const overlay = document.getElementById('authOverlay');
       if (!overlay || overlay.style.display === 'flex') return;
       showAuthOverlay();
-      authSay('Your session has ended. Sign in again to carry on.', true);
+      loginSay('Your session has ended. Sign in again to carry on.', true);
     }
 
     // Unpacks the Error thrown by api() — "<status>: <json body>" — into the
