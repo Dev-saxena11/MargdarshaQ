@@ -173,8 +173,17 @@ def load_offline_network(
     # classes first instead keeps a skeleton that still spans the whole box,
     # which is both what drawing that box asked for and the roads a van would
     # actually use.
+    # How much of the box's road network survives the budget is worth reporting,
+    # because thinning is invisible on the map: what comes back is a perfectly
+    # good network of main roads, and nothing about it says the residential
+    # streets were dropped. "The roads did not load over the whole area" is what
+    # that looks like from the outside.
+    available = len(keep)
+    thinned = False
+
     if len(keep) > max_nodes:
         keep, adj = _thin_to_budget(adj, keep, max_nodes)
+        thinned = len(keep) < available
 
     # Only if even the arterials alone overshoot — a very large box — does the
     # centre-out walk come back, because at that point something has to give
@@ -202,5 +211,9 @@ def load_offline_network(
         "area_label": doc.get("label", name),
         "source": "offline",
         "coverage": name,
+        # What the box actually contained, against what the budget allowed.
+        "nodes_available": available,
+        "nodes_kept": len(keep),
+        "thinned": thinned or len(keep) < available,
     }
     return net, meta

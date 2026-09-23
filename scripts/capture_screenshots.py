@@ -88,10 +88,27 @@ def capture(web: str, api: str, secret: str, out_dir: str) -> int:
         page.screenshot(path=os.path.join(out_dir, "02-control-room.png"))
         print("captured 02-control-room.png")
 
-        # The one-click scenario, run for real: load a district, place stops,
-        # build the instance, race all five algorithms.
-        page.evaluate("() => runDemoScenario()")
-        for _ in range(120):
+        # A real solved plan for the third shot: place a depot and stops the way
+        # the auto-placement button does, build the instance, race the field.
+        # Driven through the page's own functions rather than a shortcut, so the
+        # screenshot is of a genuine run.
+        page.evaluate(
+            """() => {
+                setPlanMode('auto');
+                document.getElementById('autoDepotMode').value = 'central';
+                document.getElementById('autoStopCount').value = 14;
+                state.selectedDepot = null;
+                pickRandomStops();
+            }"""
+        )
+        page.wait_for_timeout(1000)
+        page.evaluate("() => generateVRP()")
+        for _ in range(60):
+            if page.evaluate("() => !!(state && state.vrp)"):
+                break
+            page.wait_for_timeout(1000)
+        page.evaluate("() => runBenchmark()")
+        for _ in range(180):
             # `state` is a script-scope binding, not a property of window.
             if page.evaluate("() => !!(state && state.benchmarkResults)"):
                 break
@@ -100,10 +117,8 @@ def capture(web: str, api: str, secret: str, out_dir: str) -> int:
         page.screenshot(path=os.path.join(out_dir, "03-solved-routes.png"))
         print("captured 03-solved-routes.png")
 
-        status = page.evaluate(
-            "() => (document.getElementById('demoScenarioStatus')||{}).textContent"
-        )
-        print("scenario:", (status or "").strip()[:160])
+        solved = page.evaluate("() => !!(state && state.optimizedSolution)")
+        print("routes drawn:", solved)
         browser.close()
 
     if errors:
