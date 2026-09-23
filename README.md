@@ -24,9 +24,9 @@ instead.**
 
 ## See it
 
-Pick a district and press one button — it loads the real road network, places a
-depot and its stops, builds the delivery problem and races all five algorithms
-on it.
+The engineering console on a real district: the road network loaded from
+OpenStreetMap, a depot and its stops placed, and all five algorithms raced on
+the resulting delivery problem.
 
 ![Solved routes for Bareilly City in the engineering control room](docs/images/03-solved-routes.png)
 
