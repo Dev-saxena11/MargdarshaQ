@@ -196,6 +196,8 @@ def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get
                 num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
                 attribution=meta.get("attribution"),
                 area_label=meta.get("area_label"),
+                nodes_available=meta.get("nodes_available"),
+                thinned=bool(meta.get("thinned")),
             )
 
         try:

@@ -3970,7 +3970,7 @@
               </button>
 
               <div class="row2" style="margin-top:10px;">
-                <div><label>Max nodes</label><input id="osm_max_nodes" type="number" value="400"></div>
+                <div><label>Max nodes</label><input id="osm_max_nodes" type="number" value="5000"></div>
                 <div><label>Congestion seed</label><input id="net_seed" type="number" value="42"></div>
               </div>
 
@@ -7139,7 +7139,7 @@
             north: state.bounds.north, south: state.bounds.south,
             east: state.bounds.east, west: state.bounds.west,
             network_type: 'drive',
-            max_nodes: +document.getElementById('osm_max_nodes').value || 400,
+            max_nodes: +document.getElementById('osm_max_nodes').value || 5000,
             seed: +document.getElementById('net_seed').value || 42,
           }),
         });
@@ -7161,12 +7161,27 @@
         state.strandedStops = [];
         hideRouteLegend();
 
+        // Thinning is invisible on the map: what comes back is a perfectly good
+        // network of main roads, and nothing about it says the residential
+        // streets were dropped to fit the node budget. Unsaid, that reads as
+        // "the roads did not load over the whole area I drew".
+        const thinNote = net.thinned && net.nodes_available
+          ? '<div class="stat-line"><span>Detail</span>'
+            + '<span style="color:#F59E0B;">main roads only — ' + net.num_nodes
+            + ' of ' + net.nodes_available + ' junctions</span></div>'
+            + '<div class="step-hint" style="margin-top:6px;color:#F59E0B;">'
+            + 'Smaller streets were dropped to fit <b>Max nodes</b> ('
+            + (+document.getElementById('osm_max_nodes').value || 5000) + '). '
+            + 'Raise it and load again to include them.</div>'
+          : '';
+
         document.getElementById('netInfo').innerHTML =
           '<div class="stat-line"><span>Junctions / streets</span><span>'
           + net.num_nodes + ' / ' + net.num_edges + '</span></div>'
           + '<div class="stat-line"><span>Source</span><span>'
           + (offline ? 'Offline map — ' + (net.area_label || 'shipped with the app')
-            : (net.attribution || 'OpenStreetMap')) + '</span></div>';
+            : (net.attribution || 'OpenStreetMap')) + '</span></div>'
+          + thinNote;
 
         document.getElementById('emptyHint').style.display = 'none';
         for (const id of ['segPlanManual', 'segPlanAuto', 'segPickDepot', 'segPickStops',

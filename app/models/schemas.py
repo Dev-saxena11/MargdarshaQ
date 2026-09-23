@@ -72,6 +72,11 @@ class NetworkResponse(BaseModel):
     # carry OpenStreetMap's required attribution. None for synthetic networks.
     area_label: Optional[str] = Field(None, description="Human-readable area, e.g. 'Connaught Place, New Delhi'")
     attribution: Optional[str] = Field(None, description="Data attribution to display with the map")
+    # Thinning is invisible on the map -- what comes back is a perfectly good
+    # network of main roads, and nothing about it says the residential streets
+    # were dropped to fit the node budget. Reported so the UI can say so.
+    nodes_available: Optional[int] = Field(None, description="Junctions the drawn area actually contains")
+    thinned: bool = Field(False, description="True when smaller roads were dropped to fit max_nodes")
 
 
 class OSMNetworkRequest(BaseModel):
