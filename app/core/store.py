@@ -23,7 +23,12 @@ from app.core.vrp_problem import VRPProblem
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Stripped, because a dashboard env-var field keeps whatever was pasted into
+# it. A trailing newline lands inside the last component of the URL, so the
+# driver asks for a database whose name ends in a line break and the server
+# refuses it -- a real, reachable server turned away by one invisible
+# character, reported as the database not existing.
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
 # Keep the in-memory fallback in case DATABASE_URL is not set (e.g. for CI tests)
 _networks: Dict[Tuple[str, str], TrafficNetwork] = {}
@@ -45,7 +50,17 @@ def get_connection() -> Optional[connection]:
 def init_db():
     conn = get_connection()
     if not conn:
-        logger.warning("No DATABASE_URL set, falling back to in-memory store.")
+        # Say which of the two it is. Reporting "not set" for a URL that is set
+        # but unreachable sends you to the dashboard to re-enter a value that
+        # was already correct.
+        if DATABASE_URL:
+            logger.error(
+                "DATABASE_URL is set but the database could not be reached — "
+                "falling back to the in-memory store. Accounts created now are "
+                "NOT saved: signup will appear to work and login will always fail."
+            )
+        else:
+            logger.warning("No DATABASE_URL set, falling back to in-memory store.")
         return
     try:
         with conn.cursor() as cur:
@@ -183,14 +198,25 @@ def cleanup_old_db_entries():
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
 
-def put_network(user_id: str, net: TrafficNetwork, is_geo: bool = False) -> str:
-    network_id = new_id()
+def put_network(user_id: str, net: TrafficNetwork, is_geo: bool = False,
+                network_id: Optional[str] = None) -> str:
+    """
+    Store a network, or overwrite one when `network_id` names an existing row.
+
+    Overwriting matters because the objects handed out by get_network are
+    deserialised copies when a database is configured. Anything that changes a
+    network in place -- closing a road, applying an incident -- is otherwise
+    thrown away the moment the request ends, and only on deployments that have
+    a database. That is the worst shape of bug: it works locally.
+    """
+    network_id = network_id or new_id()
     conn = get_connection()
     if conn:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO networks (id, user_id, is_geo, data) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO networks (id, user_id, is_geo, data) VALUES (%s, %s, %s, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, is_geo = EXCLUDED.is_geo",
                     (network_id, user_id, is_geo, psycopg2.Binary(pickle.dumps(net)))
                 )
             conn.commit()
@@ -240,14 +266,17 @@ def is_geo_network(user_id: str, network_id: str) -> bool:
     else:
         return _network_is_geo.get((user_id, network_id), False)
 
-def put_vrp(user_id: str, network_id: str, problem: VRPProblem) -> str:
-    vrp_id = new_id()
+def put_vrp(user_id: str, network_id: str, problem: VRPProblem,
+            vrp_id: Optional[str] = None) -> str:
+    """Store an instance, or overwrite one when `vrp_id` names an existing row."""
+    vrp_id = vrp_id or new_id()
     conn = get_connection()
     if conn:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO vrp_problems (id, user_id, network_id, data) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO vrp_problems (id, user_id, network_id, data) VALUES (%s, %s, %s, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, network_id = EXCLUDED.network_id",
                     (vrp_id, user_id, network_id, psycopg2.Binary(pickle.dumps(problem)))
                 )
             conn.commit()

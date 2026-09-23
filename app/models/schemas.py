@@ -72,6 +72,11 @@ class NetworkResponse(BaseModel):
     # carry OpenStreetMap's required attribution. None for synthetic networks.
     area_label: Optional[str] = Field(None, description="Human-readable area, e.g. 'Connaught Place, New Delhi'")
     attribution: Optional[str] = Field(None, description="Data attribution to display with the map")
+    # Thinning is invisible on the map -- what comes back is a perfectly good
+    # network of main roads, and nothing about it says the residential streets
+    # were dropped to fit the node budget. Reported so the UI can say so.
+    nodes_available: Optional[int] = Field(None, description="Junctions the drawn area actually contains")
+    thinned: bool = Field(False, description="True when smaller roads were dropped to fit max_nodes")
 
 
 class OSMNetworkRequest(BaseModel):
@@ -267,6 +272,30 @@ class TrafficIncidentRequest(BaseModel):
     factor: float = Field(3.5, ge=1.0, le=10.0, description="Congestion multiplier (e.g. 3.5 = 350% travel time)")
     start_time: float = Field(0.0, ge=0.0)
     duration_min: Optional[float] = Field(None, description="Incident duration in minutes (None = permanent)")
+
+
+class RoadClosureRequest(BaseModel):
+    network_id: str
+    u: int
+    v: int
+    reopen: bool = Field(False, description="Lift a closure instead of applying one")
+    both_directions: bool = Field(True, description="Close the return direction too, where one exists")
+    # Optional: when given, the closure is checked against this instance's stops
+    # and depot, so a road that strands a customer is reported rather than
+    # quietly turned into a large routing penalty.
+    vrp_id: Optional[str] = Field(None, description="Check reachability for this instance's stops")
+
+
+class RoadClosureResponse(BaseModel):
+    network_id: str
+    u: int
+    v: int
+    closed: bool
+    edges_changed: int
+    closed_roads: List[List[int]] = Field(default_factory=list)
+    stranded_customers: List[int] = Field(default_factory=list,
+        description="Stops no longer reachable from the depot. Non-empty means this closure has no valid plan.")
+    message: str
 
 
 class TrafficIncidentResponse(BaseModel):

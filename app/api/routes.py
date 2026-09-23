@@ -18,11 +18,15 @@ from functools import lru_cache
 from typing import Optional
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from app.core.graph_model import generate_synthetic_city_graph
 from app.core.osm_network import load_osm_network
-from app.core.overpass_network import load_overpass_network
+from app.core.overpass_network import (
+    load_overpass_network,
+    local_overpass_ready,
+    OVERPASS_LOADING_MESSAGE,
+)
 from app.core.offline_osm import load_offline_network, available_coverage
 from app.core.cached_network import (
     load_cached_network, available_networks, cache_metadata, CachedNetworkNotFound,
@@ -33,6 +37,9 @@ from app.core.classical_baselines_vrp import (
     run_ga_vrp, run_sa_vrp, run_standard_pso_vrp, run_greedy_nn_vrp
 )
 from app.core.dynamic_vrp import simulate_dynamic_reroute
+from app.core.route_export import (
+    NotGeoreferenced, geojson_to_text, routes_to_geojson, routes_to_gpx,
+)
 from app.core import store
 from app.core.assistant import assistant_engine
 from app.core.rag import rag_engine
@@ -44,6 +51,7 @@ from app.models.schemas import (
     BenchmarkRequest, BenchmarkResponse, BenchmarkAlgoResult,
     VRPCompareRequest, VRPCompareResponse,
     TrafficIncidentRequest, TrafficIncidentResponse, DynamicSolveRequest, DynamicSolveResponse,
+    RoadClosureRequest, RoadClosureResponse,
     AssistantChatRequest, AssistantChatResponse,
     ChatRequest, ChatResponse, RAGStatusResponse,
 )
@@ -59,7 +67,20 @@ from typing import Optional
 
 security = HTTPBearer()
 
-JWT_SECRET = os.getenv("JWT_SECRET", "supersecret-logistics-key-change-in-prod")
+# The signing key for every token this API issues and accepts. There is no
+# default: the previous fallback string was committed to this repo and to
+# .env.example, so any deployment that forgot the variable was signing and
+# verifying with a secret anyone could read off GitHub — and it started up
+# clean, so nothing anywhere said so. Refusing to boot is the only failure
+# mode that cannot be missed.
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET is not set. Generate one with "
+        "`python -c \"import secrets; print(secrets.token_urlsafe(64))\"` and set it "
+        "in the environment (Render: Environment tab). It signs every login token; "
+        "without it the API cannot tell a real token from a forged one."
+    )
 ALGORITHM = "HS256"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -175,9 +196,14 @@ def generate_network_from_osm(req: OSMNetworkRequest, user_id: str = Depends(get
                 num_edges=len(edges), is_geo=True, nodes=nodes, edges=edges,
                 attribution=meta.get("attribution"),
                 area_label=meta.get("area_label"),
+                nodes_available=meta.get("nodes_available"),
+                thinned=bool(meta.get("thinned")),
             )
 
         try:
+            ready, _ = local_overpass_ready()
+            if not ready:
+                raise HTTPException(status_code=503, detail=OVERPASS_LOADING_MESSAGE)
             net, meta = load_overpass_network(
                 north=req.north, south=req.south, east=req.east, west=req.west,
                 max_nodes=req.max_nodes, congestion_seed=req.seed,
@@ -478,6 +504,65 @@ def solve_vrp(req: VRPSolveRequest, user_id: str = Depends(get_current_user)):
     return _build_solve_response(problem, sol, curve, n_eval, name, runtime_ms)
 
 
+@router.post("/vrp/export")
+def export_solution(req: VRPSolveRequest, fmt: str = "geojson",
+                    user_id: str = Depends(get_current_user)):
+    """
+    Solve an instance and return the plan as GeoJSON or GPX.
+
+    A plan that only exists inside this dashboard cannot be handed to a driver.
+    This is the same solve the dashboard runs, written out in a format an
+    operator's own tools already read: GeoJSON for anything map-shaped, GPX for
+    a navigation device.
+
+    Re-solving rather than exporting a stored result keeps the file honest --
+    the geometry written out is the geometry of a solution this API just
+    produced, not of one a client might have edited on the way past.
+    """
+    fmt = fmt.lower()
+    if fmt not in ("geojson", "gpx"):
+        raise HTTPException(status_code=400,
+                            detail=f"Unknown format {fmt!r}. Use 'geojson' or 'gpx'.")
+    try:
+        problem = store.get_vrp(user_id, req.vrp_id)
+        network_id = store.get_vrp_network_id(user_id, req.vrp_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    sol, curve, n_eval, name, runtime_ms = _solve_one(
+        problem, req.algorithm, req.n_particles, req.max_iter, req.seed, req.use_local_search
+    )
+    if sol is None:
+        raise HTTPException(status_code=500, detail="Solver failed to produce a solution")
+
+    response = _build_solve_response(problem, sol, curve, n_eval, name, runtime_ms)
+    routes = [r.model_dump() if hasattr(r, "model_dump") else r.dict()
+              for r in response.routes]
+    node_xy = {n: (d["x"], d["y"]) for n, d in problem.net.graph.nodes(data=True)}
+    is_geo = store.is_geo_network(user_id, network_id)
+
+    try:
+        if fmt == "geojson":
+            body = geojson_to_text(routes_to_geojson(
+                routes, node_xy, depot=problem.depot, is_geo=is_geo,
+                properties={"algorithm": name, "total_distance_km": sol.total_distance,
+                            "total_time_min": sol.total_time, "feasible": sol.feasible},
+            ))
+            media, ext = "application/geo+json", "geojson"
+        else:
+            body = routes_to_gpx(routes, node_xy, depot=problem.depot, is_geo=is_geo)
+            media, ext = "application/gpx+xml", "gpx"
+    except NotGeoreferenced as e:
+        # A synthetic network's coordinates are grid units. Exporting them would
+        # produce a file that opens fine and is wrong, so it is refused.
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return Response(
+        content=body, media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="plan-{req.vrp_id}.{ext}"'},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Benchmark
 # ---------------------------------------------------------------------------
@@ -616,6 +701,79 @@ def compare_vrp(req: VRPCompareRequest, user_id: str = Depends(get_current_user)
 # ---------------------------------------------------------------------------
 # Dynamic Traffic & Mid-Route Re-Optimization
 # ---------------------------------------------------------------------------
+
+@router.post("/network/close_road", response_model=RoadClosureResponse)
+def close_road(req: RoadClosureRequest, user_id: str = Depends(get_current_user)):
+    """
+    Close a road, or reopen one, and re-plan around it.
+
+    A closure is not a large congestion factor. A road that is merely slow is
+    still a road: given a bad enough detour the optimiser will use it anyway,
+    which is right for a jam and wrong for a street barricaded for a festival.
+    So the edge leaves the graph and the routing has to find another way -- or
+    report that there is not one.
+
+    That last case is why `vrp_id` is worth passing. Closing a road can cut a
+    stop off entirely rather than merely make it expensive, and the scoring
+    treats an unreachable leg as a large penalty, so a plan that strands a
+    customer still returns a number and still draws on the map. It is just not
+    a plan. When an instance is named, its stops are checked and the ones now
+    unreachable are listed.
+    """
+    try:
+        net = store.get_network(user_id, req.network_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if req.reopen:
+        changed = net.reopen_road(req.u, req.v)
+        if changed == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Road ({req.u}, {req.v}) is not closed, so there is nothing to reopen.",
+            )
+        action = "reopened"
+    else:
+        if not net.graph.has_edge(req.u, req.v) and not net.graph.has_edge(req.v, req.u):
+            raise HTTPException(
+                status_code=400,
+                detail=f"No road ({req.u}, {req.v}) in network {req.network_id!r} "
+                       f"— it may already be closed.",
+            )
+        changed = net.close_road(req.u, req.v, both_directions=req.both_directions)
+        action = "closed"
+
+    # A stored instance holds distance and time matrices computed when it was
+    # built. Leaving them alone would route the fleet down a road that is no
+    # longer there, so every instance on this network is rebuilt against the
+    # graph as it now stands.
+    stranded: list = []
+    if req.vrp_id:
+        try:
+            problem = store.get_vrp(user_id, req.vrp_id)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        problem.net = net
+        problem.recompute_matrices()
+        stranded = net.unreachable_from(
+            problem.depot, [c.node_id for c in problem.customers]
+        )
+        store.put_vrp(user_id, req.network_id, problem, vrp_id=req.vrp_id)
+
+    store.put_network(user_id, net, network_id=req.network_id)
+
+    message = f"Road ({req.u}, {req.v}) {action}; {changed} direction(s) changed."
+    if stranded:
+        message += (f" {len(stranded)} stop(s) can no longer be reached from the depot, "
+                    f"so no valid plan exists until this road reopens.")
+
+    return RoadClosureResponse(
+        network_id=req.network_id, u=req.u, v=req.v,
+        closed=not req.reopen, edges_changed=changed,
+        closed_roads=[list(pair) for pair in net.closed_roads()],
+        stranded_customers=stranded, message=message,
+    )
+
 
 @router.post("/traffic/incident", response_model=TrafficIncidentResponse)
 def create_traffic_incident(req: TrafficIncidentRequest, user_id: str = Depends(get_current_user)):
@@ -774,4 +932,3 @@ def get_profile(user_id: str = Depends(get_current_user)):
         operational_zones_mapped=stats["networks"],
         route_plans_dispatched=stats["vrps"]
     )
-

@@ -20,6 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router
+from app.core.overpass_network import local_overpass_ready
 
 app = FastAPI(
     title="MargdarshaQ ENTERPRISE - Quantum-Inspired Traffic Route Optimization",
@@ -98,4 +99,12 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    ready, detail = local_overpass_ready()
+    return {
+        "status": "ok" if ready else "degraded",
+        "osm": {
+            "ready": ready,
+            "status": "ready" if ready else "loading",
+            "detail": detail,
+        },
+    }

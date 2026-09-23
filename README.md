@@ -1,30 +1,124 @@
-# SIH26137 — Quantum-Inspired Intelligent Traffic Route Optimization
+# MargdarshaQ — Quantum-Inspired Traffic Route Optimization
 
 [![Live Dashboard](https://img.shields.io/badge/Live%20Dashboard-sih--26137.vercel.app-000000?logo=vercel&logoColor=white)](https://sih-26137.vercel.app)
 [![Live API](https://img.shields.io/badge/Live%20API-sih26137.onrender.com-46E3B7?logo=render&logoColor=white)](https://sih26137.onrender.com/docs)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Leaflet](https://img.shields.io/badge/Map-Leaflet%20%2B%20OpenStreetMap-7EBC6F?logo=leaflet&logoColor=white)](https://leafletjs.com/)
+[![Tests](https://img.shields.io/badge/tests-80%20passing-brightgreen)](tests/)
+[![SIH 2026](https://img.shields.io/badge/Smart%20India%20Hackathon-26137-FF6B00)](https://www.sih.gov.in/)
 
-A quantum-inspired metaheuristic optimization framework (QPSO) for solving
-large-scale Vehicle Routing Problems (VRP) under traffic congestion, benchmarked
-against classical metaheuristics (GA, SA, standard PSO) and exact/greedy baselines.
+**A delivery fleet has to reach every customer on time, through city traffic.
+Ordinary routing software sends each van to its nearest stop — and drives it
+straight into the jam. This plans the whole day's routes around the traffic
+instead.**
 
-## 🚀 Live Demo
+|  |  |
+| :--- | :--- |
+| **The problem** | Dispatching a fleet across a congested city is a Capacitated Vehicle Routing Problem with Time Windows (CVRPTW) — NP-hard, and made harder because a road's cost depends on *when* you drive it. Nearest-stop dispatch, which is what most municipal fleets actually run on, ignores both. |
+| **The approach** | A quantum-inspired particle swarm optimiser (QPSO) searching a random-key encoding of the routing, hybridised with 2-opt/or-opt local search, over a time-dependent congestion model built on real OpenStreetMap road networks — one-way streets included. |
+| **What it delivers** | On a 40-delivery, 9-van day it returns **5.8 hours of driver time**, at a measured cost of 108.6 km and 13.6 L more fuel. It is a trade, and [the report says so](data/impact_report.md) rather than quoting the flattering half. |
+| **How we know** | Every claim is a re-runnable measurement: five algorithms on five real districts, plus an **exact solver** that proves the true optimum on small instances so "QPSO won" can be replaced by "QPSO was N% off optimal". |
 
-The platform is deployed as two services (see [DEPLOYMENT.md](DEPLOYMENT.md) for why):
+---
+
+## See it
+
+The engineering console on a real district: the road network loaded from
+OpenStreetMap, a depot and its stops placed, and all five algorithms raced on
+the resulting delivery problem.
+
+![Solved routes for Bareilly City in the engineering control room](docs/images/03-solved-routes.png)
+
+<details>
+<summary>More screenshots — executive overview and the full console</summary>
+
+The executive view: every solver against the same instance on each district's
+real road network, same stops, same vans, same seed.
+
+![Executive overview with the five-algorithm comparison table](docs/images/01-executive-overview.png)
+
+The engineering console, where the depot, the stops, the fleet, the traffic
+model and the solver parameters are all editable.
+
+![Engineering control room](docs/images/02-control-room.png)
+
+</details>
+
+> Screenshots are captured from the running app against a local backend.
+> Regenerate them with `scripts/capture_screenshots.py`.
+
+## Try it
 
 | | URL | Hosted on |
 | :--- | :--- | :--- |
 | **Dashboard (UI)** | **https://sih-26137.vercel.app** | Vercel (static) |
 | **Backend API** | **https://sih26137.onrender.com** · [Swagger docs](https://sih26137.onrender.com/docs) | Render (web service) |
 
-Just open the dashboard link — when served from a deployed origin it points itself at the
-live API automatically. Run it locally and it defaults to `http://127.0.0.1:8000` instead,
-so local development is unaffected. Either way you can override the target in the
-**API Base URL** field at the top of the dashboard.
+Open the dashboard link — served from a deployed origin it points itself at the
+live API automatically. Run it locally and it defaults to
+`http://127.0.0.1:8000` instead, so local development is unaffected. Either way
+the target is editable in the **API Base URL** field at the top.
 
-> ⏱️ **First request may take 30–50 seconds.** The API runs on Render's free tier, which
-> sleeps after ~15 minutes of inactivity and cold-starts on the next request. It is not
-> broken — give the first call a moment, then it responds normally. Warm it up by opening
-> the [API docs](https://sih26137.onrender.com/docs) a minute before a demo.
+> ⏱️ **First request may take 30–50 seconds.** The API runs on Render's free tier,
+> which sleeps after ~15 minutes of inactivity and cold-starts on the next request.
+> It is not broken — give the first call a moment. Warm it up by opening the
+> [API docs](https://sih26137.onrender.com/docs) a minute before a demo.
+
+## How good is it, really?
+
+Comparing heuristics against each other answers "which guess is best", not "how
+good is the best guess". For instances small enough to solve exactly,
+[`app/core/exact_vrp.py`](app/core/exact_vrp.py) computes the provable optimum
+under the same objective, and the benchmark table gains a gap column:
+
+```
+Algorithm                       Fitness   Feasible   Gap vs opt
+Exact (optimal)                  194.30       True           --
+QPSO (Quantum-Inspired PSO)      194.30       True       +0.00%
+Genetic Algorithm                244.56       True      +25.87%
+Standard PSO                     268.70       True      +38.29%
+Simulated Annealing              293.96       True      +51.30%
+Greedy Nearest-Neighbor          360.88       True      +85.74%
+```
+
+*9 customers, 2 vehicles, 60 iterations — QPSO reaches the optimum exactly.*
+
+The same tool also shows where QPSO is *not* ahead: on an 8-customer instance at
+60 iterations it sits 86% above optimal while GA is at 5.6%, and needs roughly
+120 iterations before it closes to zero. Across the five shipped districts QPSO
+wins 3 of 5 on fitness. Those numbers are in the repo because a benchmark you
+can only quote when it flatters you is not a benchmark.
+
+### Against the standard benchmark
+
+Proving the optimum only reaches ten customers. Past that,
+[`scripts/run_solomon_benchmark.py`](scripts/run_solomon_benchmark.py) runs
+Solomon's 100-customer CVRPTW instances -- the set the field has been attacking
+since 1987 -- and compares against their published best-known solutions. Full
+results in [`data/solomon_results.md`](data/solomon_results.md):
+
+| Instance | QPSO | Best known | Gap |
+| :--- | ---: | ---: | ---: |
+| RC201 | 1655.55 (14 vans) | 1406.94 (4 vans) | **+17.67%** |
+| C101 | 1041.34 (14 vans) | 827.30 (10 vans) | **+25.87%** |
+| C201 | 793.49 (7 vans) | 589.10 (3 vans) | **+34.70%** |
+
+For a general-purpose metaheuristic with no VRPTW-specific operators, landing
+within 18-35% of forty years of specialised work is a fair showing -- and it is
+stated rather than implied.
+
+The starker number is what happens to everything else at this scale: **GA,
+Simulated Annealing and standard PSO return no feasible solution on any of the
+six instances**, each burning 24-25 of the 25 available vehicles. Greedy is
+always feasible and 59-219% off. On 100-customer instances QPSO is doing
+something the other metaheuristics here are not, and this is the evidence.
+
+Where QPSO is infeasible its distances are still close to best known (1762
+against 1651 on R101), so it is finding short routes and breaking time windows
+rather than failing to search -- which points at the penalty weights, not the
+algorithm.
+
 
 ## Setup (on your machine)
 
@@ -148,14 +242,16 @@ and rate-limited by IP — the same box measured 44s, then 169s, then a plain 50
 inside one hour. For anything judged, run Overpass locally instead:
 
 ```bash
-docker compose -f docker-compose.overpass.yml up -d     # first run imports; slow
+./setup-local-overpass.sh --region central-zone         # Bareilly default (~15-40 min)
+./setup-local-overpass.sh --region india                # Full India import (~2+ hours)
 python scripts/check_overpass.py --compare              # confirm it's being used
 ```
 
-Then set `OVERPASS_URL=http://localhost:12345/api/interpreter` in `.env` and the
-same query returns in under a second. Leaving the variable unset keeps the
-previous public-mirror behaviour, and a local instance that isn't running falls
-back to it automatically rather than failing.
+The setup script updates `.env` with `OSM_EXTRACT_URL` and
+`OVERPASS_URL=http://localhost:12345/api/interpreter`, then starts the local
+container. The same query returns in under a second. Leaving `OVERPASS_URL`
+unset keeps the previous public-mirror behaviour, and a local instance that
+isn't running falls back to it automatically rather than failing.
 
 The import needs 8–16 GB RAM, up to 30 GB of disk, and anywhere from minutes to
 two hours depending on how much of India you pull — **run it the day before the
@@ -193,6 +289,7 @@ sih26137/
 │   │   ├── vrp_problem.py            # CVRPTW formulation (capacity + time windows)
 │   │   ├── qpso_vrp.py               # QPSO + 2-opt/or-opt local-search hybrid for VRP (core deliverable)
 │   │   ├── local_search.py           # 2-opt / or-opt operators
+│   │   ├── exact_vrp.py              # Exact CVRPTW optimum for small instances (the yardstick)
 │   │   ├── classical_baselines.py    # Dijkstra, A*, GA, SA, standard PSO (shortest-path)
 │   │   ├── classical_baselines_vrp.py# GA, SA, standard PSO, Greedy NN (VRP)
 │   │   ├── benchmark.py              # Benchmarking suite (shortest-path)
@@ -207,9 +304,13 @@ sih26137/
 │   └── main.py                       # FastAPI app entrypoint
 ├── scripts/
 │   ├── build_osm_cache.py            # Pre-download a city network to data/networks/
-│   └── check_overpass.py             # Preflight: which Overpass endpoint will the demo use?
+│   ├── check_overpass.py             # Preflight: which Overpass endpoint will the demo use?
+│   ├── measure_exact_vrp.py          # Runtime of the exact solver by instance size
+│   └── capture_screenshots.py        # Regenerate the README screenshots from the running app
 ├── frontend/
 │   └── dashboard.html                # Standalone visualization dashboard (map + charts + controls)
+├── tests/                            # pytest suite: local search, encoding, jump cap, exact solver
+├── docs/images/                      # README screenshots (see scripts/capture_screenshots.py)
 ├── data/                             # Generated plots land here
 ├── docker-compose.overpass.yml       # Local Overpass instance, for fast/reliable demo lookups
 ├── requirements.txt
@@ -250,3 +351,9 @@ sih26137/
   stale indices (see `local_search.py`). Worth mentioning in your report as an
   example of why visualization matters for catching silent correctness bugs
   that pure fitness numbers can hide.
+
+## License
+
+**Not yet declared.** No `LICENSE` file is present, which by default means all
+rights are reserved and nobody may reuse this code. If it is meant to be open,
+add one.

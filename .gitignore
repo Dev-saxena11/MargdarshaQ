@@ -41,3 +41,6 @@ scratch_*.py
 
 # OSMnx Cache
 cache/
+
+# 3D Assets
+*.glb

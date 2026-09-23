@@ -9,6 +9,13 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      # Required. sync: false means Render prompts for the value instead of
+      # taking it from this file, so the signing key is never committed.
+      - key: JWT_SECRET
+        sync: false
+      # Postgres connection string for the users/networks/vrp tables.
+      - key: DATABASE_URL
+        sync: false
       - key: CORS_ORIGINS
         value: "*"
         # Replace "*" with your deployed frontend origin(s), comma-separated,

@@ -10,4 +10,11 @@ osmnx>=1.6.0,<2.0.0
 psycopg2-binary>=2.9.0
 python-dotenv>=1.0.0
 pyjwt[crypto]>=2.8.0   # [crypto] pulls in cryptography, which ES256 verification needs
+# passlib 1.7.4 is the last release (2020) and reads bcrypt.__about__.__version__,
+# which bcrypt removed in 4.1. Without it passlib cannot run its wraparound-bug
+# probe, and the probe's failure surfaces on the FIRST hash of any password as
+# "ValueError: password cannot be longer than 72 bytes" — whatever the password's
+# actual length. Signup then 500s for everyone. bcrypt is held below 4.1 to keep
+# the pair that works; do not relax it without checking test_password_hashing.py.
 passlib[bcrypt]>=1.7.4
+bcrypt<4.1
