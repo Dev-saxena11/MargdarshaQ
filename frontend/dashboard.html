@@ -2190,6 +2190,16 @@
       display: none;
     }
 
+    /* The one-way arrowheads carry a white text-shadow halo so they stay
+       readable against pale OSM tiles. With the tiles gone that halo has
+       nothing to sit on and reads as fuzz over the network, so the arrows come
+       off in graph view. Only the base road graph loses them -- a solved
+       route's own flow arrows (.route-direction-arrow) are the plan being
+       shown, not backdrop, so they stay in both views. */
+    #mapWrap.graph-view .leaflet-road-arrow {
+      display: none;
+    }
+
     #mapWrap.graph-view .leaflet-container {
       background-color: var(--bg);
       background-image: radial-gradient(var(--canvas-dots) 1px, transparent 0);
