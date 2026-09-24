@@ -2179,6 +2179,54 @@
       cursor: pointer;
     }
 
+    /* GIS <-> Graph view. Same nodes, same edges, same coordinates either way
+       - the only thing that changes is whether the OSM basemap is drawn
+       underneath. Hiding the tile pane rather than removing the tile layer
+       keeps Leaflet's attribution control in place, which still has to be
+       there: the road geometry itself comes from OSM via Overpass, basemap or
+       not. Dropping the attribution with the tiles would be a licence problem,
+       not a cosmetic one. */
+    #mapWrap.graph-view .leaflet-tile-pane {
+      display: none;
+    }
+
+    #mapWrap.graph-view .leaflet-container {
+      background-color: var(--bg);
+      background-image: radial-gradient(var(--canvas-dots) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+
+    .map-view-toggle {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 500;
+      display: flex;
+      gap: 6px;
+      background: var(--card-bg);
+      border: 2px solid var(--border-neo);
+      box-shadow: var(--neo-shadow-sm);
+      border-radius: 8px;
+      padding: 5px;
+    }
+
+    .map-view-btn {
+      background: var(--raised);
+      color: var(--text-muted);
+      border: 2px solid var(--border-neo);
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+
+    .map-view-btn[aria-pressed="true"] {
+      background: var(--neo-mint);
+      color: #000000;
+    }
+
     /* Floating instruction strip over the map, so the next action is visible
        where the user is actually looking. */
     .map-prompt {
@@ -4089,6 +4137,16 @@
             </div>
             <div class="map-prompt" id="mapPrompt" hidden></div>
 
+            <!-- GIS <-> Graph. Not a second renderer: the same network at the
+                 same coordinates, with the basemap taken away so the graph
+                 structure is what you see. -->
+            <div class="map-view-toggle" id="mapViewToggle">
+              <button class="map-view-btn" id="mapViewGisBtn" aria-pressed="true"
+                onclick="setMapView('gis')" title="Road map underneath the network">GIS</button>
+              <button class="map-view-btn" id="mapViewGraphBtn" aria-pressed="false"
+                onclick="setMapView('graph')" title="Network only, no basemap">GRAPH</button>
+            </div>
+
             <!-- Playback transport. Over the map rather than in a side panel:
                the clock belongs next to the vans it is driving. -->
             <div class="sim-transport" id="simTransport" hidden>
@@ -4399,6 +4457,7 @@
       network: null,
       vrp: null,
       map: null,
+      mapView: 'gis',       // 'gis' (OSM basemap under the network) | 'graph' (network alone)
       routeLayer: null,
       convChart: null,
       // Map-driven instance builder (veroviz-style): draw a boundary, then
@@ -6839,6 +6898,23 @@
     // The pre-cached network is loaded onto it (see bootstrapControlRoom), so the
     // first thing on screen is a real road network to work on; panning out and
     // drawing a boundary elsewhere still works exactly as before.
+    // GIS <-> Graph view. Deliberately NOT a second renderer: the roads,
+    // junctions and solved routes stay the exact same Leaflet layers at the
+    // exact same lat/lon in both modes, so panning, zooming, clicking a
+    // junction to place a depot and dragging a boundary all keep working in
+    // graph view. Only the basemap goes away. Re-deriving an abstract layout
+    // instead (the renderSVG path) would mean every one of those interactions
+    // needed a second implementation against different coordinates.
+    function setMapView(mode) {
+      state.mapView = (mode === 'graph') ? 'graph' : 'gis';
+      const wrap = document.getElementById('mapWrap');
+      if (wrap) wrap.classList.toggle('graph-view', state.mapView === 'graph');
+      const gis = document.getElementById('mapViewGisBtn');
+      const graph = document.getElementById('mapViewGraphBtn');
+      if (gis) gis.setAttribute('aria-pressed', String(state.mapView === 'gis'));
+      if (graph) graph.setAttribute('aria-pressed', String(state.mapView === 'graph'));
+    }
+
     function ensureControlMap() {
       if (state.map) return state.map;
 
