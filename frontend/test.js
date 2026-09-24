@@ -4701,7 +4701,7 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
 
       const ctx = buildAssistantContext();
       const welcomeHtml = `
-    <h3>👋 MargdarshaQ AI Copilot Active</h3>
+    <h3>👋 DishaQ AI Coiplot Active</h3>
     <p>I am your embedded AI routing assistant. I provide instant, context-aware traffic intelligence, analyzing multi-vehicle dispatch routes, quantum tunneling mechanisms, and bottleneck avoidance metrics in real time.</p>
     <p><b>Active Context:</b> <code>${ctx.scenario_name}</code>${ctx.delay_saved_pct != null
           ? ` (measured <b>-${ctx.delay_saved_pct.toFixed(1)}% delay reduction</b> vs ${ctx.baseline_algo || 'baseline'}).`

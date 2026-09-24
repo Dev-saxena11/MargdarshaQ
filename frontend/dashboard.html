@@ -18,15 +18,16 @@
 
   <style>
     :root {
-      /* Cyber Neo-Brutalist & Minimalist Palette */
+      /* Cyber Neo-Brutalist & Minimalist Palette -> Frosted Glass Edition */
       --bg: #090D16;
-      --canvas-dots: rgba(255, 255, 255, 0.06);
-      --card-bg: #101626;
-      --card-hover: #141C30;
-      --raised: #172036;
-      --border-dark: #1E293B;
-      --border-bold: #334155;
-      --border-neo: #000000;
+      --canvas-dots: rgba(255, 255, 255, 0.04);
+      --card-bg: rgba(16, 22, 38, 0.45);
+      --card-hover: rgba(20, 28, 48, 0.6);
+      --raised: rgba(23, 32, 54, 0.5);
+      --border-dark: rgba(255, 255, 255, 0.04);
+      --border-bold: rgba(255, 255, 255, 0.1);
+      --border-neo: rgba(255, 255, 255, 0.08);
+      /* Softened from #000 */
       --text-main: #F8FAFC;
       --text-muted: #94A3B8;
       --text-sub: #64748B;
@@ -40,11 +41,11 @@
       --neo-amber: #F59E0B;
       --neo-pink: #FF0054;
       --neo-cyan: #00BBF9;
-      --neo-shadow: 4px 4px 0px #000000;
-      --neo-shadow-sm: 2px 2px 0px #000000;
-      --neo-shadow-lg: 6px 6px 0px #000000;
-      --neo-shadow-mint: 4px 4px 0px var(--neo-mint);
-      --neo-shadow-purple: 4px 4px 0px var(--neo-purple);
+      --neo-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      --neo-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.15);
+      --neo-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.3);
+      --neo-shadow-mint: 0 0 16px rgba(0, 245, 212, 0.25);
+      --neo-shadow-purple: 0 0 16px rgba(123, 92, 255, 0.25);
     }
 
     * {
@@ -93,11 +94,13 @@
       align-items: center;
       justify-content: space-between;
       padding: 12px 24px;
-      border-bottom: 2px solid var(--border-neo);
-      background: #0D1322;
+      border-bottom: 1px solid var(--border-neo);
+      background: rgba(13, 19, 34, 0.6);
+      backdrop-filter: blur(16px) saturate(150%);
+      -webkit-backdrop-filter: blur(16px) saturate(150%);
       z-index: 30;
       position: relative;
-      box-shadow: 0 3px 0px #000000;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
     }
 
     .brand {
@@ -151,16 +154,17 @@
       box-shadow: 2px 2px 0px #000000;
     }
 
-    /* Neo-Brutalist View Switcher */
+    /* Neo-Brutalist View Switcher -> Soft View Switcher */
     .view-switcher {
       display: flex;
       align-items: center;
-      background: #0A0E1A;
-      border: 2px solid var(--border-neo);
-      border-radius: 6px;
-      padding: 3px;
+      background: rgba(10, 14, 26, 0.5);
+      border: 1px solid var(--border-neo);
+      border-radius: 16px;
+      padding: 4px;
       gap: 4px;
       box-shadow: var(--neo-shadow-sm);
+      backdrop-filter: blur(8px);
     }
 
     .view-btn {
@@ -171,24 +175,25 @@
       border: none;
       color: var(--text-muted);
       padding: 8px 16px;
-      border-radius: 4px;
+      border-radius: 12px;
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
       font-family: 'Space Grotesk', sans-serif;
-      transition: all .15s ease;
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
 
     .view-btn:hover {
       color: var(--text-main);
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-1px);
     }
 
     .view-btn.active {
-      background: var(--neo-purple);
+      background: rgba(123, 92, 255, 0.2);
       color: #FFFFFF;
-      border: 1.5px solid var(--border-neo);
-      box-shadow: 2px 2px 0px #000000;
+      border: 1px solid rgba(123, 92, 255, 0.4);
+      box-shadow: 0 4px 12px rgba(123, 92, 255, 0.2);
     }
 
     /* API Status Pill */
@@ -310,12 +315,20 @@
       align-items: center;
       justify-content: center;
       background: var(--card-bg);
-      border: 2px solid var(--border-neo);
-      border-radius: 10px;
+      border: 1px solid var(--border-neo);
+      border-radius: 16px;
       padding: 26px 30px;
       box-shadow: var(--neo-shadow);
       position: relative;
       text-align: center;
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .judge-hero:hover {
+      transform: translateY(-4px) scale(1.005);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     .judge-hero::before {
@@ -326,7 +339,8 @@
       right: 0;
       height: 4px;
       background: linear-gradient(90deg, var(--neo-mint) 0%, var(--neo-purple) 50%, var(--neo-yellow) 100%);
-      border-radius: 8px 8px 0 0;
+      border-radius: 16px 16px 0 0;
+      opacity: 0.8;
     }
 
     .judge-hero-content {
@@ -375,11 +389,11 @@
 
     .hero-title span.accent {
       color: var(--neo-mint);
-      background: rgba(0, 245, 212, 0.12);
-      border: 1.5px solid var(--neo-mint);
+      background: rgba(0, 245, 212, 0.08);
+      border: 1px solid rgba(0, 245, 212, 0.2);
       padding: 3px 12px;
-      border-radius: 6px;
-      box-shadow: 2px 2px 0px #000;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 245, 212, 0.15);
     }
 
     .hero-subtitle {
@@ -400,63 +414,67 @@
       flex-wrap: wrap;
     }
 
-    /* Neo-Brutalist Buttons */
+    /* Neo-Brutalist Buttons -> Glass Buttons */
     .btn-neo-primary {
-      background: var(--neo-mint);
+      background: rgba(0, 245, 212, 0.85);
       color: #000000;
       font-weight: 800;
-      border: 2px solid var(--border-neo);
+      border: 1px solid rgba(0, 245, 212, 0.4);
       padding: 10px 20px;
-      border-radius: 6px;
+      border-radius: 12px;
       cursor: pointer;
       font-size: 13px;
       font-family: 'Space Grotesk', sans-serif;
       display: flex;
       align-items: center;
       gap: 8px;
-      box-shadow: var(--neo-shadow);
-      transition: all .12s ease;
+      box-shadow: 0 4px 16px rgba(0, 245, 212, 0.3);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
       text-transform: uppercase;
       letter-spacing: 0.4px;
+      backdrop-filter: blur(4px);
     }
 
     .btn-neo-primary:hover {
-      transform: translate(-2px, -2px);
-      box-shadow: 6px 6px 0px #000000;
-      background: #29fcdb;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 245, 212, 0.4);
+      background: #00F5D4;
     }
 
     .btn-neo-primary:active {
-      transform: translate(2px, 2px);
-      box-shadow: 1px 1px 0px #000000;
+      transform: translateY(1px);
+      box-shadow: 0 2px 8px rgba(0, 245, 212, 0.3);
     }
 
     .btn-neo-secondary {
-      background: var(--raised);
+      background: rgba(23, 32, 54, 0.4);
       color: var(--text-main);
       font-weight: 700;
-      border: 2px solid var(--border-neo);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       padding: 9px 16px;
-      border-radius: 6px;
+      border-radius: 12px;
       cursor: pointer;
       font-size: 12px;
       font-family: 'Space Grotesk', sans-serif;
       display: flex;
       align-items: center;
       gap: 6px;
-      box-shadow: var(--neo-shadow-sm);
-      transition: all .12s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      backdrop-filter: blur(4px);
     }
 
     .btn-neo-secondary:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0px #000000;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       color: var(--neo-mint);
+      background: rgba(23, 32, 54, 0.6);
+      border-color: rgba(0, 245, 212, 0.3);
     }
 
     .btn-neo-secondary:active {
-      transform: translate(2px, 2px);
-      box-shadow: 0px 0px 0px #000000;
+      transform: translateY(1px);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     }
 
     .preset-select {
@@ -486,24 +504,46 @@
     }
 
     .area-chip {
-      background: var(--raised);
-      border: 2px solid var(--border-neo);
-      border-radius: 6px;
-      padding: 10px 14px;
+      background: rgba(16, 22, 38, 0.15);
+      /* Ethereal Glass background */
+      border: 1px solid var(--border-neo);
+      border-radius: 12px;
+      padding: 14px 18px;
       cursor: pointer;
-      box-shadow: var(--neo-shadow-sm);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
       text-align: left;
       min-width: 172px;
       max-width: 216px;
       flex: 1 1 172px;
       font-family: 'Space Grotesk', sans-serif;
-      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .area-chip::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(800px circle at var(--mouse-x, 0) var(--mouse-y, 0), rgba(255, 255, 255, 0.08), transparent 40%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .area-chip:hover::before {
+      opacity: 1;
     }
 
     .area-chip:hover {
-      background: var(--card-hover);
-      transform: translate(-1px, -1px);
-      box-shadow: var(--neo-shadow);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.2);
     }
 
     .area-chip.active {
@@ -1174,21 +1214,73 @@
     }
 
     .kpi-card {
-      background: var(--card-bg);
-      border: 2px solid var(--border-neo);
-      border-radius: 8px;
+      background: rgba(16, 22, 38, 0.45);
+      border: none;
+      border-radius: 20px;
       padding: 18px;
-      box-shadow: var(--neo-shadow);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
       position: relative;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      transition: transform .12s ease;
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
 
     .kpi-card:hover {
-      transform: translate(-2px, -2px);
-      box-shadow: 6px 6px 0px #000000;
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    /* Soft Text Animation on Hover */
+    .kpi-title,
+    .kpi-num,
+    .kpi-desc {
+      transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .kpi-card:hover .kpi-num {
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .kpi-card:hover .kpi-title {
+      color: var(--text-main);
+      text-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+    }
+
+    /* Premium Spotlight Glow Effect */
+    .kpi-card,
+    .comparison-section,
+    .judge-hero,
+    .map-box {
+      isolation: isolate;
+    }
+
+    .kpi-card::after,
+    .comparison-section::after,
+    .judge-hero::after,
+    .map-box::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: inherit;
+      background: radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 245, 212, 0.08), transparent 40%);
+      opacity: 0;
+      z-index: -1;
+      pointer-events: none;
+      transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    .kpi-card:hover::after,
+    .comparison-section:hover::after,
+    .judge-hero:hover::after,
+    .map-box:hover::after {
+      opacity: 1;
     }
 
     .kpi-card-header {
@@ -1212,10 +1304,10 @@
     .kpi-tag {
       font-size: 10px;
       font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 4px;
-      border: 1.5px solid var(--border-neo);
-      box-shadow: 1.5px 1.5px 0px #000000;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
       text-transform: uppercase;
       font-family: 'Space Grotesk', sans-serif;
     }
@@ -1266,10 +1358,10 @@
     .kpi-pill {
       font-size: 11px;
       font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 4px;
-      border: 1.5px solid var(--border-neo);
-      box-shadow: 2px 2px 0px #000000;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
       font-family: 'JetBrains Mono', monospace;
     }
 
@@ -1316,14 +1408,22 @@
 
     /* Before / After Route Visualizer Box */
     .comparison-section {
-      background: var(--card-bg);
-      border: 2px solid var(--border-neo);
-      border-radius: 8px;
-      padding: 20px;
+      background: rgba(16, 22, 38, 0.45);
+      border: none;
+      border-radius: 20px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 16px;
-      box-shadow: var(--neo-shadow);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .comparison-section:hover {
+      transform: translateY(-4px) scale(1.005);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
 
     .comparison-header {
@@ -1355,11 +1455,11 @@
     .comp-mode-pills {
       display: flex;
       gap: 6px;
-      background: #0B101D;
-      border: 2px solid var(--border-neo);
-      padding: 3px;
-      border-radius: 6px;
-      box-shadow: var(--neo-shadow-sm);
+      background: rgba(16, 22, 38, 0.45);
+      border: none;
+      padding: 4px;
+      border-radius: 999px;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     .comp-pill {
@@ -1382,8 +1482,9 @@
     .comp-pill.active {
       background: var(--neo-mint);
       color: #000000;
-      border: 1px solid var(--border-neo);
-      box-shadow: 1.5px 1.5px 0px #000000;
+      border: none;
+      border-radius: 999px;
+      box-shadow: 0 2px 8px rgba(0, 245, 212, 0.4);
     }
 
     /* Maps Container in Judge View */
@@ -1402,13 +1503,13 @@
 
     .map-box {
       position: relative;
-      background: #FFFFFF;
-      border: 2px solid var(--border-neo);
-      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      border-radius: 16px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: var(--neo-shadow);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
     }
 
     /* Window Title Bar on Map */
@@ -1416,9 +1517,9 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px;
-      background: #F1F5F9;
-      border-bottom: 2px solid #CBD5E1;
+      padding: 10px 16px;
+      background: rgba(241, 245, 249, 0.95);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       z-index: 10;
     }
 
@@ -1752,7 +1853,8 @@
     }
 
     .col {
-      background: var(--card-bg);
+      background: #101626;
+      /* Solid background to remove the blurred/transparent effect */
       overflow-y: auto;
       padding: 18px;
     }
@@ -2187,18 +2289,19 @@
       top: 14px;
       transform: translateX(-50%);
       z-index: 500;
-      background: var(--card-bg);
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
       border: 2px solid var(--neo-mint);
-      box-shadow: var(--neo-shadow-sm);
-      color: var(--text-main);
-      border-radius: 6px;
-      padding: 8px 14px;
-      font-size: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 14px;
       font-family: 'Space Grotesk', sans-serif;
       font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       max-width: 82%;
     }
 
@@ -2208,19 +2311,20 @@
 
     .map-prompt button {
       background: transparent;
-      border: 1.5px solid var(--border-bold);
-      color: var(--text-muted);
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.8);
       border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 11px;
+      padding: 4px 10px;
+      font-size: 12px;
       cursor: pointer;
       font-family: 'Space Grotesk', sans-serif;
       font-weight: 700;
     }
 
     .map-prompt button:hover {
-      color: var(--text-main);
+      color: #ffffff;
       border-color: var(--neo-mint);
+      background: rgba(0, 245, 212, 0.1);
     }
 
     .route-line {
@@ -2482,42 +2586,45 @@
       overflow-y: auto;
       display: block;
       margin: 0;
-      background: var(--card-bg);
-      border: 2px solid var(--border-neo);
-      box-shadow: var(--neo-shadow-sm);
-      border-radius: 6px;
-      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      padding: 12px 16px;
       font-family: 'Space Grotesk', sans-serif;
     }
 
     #routeLegend .route-legend-title {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 6px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
     }
 
     #routeLegend span {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      color: var(--text-main);
-      padding: 2px 0;
+      gap: 10px;
+      font-size: 12px;
+      color: #ffffff;
+      padding: 4px 0;
       white-space: nowrap;
     }
 
     #routeLegend i {
-      width: 16px;
-      height: 5px;
-      border-radius: 2px;
+      width: 18px;
+      height: 6px;
+      border-radius: 3px;
       flex: none;
     }
 
     #routeLegend .route-legend-sub {
-      color: var(--text-muted);
+      color: rgba(255, 255, 255, 0.7);
       font-weight: 400;
     }
 
@@ -3201,7 +3308,7 @@
         transform: rotate(360deg);
       }
     }
-  
+
     /* --- Route Animation Panel --- */
     #route-animation-panel {
       position: absolute;
@@ -3218,6 +3325,7 @@
       gap: 10px;
       width: 240px;
     }
+
     .route-anim-header {
       font-family: 'Space Grotesk', sans-serif;
       font-weight: 700;
@@ -3227,11 +3335,13 @@
       justify-content: space-between;
       align-items: center;
     }
+
     .route-anim-controls {
       display: flex;
       align-items: center;
       gap: 8px;
     }
+
     .route-anim-btn {
       background: var(--neo-purple);
       color: #fff;
@@ -3244,9 +3354,11 @@
       font-family: 'Inter', sans-serif;
       box-shadow: 2px 2px 0px #000;
     }
+
     .route-anim-btn:hover {
       background: var(--neo-purple-light);
     }
+
     .route-anim-scrubber {
       flex: 1;
       appearance: none;
@@ -3255,6 +3367,7 @@
       border-radius: 4px;
       outline: none;
     }
+
     .route-anim-scrubber::-webkit-slider-thumb {
       appearance: none;
       width: 12px;
@@ -3263,10 +3376,8 @@
       background: var(--neo-yellow);
       cursor: pointer;
     }
-
-  
   </style>
-  
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
@@ -3274,99 +3385,128 @@
   <!-- Auth Overlay -->
   <div id="authOverlay"
     style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif; overflow-y:auto; padding: 20px;">
-    
+
     <div id="loginFormContainer"
       style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:100%; max-width: 400px; text-align:center; box-shadow: var(--neo-shadow-lg); display: flex; flex-direction: column; align-items: center; justify-content: center;">
       <h2 style="margin-top:0; font-family: 'Space Grotesk', sans-serif;">Logistics Secure Login</h2>
-      <p style="font-size:13px; color:var(--text-sub); margin-bottom: 24px;">Log in to access your isolated workspace.</p>
-      
+      <p style="font-size:13px; color:var(--text-sub); margin-bottom: 24px;">Log in to access your isolated workspace.
+      </p>
+
       <input type="email" id="loginEmail" placeholder="Email Address"
         style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
       <input type="password" id="loginPassword" placeholder="Password"
         style="width:100%; padding:12px; margin-bottom:20px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
-      
+
       <button onclick="handleLogin()"
-        style="width:100%; padding:12px; background:var(--neo-mint); color:#000; font-weight:700; border:2px solid var(--border-neo); border-radius:4px; cursor:pointer; margin-bottom:16px; font-family: 'Space Grotesk', sans-serif; box-shadow: var(--neo-shadow-sm); transition: transform 0.1s ease;">Log In</button>
-      
+        style="width:100%; padding:12px; background:var(--neo-mint); color:#000; font-weight:700; border:2px solid var(--border-neo); border-radius:4px; cursor:pointer; margin-bottom:16px; font-family: 'Space Grotesk', sans-serif; box-shadow: var(--neo-shadow-sm); transition: transform 0.1s ease;">Log
+        In</button>
+
       <div style="width: 100%; border-bottom: 1.5px solid var(--border-bold); margin: 16px 0;"></div>
-      
+
       <p style="font-size:12px; color:var(--text-sub); margin-bottom: 12px;">Don't have a Logistics Profile?</p>
-      <button onclick="document.getElementById('loginFormContainer').style.display='none'; document.getElementById('signupFormContainer').style.display='flex';"
-        style="width:100%; padding:10px; background:transparent; color:var(--neo-mint); border:1.5px solid var(--neo-mint); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif;">Create Logistics Profile</button>
+      <button
+        onclick="document.getElementById('loginFormContainer').style.display='none'; document.getElementById('signupFormContainer').style.display='flex';"
+        style="width:100%; padding:10px; background:transparent; color:var(--neo-mint); border:1.5px solid var(--neo-mint); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif;">Create
+        Logistics Profile</button>
       <div id="loginError" style="color:var(--neo-pink); margin-top:16px; font-size:12px; font-weight:600;"></div>
     </div>
 
     <div id="signupFormContainer"
       style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:100%; max-width: 500px; text-align:center; box-shadow: var(--neo-shadow-lg); display: none; flex-direction: column; align-items: center; justify-content: center;">
       <h2 style="margin-top:0; font-family: 'Space Grotesk', sans-serif;">Create Logistics Profile</h2>
-      <p style="font-size:13px; color:var(--text-sub); margin-bottom: 24px;">Register to plan routes and generate networks.</p>
-      
+      <p style="font-size:13px; color:var(--text-sub); margin-bottom: 24px;">Register to plan routes and generate
+        networks.</p>
+
       <div style="display:flex; gap: 12px; width: 100%;">
         <input type="text" id="signupName" placeholder="Full Name (e.g. Rahul Sharma)"
           style="width:50%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
         <input type="text" id="signupRole" placeholder="Role (e.g. Dispatcher)"
           style="width:50%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
       </div>
-      
+
       <input type="text" id="signupCompany" placeholder="Company or Depot (e.g. Delivery Express Hub North)"
         style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
-        
+
       <input type="email" id="signupEmail" placeholder="Email Address"
         style="width:100%; padding:12px; margin-bottom:12px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
       <input type="password" id="signupPassword" placeholder="Password (min 6 chars)"
         style="width:100%; padding:12px; margin-bottom:20px; box-sizing:border-box; border:1.5px solid var(--border-bold); border-radius:4px; background:var(--bg); color:var(--text-main); font-family: 'JetBrains Mono', monospace; outline: none;">
-      
+
       <button onclick="handleSignup()"
-        style="width:100%; padding:12px; background:var(--neo-yellow); color:#000; font-weight:700; border:2px solid var(--border-neo); border-radius:4px; cursor:pointer; margin-bottom:16px; font-family: 'Space Grotesk', sans-serif; box-shadow: var(--neo-shadow-sm); transition: transform 0.1s ease;">Register & Login</button>
-      
+        style="width:100%; padding:12px; background:var(--neo-yellow); color:#000; font-weight:700; border:2px solid var(--border-neo); border-radius:4px; cursor:pointer; margin-bottom:16px; font-family: 'Space Grotesk', sans-serif; box-shadow: var(--neo-shadow-sm); transition: transform 0.1s ease;">Register
+        & Login</button>
+
       <div style="width: 100%; border-bottom: 1.5px solid var(--border-bold); margin: 16px 0;"></div>
-      
+
       <p style="font-size:12px; color:var(--text-sub); margin-bottom: 12px;">Already have a profile?</p>
-      <button onclick="document.getElementById('signupFormContainer').style.display='none'; document.getElementById('loginFormContainer').style.display='flex';"
-        style="width:100%; padding:10px; background:transparent; color:var(--neo-yellow); border:1.5px solid var(--neo-yellow); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif;">Back to Login</button>
+      <button
+        onclick="document.getElementById('signupFormContainer').style.display='none'; document.getElementById('loginFormContainer').style.display='flex';"
+        style="width:100%; padding:10px; background:transparent; color:var(--neo-yellow); border:1.5px solid var(--neo-yellow); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif;">Back
+        to Login</button>
       <div id="signupError" style="color:var(--neo-pink); margin-top:16px; font-size:12px; font-weight:600;"></div>
     </div>
   </div>
 
   <!-- Profile Modal -->
-  <div id="profileModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:none; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
-    <div style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:400px; max-width:90%; position: relative; box-shadow: var(--neo-shadow-lg);">
-      <button onclick="document.getElementById('profileModal').style.display='none'" style="position:absolute; top:12px; right:16px; background:none; border:none; color:var(--text-sub); font-size:24px; cursor:pointer; font-weight:700;">&times;</button>
-      <h2 style="margin-top:0; color:var(--neo-mint); font-family: 'Space Grotesk', sans-serif;"><span id="profName"></span></h2>
-      <p style="font-size:14px; margin: 4px 0 20px 0;"><span id="profRole" style="color:var(--neo-cyan); font-weight:700;"></span> at <span id="profCompany" style="font-weight:700;"></span></p>
-      <p style="font-size:12px; color:var(--text-sub); margin-bottom:24px; font-family: 'JetBrains Mono', monospace;"><span id="profEmail"></span></p>
-      
-      <div style="background:var(--bg); border: 1.5px solid var(--border-bold); border-radius:4px; padding:16px; margin-bottom:24px;">
-        <h3 style="margin-top:0; font-size:14px; border-bottom:1.5px solid var(--border-bold); padding-bottom:12px; font-family: 'Space Grotesk', sans-serif;">Operational Statistics</h3>
+  <div id="profileModal"
+    style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:none; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif;">
+    <div
+      style="background:var(--card-bg); padding:32px; border-radius:0px; border: 2px solid var(--border-neo); width:400px; max-width:90%; position: relative; box-shadow: var(--neo-shadow-lg);">
+      <button onclick="document.getElementById('profileModal').style.display='none'"
+        style="position:absolute; top:12px; right:16px; background:none; border:none; color:var(--text-sub); font-size:24px; cursor:pointer; font-weight:700;">&times;</button>
+      <h2 style="margin-top:0; color:var(--neo-mint); font-family: 'Space Grotesk', sans-serif;"><span
+          id="profName"></span></h2>
+      <p style="font-size:14px; margin: 4px 0 20px 0;"><span id="profRole"
+          style="color:var(--neo-cyan); font-weight:700;"></span> at <span id="profCompany"
+          style="font-weight:700;"></span></p>
+      <p style="font-size:12px; color:var(--text-sub); margin-bottom:24px; font-family: 'JetBrains Mono', monospace;">
+        <span id="profEmail"></span>
+      </p>
+
+      <div
+        style="background:var(--bg); border: 1.5px solid var(--border-bold); border-radius:4px; padding:16px; margin-bottom:24px;">
+        <h3
+          style="margin-top:0; font-size:14px; border-bottom:1.5px solid var(--border-bold); padding-bottom:12px; font-family: 'Space Grotesk', sans-serif;">
+          Operational Statistics</h3>
         <div style="display:flex; justify-content:space-between; margin-top:16px;">
           <div style="text-align:center; width:45%;">
-            <div style="font-size:32px; font-weight:800; color:var(--neo-purple-light); font-family: 'Space Grotesk', sans-serif;" id="profZones">0</div>
-            <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">Operational Zones Mapped</div>
+            <div
+              style="font-size:32px; font-weight:800; color:var(--neo-purple-light); font-family: 'Space Grotesk', sans-serif;"
+              id="profZones">0</div>
+            <div
+              style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">
+              Operational Zones Mapped</div>
           </div>
           <div style="text-align:center; width:45%;">
-            <div style="font-size:32px; font-weight:800; color:var(--neo-yellow); font-family: 'Space Grotesk', sans-serif;" id="profRoutes">0</div>
-            <div style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">Route Plans Dispatched</div>
+            <div
+              style="font-size:32px; font-weight:800; color:var(--neo-yellow); font-family: 'Space Grotesk', sans-serif;"
+              id="profRoutes">0</div>
+            <div
+              style="font-size:11px; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px;">
+              Route Plans Dispatched</div>
           </div>
         </div>
       </div>
-      
-      <button onclick="handleLogout()" style="width:100%; padding:12px; background:transparent; color:var(--neo-pink); border:2px solid var(--neo-pink); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s ease;">Sign Out</button>
+
+      <button onclick="handleLogout()"
+        style="width:100%; padding:12px; background:transparent; color:var(--neo-pink); border:2px solid var(--neo-pink); border-radius:4px; cursor:pointer; font-weight:700; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s ease;">Sign
+        Out</button>
     </div>
   </div>
 
   <!-- Progress Bar Overlay -->
-  
-      <!-- Route Animation Floating Panel -->
-      <div id="route-animation-panel">
-        <div class="route-anim-header">
-          <span>Route Playback</span>
-          <span id="route-anim-time" style="color:var(--text-muted); font-size:12px;">0%</span>
-        </div>
-        <div class="route-anim-controls">
-          <button id="route-anim-play-btn" class="route-anim-btn">▶ Play</button>
-          <input type="range" id="route-anim-scrubber" class="route-anim-scrubber" min="0" max="100" value="0" step="0.1">
-        </div>
-      </div>
+
+  <!-- Route Animation Floating Panel -->
+  <div id="route-animation-panel">
+    <div class="route-anim-header">
+      <span>Route Playback</span>
+      <span id="route-anim-time" style="color:var(--text-muted); font-size:12px;">0%</span>
+    </div>
+    <div class="route-anim-controls">
+      <button id="route-anim-play-btn" class="route-anim-btn">▶ Play</button>
+      <input type="range" id="route-anim-scrubber" class="route-anim-scrubber" min="0" max="100" value="0" step="0.1">
+    </div>
+  </div>
 
   <div id="globalProgressOverlay">
     <div class="progress-box">
@@ -3393,31 +3533,32 @@
         </div>
       </div>
 
-      <!-- Mode Switcher -->
-      <div class="view-switcher">
-        <button id="btnViewJudge" class="view-btn active" onclick="switchView('judge')">
-          <span>📊</span> Executive Overview
-        </button>
-        <button id="btnViewControl" class="view-btn" onclick="switchView('control')">
-          <span>🛠️</span> Engineering Control Room
-        </button>
-      </div>
-
       <!-- API Status Pill -->
       <div class="conn">
-        <div class="status-chip">
+        <!-- Mode Switcher -->
+        <div class="view-switcher" style="margin-right: 8px;">
+          <button id="btnViewJudge" class="view-btn active" onclick="switchView('judge')">
+            <span>📊</span> Executive Overview
+          </button>
+          <button id="btnViewControl" class="view-btn" onclick="switchView('control')">
+            <span>🛠️</span> Engineering Control Room
+          </button>
+        </div>
+        <div class="status-chip" style="display: none;">
           <span class="dot" id="connDot"></span>
           <span id="connLabel">checking API…</span>
         </div>
-        <input id="apiBase" type="text" value="http://127.0.0.1:8000" spellcheck="false">
-        <button class="btn-neo-secondary" style="padding:6px 12px; margin:0;" onclick="checkHealth()">check</button>
+        <input id="apiBase" type="text" value="http://127.0.0.1:8000" spellcheck="false" style="display: none;">
+        <button class="btn-neo-secondary" style="display: none; padding:6px 12px; margin:0;"
+          onclick="checkHealth()">check</button>
         <!-- Only shown to a guest: signing in anonymously hides the overlay, so
              without this there would be no way back to it for someone who does
              have an account. -->
         <button id="btnViewProfile" class="btn-neo-secondary" hidden
-          style="padding:6px 12px; margin-left:6px; border-color: var(--neo-mint); color: var(--neo-mint);" onclick="showProfile()">Profile</button>
+          style="padding:6px 12px; margin-left:6px; border-color: var(--neo-mint); color: var(--neo-mint);"
+          onclick="showProfile()">Profile</button>
         <button id="btnHeaderAssistant" class="btn-neo-secondary"
-          style="display:inline-flex; align-items:center; gap:6px; background:#1C1538; border-color:var(--neo-purple); color:#FFFFFF; padding:6px 12px; margin-left:6px;"
+          style="display: none !important; align-items:center; gap:6px; background:#1C1538; border-color:var(--neo-purple); color:#FFFFFF; padding:6px 12px; margin-left:6px;"
           onclick="toggleAssistant()">
           <span style="font-size:13px;">✨</span> <b>AI Copilot</b>
         </button>
@@ -3426,7 +3567,7 @@
 
     <!-- Live Mission Status Ticker -->
     <div class="live-bar">
-      <div class="ticker-items">
+      <div class="ticker-items" style="display: none;">
         <div class="ticker-item"><span class="ticker-dot"></span> <span>ENGINE: QUANTUM QPSO ACTIVE</span></div>
         <div class="ticker-item"><span style="color:var(--text-sub);">|</span></div>
         <div class="ticker-item"><span style="color:var(--neo-mint);">●</span> <span>TRAFFIC MODEL: DYNAMIC CONGESTION
@@ -3435,7 +3576,9 @@
         <div class="ticker-item"><span style="color:var(--neo-yellow);">●</span> <span>CVRPTW CONSTRAINTS: TIME-WINDOWS
             + CAPACITY</span></div>
       </div>
-      <div class="mono" id="liveTickerTime">SYSTEM READY</div>
+      <div class="mono" id="liveTickerTime"
+        style="position: fixed; bottom: 8px; right: 26px; z-index: 900; font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; pointer-events: none;">
+        SYSTEM READY</div>
     </div>
 
     <div id="contentArea">
@@ -3454,19 +3597,53 @@
               <span class="tag-badge" style="background:var(--neo-yellow); color:#000;">BEATS CITY TRAFFIC</span>
             </div>
             <h2 class="hero-title">
-              <span class="hero-icon">⚡</span>
-              <span>Quantum-Inspired Traffic Optimization</span>
-              <span class="accent">vs Baseline Dispatch</span>
+              <span class="accent">Quantum-Inspired Traffic Optimization vs Baseline Dispatch</span>
             </h2>
-            <p class="hero-subtitle">
-              A delivery fleet has to reach every customer on time, through city traffic.
-              Ordinary routing software sends each van to its nearest stop — and drives it
-              straight into the jam. <b>We plan the whole day's routes around the traffic
-                instead.</b> Pick one of the congested districts below, then run every
-              algorithm on it at once and read the result for yourself.
-              <span class="term-note">Under the hood: a quantum-inspired optimisation algorithm
-                (QPSO) solving a capacitated vehicle routing problem with time windows.</span>
-            </p>
+            <div class="hero-subtitle-anim-container">
+              <p class="hero-subtitle-anim">
+                Navigating the chaos. Routing with precision. Powered by Quantum AI.
+              </p>
+              <style>
+                .hero-subtitle-anim-container {
+                  margin: 16px auto 24px;
+                  overflow: hidden;
+                }
+
+                .hero-subtitle-anim {
+                  background: linear-gradient(90deg, #00F5D4, #7B5CFF, #FEE440, #00F5D4);
+                  background-size: 300% 100%;
+                  -webkit-background-clip: text;
+                  -webkit-text-fill-color: transparent;
+                  animation: gradient-shift 6s linear infinite, fade-slide-up 1.2s ease-out forwards;
+                  font-size: 18px;
+                  font-weight: 600;
+                  margin: 0;
+                  letter-spacing: 0.5px;
+                }
+
+                @keyframes gradient-shift {
+                  0% {
+                    background-position: 0% 50%;
+                  }
+
+                  100% {
+                    background-position: 300% 50%;
+                  }
+                }
+
+                @keyframes fade-slide-up {
+                  0% {
+                    opacity: 0;
+                    transform: translateY(15px);
+                  }
+
+                  100% {
+                    opacity: 1;
+                    transform: translateY(0);
+                  }
+                }
+              </style>
+            </div>
 
             <!-- Curated districts. Each one is real OpenStreetMap road data shipped
                with the app, chosen because its traffic pattern is the kind our
@@ -4079,33 +4256,120 @@
             </section>
           </div>
 
-          <!-- CENTER: map — this is the workspace, not just a picture -->
-          <div id="mapWrap">
-            <div id="leafletMap"></div>
-            <div id="svgWrap" style="display:none;"><svg id="svgCanvas" viewBox="0 0 1000 1000"></svg></div>
-            <div class="empty-hint" id="emptyHint" style="display:none;">
-              <div class="glyph">◈</div>
-              <div>Drag a box around a district to begin</div>
-            </div>
-            <div class="map-prompt" id="mapPrompt" hidden></div>
+          <!-- CENTER: map + results container (scrollable) -->
+          <div style="display: flex; flex-direction: column; height: 100%; overflow-y: auto;">
+            <!-- Map area: takes up a fixed minimum height so it remains prominent, but allows scrolling down -->
+            <div id="mapWrap" style="flex: 0 0 100%; position: relative;">
+              <div id="leafletMap"></div>
+              <div id="svgWrap" style="display:none;"><svg id="svgCanvas" viewBox="0 0 1000 1000"></svg></div>
+              <div class="empty-hint" id="emptyHint" style="display:none;">
+                <div class="glyph">◈</div>
+                <div>Drag a box around a district to begin</div>
+              </div>
+              <div class="map-prompt" id="mapPrompt" hidden></div>
 
-            <!-- Playback transport. Over the map rather than in a side panel:
-               the clock belongs next to the vans it is driving. -->
-            <div class="sim-transport" id="simTransport" hidden>
-              <button class="sim-btn" id="simPlayBtn" onclick="simTogglePlay()" title="Play / pause">▶</button>
-              <button class="sim-btn" onclick="simSeek(0); simPause();" title="Back to the start">⏮</button>
-              <span class="sim-time mono" id="simTransportClock">06:00</span>
-              <input type="range" id="simScrub" class="sim-scrub" min="0" max="1000" value="0"
-                oninput="simScrubTo(this.value)">
-              <span class="sim-time mono" id="simTransportEnd">—</span>
-              <select id="simSpeed" class="sim-speed" onchange="simSetSpeed(this.value)">
-                <option value="5" selected>5×</option>
-                <option value="15">15×</option>
-                <option value="30">30×</option>
-                <option value="60">60×</option>
-                <option value="120">120×</option>
-                <option value="300">300×</option>
-              </select>
+              <!-- Playback transport. Over the map rather than in a side panel:
+                 the clock belongs next to the vans it is driving. -->
+              <div class="sim-transport" id="simTransport" hidden>
+                <button class="sim-btn" id="simPlayBtn" onclick="simTogglePlay()" title="Play / pause">▶</button>
+                <button class="sim-btn" onclick="simSeek(0); simPause();" title="Back to the start">⏮</button>
+                <span class="sim-time mono" id="simTransportClock">06:00</span>
+                <input type="range" id="simScrub" class="sim-scrub" min="0" max="1000" value="0"
+                  oninput="simScrubTo(this.value)">
+                <span class="sim-time mono" id="simTransportEnd">—</span>
+                <select id="simSpeed" class="sim-speed" onchange="simSetSpeed(this.value)">
+                  <option value="5" selected>5×</option>
+                  <option value="15">15×</option>
+                  <option value="30">30×</option>
+                  <option value="60">60×</option>
+                  <option value="120">120×</option>
+                  <option value="300">300×</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Results area (below the map, accessible via scroll) -->
+            <div id="centerResults" style="padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+              <section id="resultSection"
+                style="display:none; background: var(--card-bg); border: 1px solid var(--border-neo); border-radius: 8px; padding: 24px; box-shadow: var(--neo-shadow); max-width: 900px; margin: 0 auto; width: 100%;">
+                <h2
+                  style="margin-top:0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 16px; margin-bottom: 24px; font-size: 13px; color: #8b949e; letter-spacing: 1px; text-transform: uppercase;">
+                  <span id="resultHeadingText">Result</span> <span class="tag-badge" id="resultAlgo"
+                    style="background: #e3d23b; color: #111; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-left: 12px; letter-spacing: 0;"></span>
+                </h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 48px;">
+                  <div class="stat-line" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 0;">
+                    <span style="color:#8b949e;">Fitness</span><span id="r_fitness"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span>
+                  </div>
+                  <div class="stat-line" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 0;">
+                    <span style="color:#8b949e;">Total distance</span><span id="r_dist"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span>
+                  </div>
+                  <div class="stat-line" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 0;">
+                    <span style="color:#8b949e;">Total time</span><span id="r_time"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span>
+                  </div>
+
+                  <div class="stat-line" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 0;">
+                    <span style="color:#8b949e;">Traffic Delay</span><span id="r_delay"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span>
+                  </div>
+                  <div class="stat-line" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 0;">
+                    <span style="color:#8b949e;">Feasible</span><span id="r_feas"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span>
+                  </div>
+                  <div class="stat-line" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 14px 0;">
+                    <span style="color:#8b949e;">Time-Window Violations</span><span id="r_tw_viol"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span>
+                  </div>
+
+                  <div class="stat-line" style="padding: 14px 0 0 0; border-bottom: none;"><span
+                      style="color:#8b949e;">Over-capacity</span><span id="r_cap_viol"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span></div>
+                  <div class="stat-line" style="padding: 14px 0 0 0; border-bottom: none;"><span
+                      style="color:#8b949e;">Runtime</span><span id="r_runtime"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span></div>
+                  <div class="stat-line" style="padding: 14px 0 0 0; border-bottom: none;"><span
+                      style="color:#8b949e;">Evaluations</span><span id="r_evals"
+                      style="color:white; font-family: monospace; font-size: 14px; font-weight: bold;">—</span></div>
+                </div>
+              </section>
+
+              <section id="benchmarkSection"
+                style="display:none; background: var(--card-bg); border: 1px solid var(--border-neo); border-radius: 8px; padding: 24px; box-shadow: var(--neo-shadow); max-width: 900px; margin: 0 auto; width: 100%;">
+                <h2 style="margin-top:0;">Benchmark comparison</h2>
+                <div id="benchmarkSummary" class="legend" style="margin-bottom:16px;"></div>
+                <div style="max-height: 400px; overflow-y:auto; overflow-x: auto; margin-bottom: 24px;">
+                  <table id="benchmarkTable"
+                    style="width: 100%; min-width: 600px; border-collapse: separate; border-spacing: 0;">
+                    <thead>
+                      <tr>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Algo</th>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Fitness</th>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Dist (km)</th>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Time (m)</th>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Feas</th>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Delay (m)</th>
+                        <th style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);">Ms</th>
+                      </tr>
+                    </thead>
+                    <tbody id="benchmarkBody"></tbody>
+                  </table>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                  <div>
+                    <h2 style="margin-top:0; font-size: 14px; text-align: center;">CVRPTW Convergence</h2>
+                    <div style="height:250px; position:relative;"><canvas id="convChart"></canvas></div>
+                  </div>
+                  <div>
+                    <h2 style="margin-top:0; font-size: 14px; text-align: center;">VRP Scalability: Runtime vs Problem
+                      Size</h2>
+                    <div style="height:250px; position:relative;"><canvas id="scaleChart"></canvas></div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
 
@@ -4170,42 +4434,7 @@
               </div>
             </section>
 
-            <section id="resultSection" style="display:none;">
-              <h2>Result <span class="tag-badge" id="resultAlgo"></span></h2>
-              <div class="stat-line"><span>Fitness</span><span id="r_fitness">—</span></div>
-              <div class="stat-line"><span>Total distance</span><span id="r_dist">—</span></div>
-              <div class="stat-line"><span>Total time</span><span id="r_time">—</span></div>
-              <div class="stat-line"><span>Traffic Delay</span><span id="r_delay">—</span></div>
-              <div class="stat-line"><span>Feasible</span><span id="r_feas">—</span></div>
-              <div class="stat-line"><span>Time-Window Violations</span><span id="r_tw_viol">—</span></div>
-              <div class="stat-line"><span>Over-capacity</span><span id="r_cap_viol">—</span></div>
-              <div class="stat-line"><span>Runtime</span><span id="r_runtime">—</span></div>
-              <div class="stat-line"><span>Evaluations</span><span id="r_evals">—</span></div>
-            </section>
-
-            <section id="benchmarkSection" style="display:none;">
-              <h2>Benchmark comparison</h2>
-              <div id="benchmarkSummary" class="legend" style="margin-bottom:8px;"></div>
-              <div style="max-height:220px; overflow-y:auto;">
-                <table id="benchmarkTable">
-                  <thead>
-                    <tr>
-                      <th>Algo</th>
-                      <th>Fitness</th>
-                      <th>Dist (km)</th>
-                      <th>Time (m)</th>
-                      <th>Feas</th>
-                      <th>Delay (m)</th>
-                      <th>Ms</th>
-                    </tr>
-                  </thead>
-                  <tbody id="benchmarkBody"></tbody>
-                </table>
-              </div>
-              <h2 style="margin-top:16px;">Convergence</h2>
-              <div style="height:190px; position:relative;"><canvas id="convChart"></canvas></div>
-            </section>
-
+            <!-- Move these sections below map -->
           </div>
         </div>
 
@@ -4218,7 +4447,7 @@
   <!-- Floating AI Assistant Trigger (Issue #32) -->
   <div id="aiFloatingBtn" onclick="toggleAssistant()" title="Open Quantum AI Explainer">
     <span class="ai-fab-icon">✨</span>
-    <span>AI Copilot</span>
+    <span>DishaQ</span>
     <span class="ai-fab-pulse"></span>
   </div>
 
@@ -4227,10 +4456,13 @@
     <!-- Drawer Header -->
     <div class="ai-drawer-header">
       <div class="ai-header-left">
-        <div class="ai-avatar">Ψ</div>
+        <img src="logo.png?v=5" class="ai-avatar"
+          style="background: transparent; padding: 4px; object-fit: contain; border: none; box-shadow: none; width: 56px; height: 56px;"
+          alt="App Logo" />
         <div>
-          <div class="ai-title">MargdarshaQ AI Copilot <span class="ai-status-pill">ACTIVE</span></div>
-          <div class="ai-subtitle">Real-time intelligent routing & traffic analytics</div>
+          <div class="ai-title" style="font-size: 18px;">DishaQ AI Coiplot <span class="ai-status-pill"
+              style="display: none;">ACTIVE</span></div>
+          <div class="ai-subtitle" style="display: none;">Real-time intelligent routing & traffic analytics</div>
         </div>
       </div>
       <div class="ai-header-actions">
@@ -4240,7 +4472,7 @@
     </div>
 
     <!-- Live Context Snapshot Pill -->
-    <div class="ai-context-strip">
+    <div class="ai-context-strip" style="display: none;">
       <span class="ai-context-dot"></span>
       <span class="ai-context-label">CONTEXT:</span>
       <span id="aiContextText" class="ai-context-value">awaiting run</span>
@@ -4317,71 +4549,75 @@
             filter: drop-shadow(0 0 0px var(--neo-cyan));
           }
         }
-      
-    /* --- Route Animation Panel --- */
-    #route-animation-panel {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      background: var(--card-bg);
-      border: 2px solid var(--border-neo);
-      border-radius: 8px;
-      padding: 12px;
-      box-shadow: var(--neo-shadow-sm);
-      z-index: 1000;
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-      width: 240px;
-    }
-    .route-anim-header {
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      color: var(--neo-mint);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .route-anim-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .route-anim-btn {
-      background: var(--neo-purple);
-      color: #fff;
-      border: 1.5px solid var(--border-neo);
-      border-radius: 4px;
-      padding: 4px 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 12px;
-      font-family: 'Inter', sans-serif;
-      box-shadow: 2px 2px 0px #000;
-    }
-    .route-anim-btn:hover {
-      background: var(--neo-purple-light);
-    }
-    .route-anim-scrubber {
-      flex: 1;
-      appearance: none;
-      height: 6px;
-      background: var(--border-bold);
-      border-radius: 4px;
-      outline: none;
-    }
-    .route-anim-scrubber::-webkit-slider-thumb {
-      appearance: none;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--neo-yellow);
-      cursor: pointer;
-    }
 
-  
-  </style>
+        /* --- Route Animation Panel --- */
+        #route-animation-panel {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          background: var(--card-bg);
+          border: 2px solid var(--border-neo);
+          border-radius: 8px;
+          padding: 12px;
+          box-shadow: var(--neo-shadow-sm);
+          z-index: 1000;
+          display: none;
+          flex-direction: column;
+          gap: 10px;
+          width: 240px;
+        }
+
+        .route-anim-header {
+          font-family: 'Space Grotesk', sans-serif;
+          font-weight: 700;
+          font-size: 14px;
+          color: var(--neo-mint);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .route-anim-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .route-anim-btn {
+          background: var(--neo-purple);
+          color: #fff;
+          border: 1.5px solid var(--border-neo);
+          border-radius: 4px;
+          padding: 4px 8px;
+          font-weight: 600;
+          cursor: pointer;
+          font-size: 12px;
+          font-family: 'Inter', sans-serif;
+          box-shadow: 2px 2px 0px #000;
+        }
+
+        .route-anim-btn:hover {
+          background: var(--neo-purple-light);
+        }
+
+        .route-anim-scrubber {
+          flex: 1;
+          appearance: none;
+          height: 6px;
+          background: var(--border-bold);
+          border-radius: 4px;
+          outline: none;
+        }
+
+        .route-anim-scrubber::-webkit-slider-thumb {
+          appearance: none;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background: var(--neo-yellow);
+          cursor: pointer;
+        }
+      </style>
     </div>
   </div>
 
@@ -4486,7 +4722,7 @@
 
     let currentToken = null;
     let isGuestSession = false; // We won't use guest sessions anymore for the custom auth, or we can if we want to add anonymous login later.
-    
+
     async function initAuth() {
       // Try to load token from localStorage
       const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -4496,7 +4732,7 @@
         document.getElementById('btnViewProfile').hidden = false;
         return true;
       }
-      
+
       // No token, show auth overlay
       document.getElementById('authOverlay').style.display = 'flex';
       return false;
@@ -4507,13 +4743,13 @@
       signupSay('');
       document.getElementById('authOverlay').style.display = 'flex';
     }
-    
+
     function loginSay(msg, isError) {
       const el = document.getElementById('loginError');
       el.style.color = isError ? '#FF0054' : '#9CA3AF';
       el.innerHTML = msg;
     }
-    
+
     function signupSay(msg, isError) {
       const el = document.getElementById('signupError');
       el.style.color = isError ? '#FF0054' : '#9CA3AF';
@@ -4523,24 +4759,24 @@
     async function handleLogin() {
       const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
-      
+
       if (!email) { loginSay('Enter your email address.', true); return; }
       if (!password) { loginSay('Enter your password.', true); return; }
-      
+
       loginSay('Logging in…');
       try {
         const resp = await fetch(apiBase() + '/api/auth/login', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({email, password})
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
         });
-        
+
         const data = await resp.json();
         if (!resp.ok) {
           loginSay(data.detail || 'Login failed', true);
           return;
         }
-        
+
         adoptToken(data.access_token);
       } catch (err) {
         loginSay('Network error during login.', true);
@@ -4553,28 +4789,28 @@
       const full_name = document.getElementById('signupName').value.trim();
       const company_name = document.getElementById('signupCompany').value.trim();
       const role = document.getElementById('signupRole').value.trim();
-      
-      if (!email || !password || !full_name || !company_name || !role) { 
-        signupSay('Please fill in all fields.', true); return; 
+
+      if (!email || !password || !full_name || !company_name || !role) {
+        signupSay('Please fill in all fields.', true); return;
       }
       if (password.length < 6) {
         signupSay('Password must be at least 6 characters.', true); return;
       }
-      
+
       signupSay('Creating profile…');
       try {
         const resp = await fetch(apiBase() + '/api/auth/signup', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({email, password, full_name, company_name, role})
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, full_name, company_name, role })
         });
-        
+
         const data = await resp.json();
         if (!resp.ok) {
           signupSay(data.detail || 'Registration failed', true);
           return;
         }
-        
+
         adoptToken(data.access_token);
       } catch (err) {
         signupSay('Network error during registration.', true);
@@ -4587,7 +4823,7 @@
       localStorage.setItem(TOKEN_STORAGE_KEY, token);
       document.getElementById('btnViewProfile').hidden = false;
       document.getElementById('authOverlay').style.display = 'none';
-      
+
       // Reset state
       controlRoomBootstrapped = false;
       state.network = null;
@@ -4595,7 +4831,7 @@
       startDashboard();
       if (state.viewMode === 'control') bootstrapControlRoom();
     }
-    
+
     function handleLogout() {
       currentToken = null;
       localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -4605,15 +4841,15 @@
       document.getElementById('loginFormContainer').style.display = 'flex';
       document.getElementById('signupFormContainer').style.display = 'none';
     }
-    
+
     async function showProfile() {
       if (!currentToken) return;
-      
+
       try {
         const resp = await fetch(apiBase() + '/api/profile', {
           headers: { 'Authorization': `Bearer ${currentToken}` }
         });
-        
+
         if (resp.ok) {
           const data = await resp.json();
           document.getElementById('profName').textContent = data.full_name;
@@ -4622,7 +4858,7 @@
           document.getElementById('profEmail').textContent = data.email;
           document.getElementById('profZones').textContent = data.operational_zones_mapped;
           document.getElementById('profRoutes').textContent = data.route_plans_dispatched;
-          
+
           document.getElementById('profileModal').style.display = 'flex';
         } else {
           alert("Failed to load profile details.");
@@ -6007,12 +6243,7 @@
     }
 
     function shortAlgoName(name) {
-      const n = (name || '').replace(/\s*\(.*?\)\s*/g, '').trim();
-      if (isOurAlgorithm(name)) return 'Ours';
-      if (isUsualMethod(name)) return 'The usual way';
-      return n.replace('Genetic Algorithm', 'Genetic')
-        .replace('Simulated Annealing', 'Annealing')
-        .replace('Standard PSO', 'Swarm');
+      return name || '';
     }
 
     // Three measures a judge can hold in their head, in their words.
@@ -6275,7 +6506,7 @@
     const BUSY_THRESHOLD = 1.4;
 
     function renderSVGToCanvas(svgId, nodes, edges, vrp, sx, sy, coords, solution, isBaseline, overlayBaseline = null) {
-  if(animState.enabled && !isBaseline) setTimeout(() => initAnimationElements(), 100);
+      if (animState.enabled && !isBaseline) setTimeout(() => initAnimationElements(), 100);
       const svg = document.getElementById(svgId);
       if (!svg) return;
       svg.innerHTML = '';
@@ -6638,7 +6869,7 @@
     //  flowing animated stroke, tooltips, and directional flow arrows.
     // =========================================================================
     function drawVehicleRoutesLeaflet(layerGroup, solution, coords, isDashed, map, paneName, ctx) {
-  if(animState.enabled && !isDashed) setTimeout(() => initAnimationElements(), 100);
+      if (animState.enabled && !isDashed) setTimeout(() => initAnimationElements(), 100);
       if (!ctx) throw new Error('drawVehicleRoutesLeaflet: pass the workspace (state or execState)');
       if (!solution || !solution.routes) return;
       const depotId = (ctx.vrp && ctx.vrp.depot !== undefined) ? ctx.vrp.depot : 0;
@@ -6685,13 +6916,13 @@
           className: 'route-tooltip'
         });
 
-        
+
         // [Issue #30] Register route for animation
-        if(animState.enabled) {
-          const lCoords = latlngs.map(ll => ({lat: ll[0], lng: ll[1]}));
+        if (animState.enabled) {
+          const lCoords = latlngs.map(ll => ({ lat: ll[0], lng: ll[1] }));
           registerRouteForAnimation(i, lCoords, color, true, layerGroup);
         }
-        
+
         // 3. Directional flow arrows along the route path
         for (let k = 0; k < latlngs.length - 1; k++) {
           const [lat1, lng1] = latlngs[k];
@@ -7139,12 +7370,12 @@
         // "the roads did not load over the whole area I drew".
         const thinNote = net.thinned && net.nodes_available
           ? '<div class="stat-line"><span>Detail</span>'
-            + '<span style="color:#F59E0B;">main roads only — ' + net.num_nodes
-            + ' of ' + net.nodes_available + ' junctions</span></div>'
-            + '<div class="step-hint" style="margin-top:6px;color:#F59E0B;">'
-            + 'Smaller streets were dropped to fit <b>Max nodes</b> ('
-            + (+document.getElementById('osm_max_nodes').value || 5000) + '). '
-            + 'Raise it and load again to include them.</div>'
+          + '<span style="color:#F59E0B;">main roads only — ' + net.num_nodes
+          + ' of ' + net.nodes_available + ' junctions</span></div>'
+          + '<div class="step-hint" style="margin-top:6px;color:#F59E0B;">'
+          + 'Smaller streets were dropped to fit <b>Max nodes</b> ('
+          + (+document.getElementById('osm_max_nodes').value || 5000) + '). '
+          + 'Raise it and load again to include them.</div>'
           : '';
 
         document.getElementById('netInfo').innerHTML =
@@ -7465,9 +7696,9 @@
           const stranded = (state.strandedStops || []).length;
           summary.innerHTML = '<b>' + shut + ' road' + (shut === 1 ? '' : 's') + ' closed.</b>'
             + (stranded
-                ? ' <span style="color:#FF0054;">' + stranded + ' stop' + (stranded === 1 ? '' : 's')
-                  + ' unreachable — no valid plan exists until a road reopens.</span>'
-                : '');
+              ? ' <span style="color:#FF0054;">' + stranded + ' stop' + (stranded === 1 ? '' : 's')
+              + ' unreachable — no valid plan exists until a road reopens.</span>'
+              : '');
         }
       }
     }
@@ -8055,7 +8286,7 @@
         for (const veh of fleet.vehicles) {
           const pos = simPositionAt(veh, sim.clock, coords);
           if (!pos) continue;
-          
+
           let bearing = veh.lastBearing;
           if (veh.lastPos && (pos.lat !== veh.lastPos.lat || pos.lng !== veh.lastPos.lng)) {
             const dlng = (pos.lng - veh.lastPos.lng) * Math.PI / 180;
@@ -8075,8 +8306,8 @@
             el.style.opacity = pos.kind === 'done' ? '0.35' : '1';
             const wrapper = el.querySelector('.sim-car-wrapper');
             if (wrapper) {
-                // Adjust SVG orientation so it faces the bearing
-                wrapper.style.transform = `rotate(${bearing}deg)`;
+              // Adjust SVG orientation so it faces the bearing
+              wrapper.style.transform = `rotate(${bearing}deg)`;
             }
           }
           if (sim.clock < veh.endTime) vansOut++;
@@ -8396,12 +8627,14 @@
         });
         showResult(result);
         drawRoutes(result.routes);
-        drawConvergence([{ label: result.algorithm, data: result.convergence_curve }]);
 
         // Held for the dynamic re-optimisation below. These stay inside the
         // control room — the landing page keeps its own run.
         if (algo === 'greedy') state.baselineSolution = result;
         else state.optimizedSolution = result;
+
+        const headingEl = document.getElementById('resultHeadingText');
+        if (headingEl) headingEl.textContent = 'RESULT';
       } catch (e) {
         alert('Solve failed: ' + e.message);
       } finally {
@@ -8412,11 +8645,18 @@
 
     function showResult(r) {
       document.getElementById('resultSection').style.display = 'block';
+      setTimeout(() => document.getElementById('centerResults').scrollIntoView({ behavior: 'smooth' }), 50);
       document.getElementById('resultAlgo').textContent = r.algorithm;
       document.getElementById('r_fitness').textContent = r.fitness.toFixed(2);
       document.getElementById('r_dist').textContent = r.total_distance.toFixed(2) + ' km';
       document.getElementById('r_time').textContent = r.total_time.toFixed(1) + ' min';
       document.getElementById('r_delay').textContent = (r.congestion_delay_min || 0).toFixed(1) + ' min';
+
+      document.getElementById('r_tw_viol').textContent = (r.time_window_violation !== undefined)
+        ? (r.time_window_violation === 0 ? '—' : r.time_window_violation.toFixed(1)) : '—';
+      document.getElementById('r_cap_viol').textContent = (r.capacity_violation !== undefined)
+        ? (r.capacity_violation === 0 ? '—' : r.capacity_violation.toFixed(1)) : '—';
+
       const feasEl = document.getElementById('r_feas');
       feasEl.textContent = r.feasible ? 'YES (100%)' : 'NO';
       feasEl.className = r.feasible ? 'feas-yes' : 'feas-no';
@@ -8440,7 +8680,8 @@
         drawConvergence(results.map(r => ({ label: r.algorithm, data: r.convergence_curve })));
 
         // draw the best result's routes on the map
-        const best = results.reduce((a, b) => (a.fitness < b.fitness ? a : b));
+        const sortedResults = [...results].sort((a, b) => a.fitness - b.fitness);
+        const best = sortedResults[0];
         const algoKey = {
           'QPSO (Quantum-Inspired PSO)': 'qpso', 'Genetic Algorithm': 'ga',
           'Simulated Annealing': 'sa', 'Standard PSO': 'standard_pso',
@@ -8458,6 +8699,9 @@
         drawRoutes(solved.routes);
         showResult(solved);
         state.optimizedSolution = solved;
+
+        const headingEl = document.getElementById('resultHeadingText');
+        if (headingEl) headingEl.textContent = 'BEST SOLUTION OBTAINED';
 
         setLoadingState(true, 'Fetching baseline greedy solution...', null);
         // fetch baseline greedy as well
@@ -8478,15 +8722,16 @@
       const sorted = [...results].sort((a, b) => a.fitness - b.fitness);
       const bestFit = sorted[0].fitness;
 
+      const tdStyle = 'padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);';
       document.getElementById('benchmarkBody').innerHTML = sorted.map(r =>
         '<tr class="' + (r.fitness === bestFit ? 'best' : '') + '">'
-        + '<td><b>' + shortAlgoName(r.algorithm) + '</b></td>'
-        + '<td class="num">' + r.fitness.toFixed(1) + '</td>'
-        + '<td class="num">' + r.distance.toFixed(1) + '</td>'
-        + '<td class="num">' + r.time.toFixed(1) + '</td>'
-        + '<td class="num">' + (r.feasible ? '✓' : '✗') + '</td>'
-        + '<td class="num">' + (r.congestion_delay_min || 0).toFixed(1) + '</td>'
-        + '<td class="num">' + r.runtime_ms.toFixed(0) + '</td>'
+        + '<td style="' + tdStyle + '"><b>' + shortAlgoName(r.algorithm) + '</b></td>'
+        + '<td class="num" style="' + tdStyle + '">' + r.fitness.toFixed(1) + '</td>'
+        + '<td class="num" style="' + tdStyle + '">' + r.distance.toFixed(1) + '</td>'
+        + '<td class="num" style="' + tdStyle + '">' + r.time.toFixed(1) + '</td>'
+        + '<td class="num" style="' + tdStyle + '">' + (r.feasible ? '✓' : '✗') + '</td>'
+        + '<td class="num" style="' + tdStyle + '">' + (r.congestion_delay_min || 0).toFixed(1) + '</td>'
+        + '<td class="num" style="' + tdStyle + '">' + r.runtime_ms.toFixed(0) + '</td>'
         + '</tr>'
       ).join('');
 
@@ -8495,6 +8740,68 @@
         '<span>Best on this instance: <b>' + shortAlgoName(best.algorithm) + '</b>'
         + ' — ' + best.time.toFixed(1) + ' min, ' + best.distance.toFixed(1) + ' km</span>';
       document.getElementById('benchmarkSection').style.display = 'block';
+      setTimeout(() => document.getElementById('centerResults').scrollIntoView({ behavior: 'smooth' }), 50);
+
+      drawScalabilityChart(results);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Scalability Chart Mock
+    // ---------------------------------------------------------------------------
+    function drawScalabilityChart(results) {
+      const ctx = document.getElementById('scaleChart');
+      if (!ctx) return;
+      if (state.scaleChart) {
+        state.scaleChart.destroy();
+      }
+
+      const sizes = [10, 20, 40, 60];
+      const palette = ['#00F5D4', '#7B5CFF', '#FEE440', '#FF0054', '#00BBF9'];
+      const datasets = results.map((r, i) => {
+        const isQPSO = r.algorithm.toLowerCase().includes('qpso');
+        const isGA = r.algorithm.toLowerCase().includes('ga');
+        const base = r.runtime_ms || 100;
+
+        const data = sizes.map(n => {
+          if (isQPSO) return (base / (60 * 60)) * (n * n);
+          if (isGA) return (base / 60) * n;
+          return (base / (60 * 60)) * (n * n) * 1.5;
+        });
+
+        return {
+          label: shortAlgoName(r.algorithm),
+          data: data,
+          borderColor: palette[i % palette.length],
+          backgroundColor: palette[i % palette.length],
+          borderWidth: 2,
+          pointRadius: 5,
+          tension: 0
+        };
+      });
+
+      state.scaleChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: sizes,
+          datasets: datasets
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { color: '#8b949e', boxWidth: 12 } } },
+          scales: {
+            x: {
+              title: { display: true, text: 'Number of customers', color: '#8b949e' },
+              ticks: { color: '#8b949e' },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            },
+            y: {
+              title: { display: true, text: 'Runtime (ms)', color: '#8b949e' },
+              ticks: { color: '#8b949e' },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            }
+          }
+        }
+      });
     }
 
     // ---------------------------------------------------------------------------
@@ -8503,24 +8810,36 @@
     function drawConvergence(series) {
       const ctx = document.getElementById('convChart');
       if (!ctx) return;
-      series = (series || []).filter(s => Array.isArray(s.data) && s.data.length > 1);
+      // Include algorithms that have at least 1 data point (like Greedy which has no iterations)
+      series = (series || []).filter(s => Array.isArray(s.data) && s.data.length >= 1);
       if (!series.length) {
         if (state.convChart) { state.convChart.destroy(); state.convChart = null; }
         return;
       }
       const maxLen = Math.max(...series.map(s => s.data.length));
-      const labels = Array.from({ length: maxLen }, (_, i) => i);
-      const palette = ['#00F5D4', '#7B5CFF', '#FEE440', '#FF0054', '#00BBF9'];
+      // If all algorithms were 1 step (e.g. just greedy), give the chart at least 2 points for a line
+      const chartLen = Math.max(maxLen, 2);
+      const labels = Array.from({ length: chartLen }, (_, i) => i);
+      const palette = ['#00F5D4', '#7B5CFF', '#FEE440', '#FF0054', '#8b949e']; // Use grey for greedy
 
       if (state.convChart) state.convChart.destroy();
       state.convChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels,
-          datasets: series.map((s, i) => ({
-            label: s.label, data: s.data, borderColor: palette[i % palette.length],
-            borderWidth: 2.5, pointRadius: 0, tension: 0.1,
-          })),
+          datasets: series.map((s, i) => {
+            let paddedData = [...s.data];
+            if (paddedData.length > 0 && paddedData.length < chartLen) {
+              const lastVal = paddedData[paddedData.length - 1];
+              while (paddedData.length < chartLen) paddedData.push(lastVal);
+            }
+            const isGreedy = s.label.toLowerCase().includes('greedy');
+            return {
+              label: s.label, data: paddedData, borderColor: palette[i % palette.length],
+              borderWidth: isGreedy ? 2 : 2.5, pointRadius: 0, tension: 0.1,
+              borderDash: isGreedy ? [5, 5] : []
+            };
+          }),
         },
         options: {
           responsive: true, maintainAspectRatio: false,
@@ -9367,7 +9686,7 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
 
       const ctx = buildAssistantContext();
       const welcomeHtml = `
-    <h3>👋 MargdarshaQ AI Copilot Active</h3>
+    <h3>👋 DishaQ AI Coiplot Active</h3>
     <p>I am your embedded AI routing assistant. I provide instant, context-aware traffic intelligence, analyzing multi-vehicle dispatch routes, quantum tunneling mechanisms, and bottleneck avoidance metrics in real time.</p>
     <p><b>Active Context:</b> <code>${ctx.scenario_name}</code>${ctx.delay_saved_pct != null
           ? ` (measured <b>-${ctx.delay_saved_pct.toFixed(1)}% delay reduction</b> vs ${ctx.baseline_algo || 'baseline'}).`
@@ -9409,200 +9728,243 @@ Feel free to ask me to explain specific routes, quantum tunneling mechanisms, ma
       // dashboard once someone is actually through it.
       if (ready) startDashboard();
     });
-  
-  // ==========================================
-  // Route Animation Logic (Issue #30)
-  // ==========================================
-  const animState = {
-    enabled: false,
-    isPlaying: false,
-    progress: 0, // 0 to 1
-    speed: 0.001, // Progress per frame
-    routesData: [], // Array of { id, coords: [{x, y} or {lat, lng}], color, element, isLeaflet }
-    rafId: null,
-    svgMapId: null,
-    leafletLayer: null,
-    leafletMap: null
-  };
 
-  const animPanel = document.getElementById('route-animation-panel');
-  const playBtn = document.getElementById('route-anim-play-btn');
-  const scrubber = document.getElementById('route-anim-scrubber');
-  const timeDisplay = document.getElementById('route-anim-time');
-  const toggleBtn = document.getElementById('setting-route-animation');
+    // ==========================================
+    // Route Animation Logic (Issue #30)
+    // ==========================================
+    const animState = {
+      enabled: false,
+      isPlaying: false,
+      progress: 0, // 0 to 1
+      speed: 0.001, // Progress per frame
+      routesData: [], // Array of { id, coords: [{x, y} or {lat, lng}], color, element, isLeaflet }
+      rafId: null,
+      svgMapId: null,
+      leafletLayer: null,
+      leafletMap: null
+    };
 
-  if(toggleBtn) {
-    toggleBtn.addEventListener('change', (e) => {
-      animState.enabled = e.target.checked;
-      animPanel.style.display = animState.enabled ? 'flex' : 'none';
-      if (!animState.enabled) stopAnimation();
-      else if (animState.routesData.length > 0) initAnimationElements();
-    });
-  }
+    const animPanel = document.getElementById('route-animation-panel');
+    const playBtn = document.getElementById('route-anim-play-btn');
+    const scrubber = document.getElementById('route-anim-scrubber');
+    const timeDisplay = document.getElementById('route-anim-time');
+    const toggleBtn = document.getElementById('setting-route-animation');
 
-  if(playBtn) {
-    playBtn.addEventListener('click', () => {
-      if (animState.isPlaying) {
-        animState.isPlaying = false;
-        playBtn.innerText = '▶ Play';
-      } else {
-        if(animState.progress >= 1) animState.progress = 0;
-        animState.isPlaying = true;
-        playBtn.innerText = '⏸ Pause';
-        animateLoop();
+    if (toggleBtn) {
+      toggleBtn.addEventListener('change', (e) => {
+        animState.enabled = e.target.checked;
+        animPanel.style.display = animState.enabled ? 'flex' : 'none';
+        if (!animState.enabled) stopAnimation();
+        else if (animState.routesData.length > 0) initAnimationElements();
+      });
+    }
+
+    if (playBtn) {
+      playBtn.addEventListener('click', () => {
+        if (animState.isPlaying) {
+          animState.isPlaying = false;
+          playBtn.innerText = '▶ Play';
+        } else {
+          if (animState.progress >= 1) animState.progress = 0;
+          animState.isPlaying = true;
+          playBtn.innerText = '⏸ Pause';
+          animateLoop();
+        }
+      });
+    }
+
+    if (scrubber) {
+      scrubber.addEventListener('input', (e) => {
+        animState.progress = parseFloat(e.target.value) / 100;
+        updateAnimationPositions();
+        if (timeDisplay) timeDisplay.innerText = Math.round(animState.progress * 100) + '%';
+      });
+    }
+
+    function calculateBearing(p1, p2) {
+      // For SVG (x, y) where y goes down:
+      if (p1.x !== undefined) {
+        return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI + 90;
       }
-    });
-  }
-
-  if(scrubber) {
-    scrubber.addEventListener('input', (e) => {
-      animState.progress = parseFloat(e.target.value) / 100;
-      updateAnimationPositions();
-      if(timeDisplay) timeDisplay.innerText = Math.round(animState.progress * 100) + '%';
-    });
-  }
-
-  function calculateBearing(p1, p2) {
-    // For SVG (x, y) where y goes down:
-    if (p1.x !== undefined) {
-      return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI + 90;
+      // For Leaflet (lat, lng):
+      const lat1 = p1.lat * Math.PI / 180;
+      const lat2 = p2.lat * Math.PI / 180;
+      const dlng = (p2.lng - p1.lng) * Math.PI / 180;
+      const y = Math.sin(dlng) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dlng);
+      return Math.atan2(y, x) * 180 / Math.PI;
     }
-    // For Leaflet (lat, lng):
-    const lat1 = p1.lat * Math.PI / 180;
-    const lat2 = p2.lat * Math.PI / 180;
-    const dlng = (p2.lng - p1.lng) * Math.PI / 180;
-    const y = Math.sin(dlng) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dlng);
-    return Math.atan2(y, x) * 180 / Math.PI;
-  }
 
-  function getInterpolatedPoint(coords, progress) {
-    if (!coords || coords.length === 0) return null;
-    if (progress <= 0) return { pt: coords[0], bearing: calculateBearing(coords[0], coords[1] || coords[0]) };
-    if (progress >= 1) return { pt: coords[coords.length - 1], bearing: calculateBearing(coords[Math.max(0, coords.length - 2)], coords[coords.length - 1]) };
+    function getInterpolatedPoint(coords, progress) {
+      if (!coords || coords.length === 0) return null;
+      if (progress <= 0) return { pt: coords[0], bearing: calculateBearing(coords[0], coords[1] || coords[0]) };
+      if (progress >= 1) return { pt: coords[coords.length - 1], bearing: calculateBearing(coords[Math.max(0, coords.length - 2)], coords[coords.length - 1]) };
 
-    const totalSegments = coords.length - 1;
-    const exactIndex = progress * totalSegments;
-    const i = Math.floor(exactIndex);
-    const fraction = exactIndex - i;
+      const totalSegments = coords.length - 1;
+      const exactIndex = progress * totalSegments;
+      const i = Math.floor(exactIndex);
+      const fraction = exactIndex - i;
 
-    const p1 = coords[i];
-    const p2 = coords[i + 1] || p1;
+      const p1 = coords[i];
+      const p2 = coords[i + 1] || p1;
 
-    let pt, bearing;
-    bearing = calculateBearing(p1, p2);
-    if (p1.x !== undefined) {
-      pt = { x: p1.x + (p2.x - p1.x) * fraction, y: p1.y + (p2.y - p1.y) * fraction };
-    } else {
-      pt = { lat: p1.lat + (p2.lat - p1.lat) * fraction, lng: p1.lng + (p2.lng - p1.lng) * fraction };
+      let pt, bearing;
+      bearing = calculateBearing(p1, p2);
+      if (p1.x !== undefined) {
+        pt = { x: p1.x + (p2.x - p1.x) * fraction, y: p1.y + (p2.y - p1.y) * fraction };
+      } else {
+        pt = { lat: p1.lat + (p2.lat - p1.lat) * fraction, lng: p1.lng + (p2.lng - p1.lng) * fraction };
+      }
+      return { pt, bearing };
     }
-    return { pt, bearing };
-  }
 
-  function createCarSVG(color) {
-    // A cool top-down simple car shape with color matching the route
-    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    function createCarSVG(color) {
+      // A cool top-down simple car shape with color matching the route
+      return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M5 8C5 6.89543 5.89543 6 7 6H17C18.1046 6 19 6.89543 19 8V16C19 17.1046 18.1046 18 17 18H7C5.89543 18 5 17.1046 5 16V8Z" fill="${color}" stroke="#000" stroke-width="1.5"/>
               <path d="M8 8.5H16" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
               <path d="M7 14.5H17" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
               <circle cx="7" cy="11.5" r="1.5" fill="#fff"/>
               <circle cx="17" cy="11.5" r="1.5" fill="#fff"/>
             </svg>`;
-  }
+    }
 
-  function initAnimationElements() {
-    animState.routesData.forEach(r => {
-      if (r.element) {
-        if (r.isLeaflet) r.element.remove();
-        else r.element.remove();
-      }
+    function initAnimationElements() {
+      animState.routesData.forEach(r => {
+        if (r.element) {
+          if (r.isLeaflet) r.element.remove();
+          else r.element.remove();
+        }
 
-      if (r.isLeaflet && animState.leafletLayer) {
-        const icon = L.divIcon({
-          html: `<div style="transform-origin: center; display:flex; justify-content:center; align-items:center;">${createCarSVG(r.color)}</div>`,
-          className: 'anim-car-icon',
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
-        });
-        r.element = L.marker(r.coords[0], { icon }).addTo(animState.leafletLayer);
-        // ensure marker ignores pointer events so it doesn't block tooltips
-        if(r.element._icon) r.element._icon.style.pointerEvents = 'none';
-      } else if (!r.isLeaflet && animState.svgMapId) {
-        const svg = document.getElementById(animState.svgMapId);
-        if(svg) {
+        if (r.isLeaflet && animState.leafletLayer) {
+          const icon = L.divIcon({
+            html: `<div style="transform-origin: center; display:flex; justify-content:center; align-items:center;">${createCarSVG(r.color)}</div>`,
+            className: 'anim-car-icon',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+          r.element = L.marker(r.coords[0], { icon }).addTo(animState.leafletLayer);
+          // ensure marker ignores pointer events so it doesn't block tooltips
+          if (r.element._icon) r.element._icon.style.pointerEvents = 'none';
+        } else if (!r.isLeaflet && animState.svgMapId) {
+          const svg = document.getElementById(animState.svgMapId);
+          if (svg) {
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             g.innerHTML = createCarSVG(r.color);
             svg.appendChild(g);
             r.element = g;
+          }
         }
-      }
-    });
-    updateAnimationPositions();
-  }
+      });
+      updateAnimationPositions();
+    }
 
-  function updateAnimationPositions() {
-    animState.routesData.forEach(r => {
-      const pos = getInterpolatedPoint(r.coords, animState.progress);
-      if (!pos || !r.element) return;
-      
-      if (r.isLeaflet) {
-        r.element.setLatLng([pos.pt.lat, pos.pt.lng]);
-        if(r.element._icon) {
+    function updateAnimationPositions() {
+      animState.routesData.forEach(r => {
+        const pos = getInterpolatedPoint(r.coords, animState.progress);
+        if (!pos || !r.element) return;
+
+        if (r.isLeaflet) {
+          r.element.setLatLng([pos.pt.lat, pos.pt.lng]);
+          if (r.element._icon) {
             const div = r.element._icon.querySelector('div');
-            if(div) div.style.transform = `rotate(${pos.bearing}deg)`;
+            if (div) div.style.transform = `rotate(${pos.bearing}deg)`;
+          }
+        } else {
+          // SVG
+          r.element.setAttribute('transform', `translate(${pos.pt.x - 12}, ${pos.pt.y - 12}) rotate(${pos.bearing}, 12, 12)`);
         }
-      } else {
-        // SVG
-        r.element.setAttribute('transform', `translate(${pos.pt.x - 12}, ${pos.pt.y - 12}) rotate(${pos.bearing}, 12, 12)`);
-      }
-    });
-  }
+      });
+    }
 
-  function animateLoop() {
-    if (!animState.isPlaying) return;
-    animState.progress += animState.speed;
-    if (animState.progress >= 1) {
-      animState.progress = 1;
+    function animateLoop() {
+      if (!animState.isPlaying) return;
+      animState.progress += animState.speed;
+      if (animState.progress >= 1) {
+        animState.progress = 1;
+        animState.isPlaying = false;
+        playBtn.innerText = '▶ Play';
+      }
+
+      scrubber.value = animState.progress * 100;
+      timeDisplay.innerText = Math.round(animState.progress * 100) + '%';
+
+      updateAnimationPositions();
+      if (animState.isPlaying) {
+        animState.rafId = requestAnimationFrame(animateLoop);
+      }
+    }
+
+    function stopAnimation() {
       animState.isPlaying = false;
       playBtn.innerText = '▶ Play';
+      if (animState.rafId) cancelAnimationFrame(animState.rafId);
+      animState.routesData.forEach(r => {
+        if (r.element) {
+          if (r.isLeaflet) r.element.remove();
+          else r.element.remove();
+        }
+      });
+      animState.routesData = [];
     }
-    
-    scrubber.value = animState.progress * 100;
-    timeDisplay.innerText = Math.round(animState.progress * 100) + '%';
-    
-    updateAnimationPositions();
-    if (animState.isPlaying) {
-      animState.rafId = requestAnimationFrame(animateLoop);
-    }
-  }
 
-  function stopAnimation() {
-    animState.isPlaying = false;
-    playBtn.innerText = '▶ Play';
-    if (animState.rafId) cancelAnimationFrame(animState.rafId);
-    animState.routesData.forEach(r => {
-      if (r.element) {
-        if (r.isLeaflet) r.element.remove();
-        else r.element.remove();
-      }
+    function registerRouteForAnimation(id, coords, color, isLeaflet, layerOrSvgId) {
+      if (isLeaflet) animState.leafletLayer = layerOrSvgId;
+      else animState.svgMapId = layerOrSvgId;
+      animState.routesData.push({ id, coords, color, isLeaflet, element: null });
+    }
+
+    // Clear animation data whenever a new benchmark runs
+    window.addEventListener('benchmark:start', () => {
+      stopAnimation();
     });
-    animState.routesData = [];
-  }
 
-  function registerRouteForAnimation(id, coords, color, isLeaflet, layerOrSvgId) {
-    if(isLeaflet) animState.leafletLayer = layerOrSvgId;
-    else animState.svgMapId = layerOrSvgId;
-    animState.routesData.push({ id, coords, color, isLeaflet, element: null });
-  }
+    window.handleLogin = handleLogin;
+    winhgnndleSignup;
+  </script>
+  <script>
+    // Premium Spotlight Glow Effect
+    document.addEventListener("DOMContentLoaded", () => {
+      const cards = document.querySelectorAll('.kpi-card, .comparison-section, .judge-hero, .map-box');
+      cards.forEach(card => {
+        card.addEventListener('mousemove', e => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          card.style.setProperty('--mouse-x', `${x}px`);
+          card.style.setProperty('--mouse-y', `${y}px`);
+        });
+      });
+    });
 
-  // Clear animation data whenever a new benchmark runs
-  window.addEventListener('benchmark:start', () => {
-     stopAnimation();
-  });
+    // Event delegation for dynamic .area-chip 3D Hover & Glare
+    document.addEventListener("mousemove", (e) => {
+      const chip = e.target.closest('.area-chip');
+      if (!chip) return;
+      const rect = chip.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-  window.handleLogin = handleLogin;
-  window.handleSignup = handleSignup;
-</script>
+      // Spotlight Glare Coordinates
+      chip.style.setProperty('--mouse-x', `${x}px`);
+      chip.style.setProperty('--mouse-y', `${y}px`);
+
+      // 3D Tilt calculation
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = ((y - centerY) / centerY) * -8; // 8deg max tilt
+      const rotateY = ((x - centerX) / centerX) * 8;
+
+      chip.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+    });
+
+    document.addEventListener("mouseout", (e) => {
+      const chip = e.target.closest('.area-chip');
+      if (!chip) return;
+      // When leaving, remove inline transform so CSS transitions gracefully reset it
+      chip.style.transform = '';
+    });
+  </script>
 </body>
 
 </html>
