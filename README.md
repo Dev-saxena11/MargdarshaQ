@@ -193,6 +193,36 @@ Copy [`.env.example`](.env.example) to `.env` and set `OPENROUTER_API_KEY`.
 Architecture and the no-fabrication rule are documented in
 [docs/AI_ASSISTANT.md](docs/AI_ASSISTANT.md).
 
+## The mathematical model
+
+The problem is a CVRPTW: a capacitated vehicle routing problem with time
+windows, over a time-dependent road graph. The formal model — decision
+variables, the objective function, and the capacity, time-window and flow
+constraints as equations — is in
+[docs/FORMULATION.md](docs/FORMULATION.md).
+
+What is minimised, in short:
+
+$$\mathcal{F} \;=\; w_T \cdot T_{\text{total}} \;+\; w_D \cdot D_{\text{total}} \;+\; \lambda_{\text{cap}} \cdot \mathcal{P}_{\text{cap}} \;+\; \lambda_{\text{time}} \cdot \mathcal{P}_{\text{time}} \;+\; \lambda_{\text{idle}} \cdot \mathcal{P}_{\text{idle}}$$
+
+It is bi-objective — fleet time against distance driven, $w_T = 0.6$ and
+$w_D = 0.4$ by default — with capacity and time-window violations handled as
+soft penalties so the swarm can cross an infeasible region rather than being
+walled out of it. The weights live on the problem instance, not on a solver, so
+a benchmark that scores something else (Solomon's set is judged on distance
+alone) is answered on its own terms.
+
+Every solver here — QPSO, GA, SA, PSO and the greedy baselines — reaches that
+objective through one implementation, `evaluate_solution` in
+[`app/core/vrp_problem.py`](app/core/vrp_problem.py), so there is a single place
+where they all agree on what "better" means.
+
+The document is checked against that implementation by
+[`tests/test_formulation_matches_code.py`](tests/test_formulation_matches_code.py),
+which transcribes the equations independently and requires them to reproduce the
+code's fitness exactly. A formulation that has quietly drifted from the code is
+worse than none, so the correspondence is a test rather than a promise.
+
 ## Time-dependent traffic
 
 Routes can be priced by **when** a vehicle departs, not by a single snapshot of

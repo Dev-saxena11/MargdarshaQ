@@ -35,7 +35,11 @@ The all-pairs shortest path distance matrix $d_{ij}$ and travel time matrix $t_{
   - $e_i \ge 0$ is the earliest arrival time (ready time). If a vehicle arrives at $t < e_i$, it waits until $e_i$.
   - $l_i \ge e_i$ is the latest acceptable service start time (due time / SLA deadline).
 - **Service duration**: Customer $i$ requires service duration $s_i \ge 0$ minutes. For depot, $s_0 = 0$.
-- **Vehicle fleet**: A homogeneous fleet of $K$ vehicles, each having maximum capacity $Q$ (or heterogeneous per-vehicle capacities $Q_k$ for mid-route re-planning).
+- **Vehicle fleet**: $K$ vehicles. Capacity is $Q_k$ per vehicle, defaulting to the uniform $Q$ when no per-vehicle list is supplied (per-vehicle capacities are used for mid-route re-planning, where a van has already consumed part of its load).
+- **Mixed fleet**: two further per-vehicle factors, both defaulting to $1.0$ so a uniform fleet is arithmetically unchanged:
+  - $\sigma_k > 0$ — **speed factor**, multiplying this vehicle's travel time on every leg. Below $1.0$ is faster than the network's base speed. It multiplies rather than replaces, so a two-wheeler is quicker *through the same congestion*, not quicker in free flow.
+  - $\gamma_k > 0$ — **cost per kilometre**, weighting distance driven by this vehicle. Relative, not currency; only the ratio matters to the objective.
+- **Fleet utilisation mode**: a flag $\rho \in \{0, 1\}$ (`require_all_vehicles`, default $0$). When $\rho = 1$, $K$ is a fleet that must all be dispatched rather than a ceiling. See the idle-vehicle penalty in §4.
 - **Depot operating window**: The depot operates within $[e_0, l_0]$, where $l_0$ represents the planning horizon $H$.
 
 ---
@@ -62,31 +66,111 @@ $$R_k = (0, c_{k,1}, c_{k,2}, \dots, c_{k, m_k}, 0)$$
 
 ## 4. Objective Function & Penalty Formulation
 
-The primary objective is to minimize total fleet travel time and congestion delays, while satisfying vehicle capacity and time window constraints.
+This section states the function that is actually minimised. Every solver in
+this project — QPSO, GA, SA, PSO and the greedy baselines — reaches the
+objective through the single implementation in
+[`app/core/vrp_problem.py`](../app/core/vrp_problem.py) (`evaluate_solution`),
+so the model below is the one they all agree on.
 
-To enable the metaheuristic swarm to traverse constraint boundaries smoothly and converge reliably toward the feasible global optimum, constraints are handled via soft penalties:
+### 4.1 Route clock
 
-$$\min \mathcal{F}(X) = T_{\text{total}}(X) + \lambda_{\text{cap}} \cdot \mathcal{P}_{\text{cap}}(X) + \lambda_{\text{time}} \cdot \mathcal{P}_{\text{time}}(X)$$
+A route for vehicle $k$ is the ordered customer sequence
+$R_k = (c_{k,1}, \dots, c_{k,m_k})$, driven as $0 \to c_{k,1} \to \dots \to c_{k,m_k} \to 0$.
+The vehicle leaves the depot at $\tau_{k,0} = 0$. Writing $c_{k,0} = 0$ for the
+depot, for each $j \in \{1, \dots, m_k\}$:
 
-where:
-1. **Total Travel Time**:
-   $$T_{\text{total}}(X) = \sum_{k=1}^K \left[ t_{0, c_{k,1}} + \sum_{j=1}^{m_k - 1} t_{c_{k,j}, c_{k,j+1}} + t_{c_{k,m_k}, 0} \right]$$
+$$\theta_{k,j} = \sigma_k \cdot t\big(c_{k,j-1},\, c_{k,j},\, \tau_{k,j-1}\big) \qquad \text{(travel time, priced at the moment of departure)}$$
 
-2. **Capacity Violation Penalty**:
-   $$\mathcal{P}_{\text{cap}}(X) = \sum_{k=1}^K \max\left(0, \; \sum_{j=1}^{m_k} q_{c_{k,j}} - Q_k\right)$$
-   Weighted by penalty multiplier $\lambda_{\text{cap}} = 50.0$.
+$$a_{k,j} = \tau_{k,j-1} + \theta_{k,j} \qquad \text{(arrival)}$$
 
-3. **Time-Window Lateness Penalty**:
-   For each vehicle $k$, departure from depot starts at $t_0 = 0$. For customer $j$ on route $k$:
-   $$a_j = t_{\text{prev}} + t_{\text{prev}, j} \quad \text{(arrival time)}$$
-   $$\text{start}_j = \max(a_j, e_j) \quad \text{(service start after potential wait)}$$
-   $$t_j = \text{start}_j + s_j \quad \text{(departure time after service)}$$
-   $$\text{Lateness}_j = \max(0, \; a_j - l_j)$$
+$$w_{k,j} = \max\big(0,\; e_{c_{k,j}} - a_{k,j}\big) \qquad \text{(wait, if early)}$$
 
-   $$\mathcal{P}_{\text{time}}(X) = \sum_{j \in C} \text{Lateness}_j$$
-   Weighted by penalty multiplier $\lambda_{\text{time}} = 10.0$.
+$$\beta_{k,j} = \max\big(a_{k,j},\; e_{c_{k,j}}\big) = a_{k,j} + w_{k,j} \qquad \text{(service start)}$$
 
-A solution is strictly **feasible** if and only if $\mathcal{P}_{\text{cap}}(X) = 0$ and $\mathcal{P}_{\text{time}}(X) = 0$.
+$$\tau_{k,j} = \beta_{k,j} + s_{c_{k,j}} \qquad \text{(departure, after service)}$$
+
+The return leg is $\theta_{k,m_k+1} = \sigma_k \cdot t(c_{k,m_k}, 0, \tau_{k,m_k})$, with no wait
+and no service at the depot.
+
+Note that $t(\cdot,\cdot,\tau)$ is evaluated **at the departure time**: with
+time-dependence enabled the lookup selects the matrix for bucket
+$b(\tau) = \min\big(\lfloor \tau / \Delta \rfloor,\, B-1\big)$, so a leg driven through rush
+hour costs more than the same leg at midday. With time-dependence disabled
+(the default) this degrades to the single static matrix $t_{ij}$.
+
+### 4.2 Accumulated quantities
+
+$$T_{\text{total}} = \sum_{k=1}^{K} \left[ \sum_{j=1}^{m_k} \big(\theta_{k,j} + w_{k,j}\big) \;+\; \theta_{k,m_k+1} \right]$$
+
+$$D_{\text{total}} = \sum_{k=1}^{K} \gamma_k \left[ \sum_{j=1}^{m_k} d\big(c_{k,j-1}, c_{k,j}\big) \;+\; d\big(c_{k,m_k}, 0\big) \right]$$
+
+Two things worth stating plainly, because both are easy to misread from the
+symbols alone:
+
+- $T_{\text{total}}$ **includes waiting time**, not just driving. A vehicle that
+  arrives early and idles until the window opens is charged for the idling.
+- $D_{\text{total}}$ is a **weighted** distance. For a uniform fleet every
+  $\gamma_k = 1$ and it is distance in kilometres, but for a mixed fleet the
+  figure reported as `total_distance` is a cost, not a raw odometer reading.
+
+### 4.3 Penalties
+
+Constraints are handled as soft penalties so the swarm can cross an infeasible
+region rather than being walled out of it.
+
+**Capacity.** Per vehicle, against that vehicle's own capacity:
+
+$$\mathcal{P}_{\text{cap}} = \sum_{k=1}^{K} \max\left(0,\; \sum_{j=1}^{m_k} q_{c_{k,j}} - Q_k \right)$$
+
+**Time window.** Lateness is measured from the **service start**
+$\beta_{k,j}$, not from arrival — a vehicle that arrives before $e_i$ and waits
+is late only if the wait itself pushes it past the deadline:
+
+$$\mathcal{P}_{\text{time}} = \sum_{k=1}^{K} \sum_{j=1}^{m_k} \max\big(0,\; \beta_{k,j} - l_{c_{k,j}}\big) \;+\; 1000 \cdot \big|U\big|$$
+
+where $U$ is the set of legs whose travel time is not finite — an unreachable
+node, which a disconnected sub-graph or a closed road can produce. Such a leg
+contributes a flat $1000$ and accrues no time or distance; the vehicle's clock
+does not advance across it.
+
+**Idle vehicle.** Only when the fleet must all be dispatched ($\rho = 1$):
+
+$$\mathcal{P}_{\text{idle}} = \rho \cdot \big|\{\, k : R_k = \varnothing \,\}\big|$$
+
+Left alone the optimiser parks any van it does not need, so asking for five and
+being shown three is the correct answer to "how many do I need". This penalty
+exists for the opposite question — a depot with five drivers rostered and paid
+either way — and makes leaving one parked the expensive option instead.
+
+### 4.4 Fitness
+
+$$\boxed{\;\min \; \mathcal{F} \;=\; w_T \cdot T_{\text{total}} \;+\; w_D \cdot D_{\text{total}} \;+\; \lambda_{\text{cap}} \cdot \mathcal{P}_{\text{cap}} \;+\; \lambda_{\text{time}} \cdot \mathcal{P}_{\text{time}} \;+\; \lambda_{\text{idle}} \cdot \mathcal{P}_{\text{idle}}\;}$$
+
+| symbol | meaning | default |
+|---|---|---|
+| $w_T$ | weight on fleet time | $0.6$ |
+| $w_D$ | weight on distance driven | $0.4$ |
+| $\lambda_{\text{cap}}$ | capacity violation multiplier | $50.0$ |
+| $\lambda_{\text{time}}$ | lateness multiplier | $10.0$ |
+| $\lambda_{\text{idle}}$ | idle-vehicle multiplier | $200.0$ |
+
+The objective is therefore **bi-objective**, not pure travel time: $w_T$ and
+$w_D$ trade fleet hours against kilometres driven. They live on the problem
+instance rather than on a solver, because they are a property of the question
+being asked rather than of the method used to answer it. The defaults above are
+this project's own — a municipal fleet mostly cares about finishing the round on
+time. A published benchmark may score something else entirely; Solomon's CVRPTW
+set is judged on total distance alone, and an instance loaded from it sets
+$w_T = 0$, $w_D = 1$ so the optimiser answers the question that benchmark
+actually asks.
+
+A solution is reported **feasible** when both hard-constraint penalties vanish
+to numerical tolerance:
+
+$$\mathcal{P}_{\text{cap}} < 10^{-6} \quad \text{and} \quad \mathcal{P}_{\text{time}} < 10^{-6}$$
+
+Note that $\mathcal{P}_{\text{idle}}$ does not enter this test: an idle van is a
+preference, not an infeasibility.
 
 ---
 
