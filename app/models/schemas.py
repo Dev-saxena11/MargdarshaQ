@@ -215,6 +215,22 @@ class BenchmarkRequest(BaseModel):
     algorithms: Optional[List[AlgorithmName]] = Field(
         None, description="Subset of algorithms to run; defaults to all"
     )
+    # One run per algorithm shows which algorithm won that run, which is not the
+    # same claim as which algorithm is better -- a metaheuristic's result moves
+    # with its seed. Repeating the run is what turns a single figure into a
+    # spread you can show somebody.
+    trials: int = Field(
+        1, ge=1, le=25,
+        description="Runs per algorithm, each with a different seed. 1 (the "
+                    "default) reproduces the previous single-run behaviour "
+                    "exactly, including the seed used."
+    )
+    success_threshold_pct: float = Field(
+        5.0, ge=0.0, le=100.0,
+        description="A trial counts as a success when its fitness is within "
+                    "this percentage of the best fitness found by any "
+                    "algorithm in any trial of this run."
+    )
 
 
 class BenchmarkAlgoResult(BaseModel):
@@ -228,6 +244,37 @@ class BenchmarkAlgoResult(BaseModel):
     convergence_curve: List[float]
     congestion_delay_min: float = Field(0.0, description="Total fleet minutes lost to traffic congestion")
     avg_congestion: float = Field(1.0, description="Fleet-wide average congestion factor")
+
+    # Repeated-run statistics. With trials=1 these hold the single run, so a
+    # caller that ignores them sees exactly what it saw before: every scalar
+    # field above describes the BEST trial, not an average, so "the result"
+    # still means the same thing.
+    trials: int = Field(1, description="How many runs this algorithm was given")
+    fitness_samples: List[float] = Field(
+        default_factory=list,
+        description="Fitness of each trial, in seed order. The raw sample, not "
+                    "a summary, so the client can draw a box plot without the "
+                    "server having to guess which quartiles it wants."
+    )
+    runtime_samples_ms: List[float] = Field(
+        default_factory=list, description="Wall-clock time of each trial"
+    )
+    time_samples: List[float] = Field(
+        default_factory=list,
+        description="Fleet time of each trial. With distance_samples this gives "
+                    "a cloud of points per algorithm rather than one, which is "
+                    "what makes a time-versus-distance trade-off plot readable."
+    )
+    distance_samples: List[float] = Field(
+        default_factory=list, description="Distance driven in each trial"
+    )
+    feasible_rate: float = Field(
+        1.0, description="Fraction of trials that satisfied every hard constraint"
+    )
+    success_rate: float = Field(
+        1.0, description="Fraction of trials landing within "
+                         "success_threshold_pct of the best fitness seen"
+    )
 
 
 class BenchmarkResponse(BaseModel):

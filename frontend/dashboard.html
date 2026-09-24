@@ -1632,6 +1632,30 @@
       box-shadow: none !important;
     }
 
+    /* A chart that cannot say where its numbers came from invites the reader
+       to assume they were measured. These captions say what was run. */
+    .chart-provenance {
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--text-sub);
+      text-align: center;
+    }
+
+    .detail-metrics-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .detail-metrics-note {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
     /* Route tooltip styling */
     .route-tooltip {
       font-family: 'Space Grotesk', sans-serif !important;
@@ -4462,6 +4486,57 @@
                     <h2 style="margin-top:0; font-size: 14px; text-align: center;">VRP Scalability: Runtime vs Problem
                       Size</h2>
                     <div style="height:250px; position:relative;"><canvas id="scaleChart"></canvas></div>
+                    <div class="chart-provenance" id="scaleProvenance"></div>
+                  </div>
+                </div>
+
+                <!-- Solution quality and cost. These two answer the first two
+                     questions anyone asks of a benchmark - who won, and what
+                     did winning cost - so they are visible without a click. -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+                  <div>
+                    <h2 style="margin-top:0; font-size: 14px; text-align: center;">Solution Quality</h2>
+                    <div style="height:250px; position:relative;"><canvas id="qualityChart"></canvas></div>
+                    <div class="chart-provenance" id="qualityProvenance"></div>
+                  </div>
+                  <div>
+                    <h2 style="margin-top:0; font-size: 14px; text-align: center;">Computation Time</h2>
+                    <div style="height:250px; position:relative;"><canvas id="runtimeChart"></canvas></div>
+                    <div class="chart-provenance">Log scale — the algorithms differ by orders of magnitude.</div>
+                  </div>
+                </div>
+
+                <!-- Everything below needs repeated runs to mean anything, and
+                     would crowd the page for someone who just wants the result,
+                     so it is opt-in. -->
+                <div class="detail-metrics-bar">
+                  <button class="secondary" id="btnDetailMetrics" onclick="toggleDetailMetrics()"
+                    aria-expanded="false" aria-controls="detailMetrics">Show detailed metrics</button>
+                  <span class="detail-metrics-note" id="detailMetricsNote"></span>
+                </div>
+
+                <div id="detailMetrics" hidden>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px;">
+                    <div>
+                      <h2 style="margin-top:0; font-size: 14px; text-align: center;">Consistency Across Runs</h2>
+                      <div style="height:260px; position:relative;"><canvas id="spreadChart"></canvas></div>
+                      <div class="chart-provenance" id="spreadProvenance"></div>
+                    </div>
+                    <div>
+                      <h2 style="margin-top:0; font-size: 14px; text-align: center;">Success Rate</h2>
+                      <div style="height:260px; position:relative;"><canvas id="successChart"></canvas></div>
+                      <div class="chart-provenance" id="successProvenance"></div>
+                    </div>
+                    <div>
+                      <h2 style="margin-top:0; font-size: 14px; text-align: center;">Time vs Distance Trade-off</h2>
+                      <div style="height:260px; position:relative;"><canvas id="paretoChart"></canvas></div>
+                      <div class="chart-provenance">Lower-left is better on both. Each point is one run.</div>
+                    </div>
+                    <div>
+                      <h2 style="margin-top:0; font-size: 14px; text-align: center;">At a Glance</h2>
+                      <div style="height:260px; position:relative;"><canvas id="radarChart"></canvas></div>
+                      <div class="chart-provenance">Each axis normalised across the algorithms in this run; outer is better.</div>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -4489,6 +4564,14 @@
 
               <button class="primary" onclick="solveVRP()" id="btnSolve" disabled>Solve</button>
               <button class="secondary" onclick="runBenchmark()" id="btnBench" disabled>Run full benchmark</button>
+              <!-- One run tells you which algorithm won that run, which is not
+                   the same as which is better. More runs is what the spread,
+                   box plot and success rate are drawn from. -->
+              <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color: var(--text-muted);">
+                Runs per algorithm
+                <input type="number" id="benchTrials" min="1" max="25" value="1"
+                  style="width:64px;" title="Each run uses a different seed. More runs take proportionally longer.">
+              </label>
             </section>
 
             <section>
@@ -5567,10 +5650,16 @@
       ];
       let results = [];
       for (let i = 0; i < algos.length; i++) {
-        setLoadingState(true, `Running algorithm ${i + 1} of 5: ${algos[i].name}...`, (i / algos.length) * 100);
+        const nTrials = (typeof benchmarkTrials === 'function') ? benchmarkTrials() : 1;
+        setLoadingState(true,
+          `Running algorithm ${i + 1} of 5: ${algos[i].name}` + (nTrials > 1 ? ` (${nTrials} runs)` : '') + '...',
+          (i / algos.length) * 100);
         const bench = await api('/api/benchmark/run', {
           method: 'POST',
-          body: JSON.stringify({ vrp_id, max_iter, seed, algorithms: [algos[i].key] })
+          body: JSON.stringify({
+            vrp_id, max_iter, seed, algorithms: [algos[i].key],
+            trials: (typeof benchmarkTrials === 'function') ? benchmarkTrials() : 1,
+          })
         });
         if (bench.results && bench.results.length > 0) {
           results.push(bench.results[0]);
@@ -8859,66 +8948,401 @@
       document.getElementById('benchmarkSection').style.display = 'block';
       setTimeout(() => document.getElementById('centerResults').scrollIntoView({ behavior: 'smooth' }), 50);
 
-      drawScalabilityChart(results);
+      drawQualityChart(results);
+      drawRuntimeChart(results);
+
+      // Measured scalability is independent of this run -- it comes from the
+      // cached sweep -- so it is fetched rather than derived from `results`.
+      drawScalabilityChart();
+
+      // The detailed panel builds its charts when it is opened, because a
+      // canvas in a hidden container has no size to lay out against. If it is
+      // already open, refresh it now.
+      const detail = document.getElementById('detailMetrics');
+      if (detail && !detail.hidden) drawDetailCharts(results);
+
+      const note = document.getElementById('detailMetricsNote');
+      if (note) {
+        const n = trialCount(results);
+        note.textContent = n > 1
+          ? 'Spread, success rate, trade-off and summary across ' + n + ' runs per algorithm.'
+          : 'Spread and success rate need more than one run per algorithm to say anything.';
+      }
     }
 
     // ---------------------------------------------------------------------------
-    // Scalability Chart Mock
+    // Benchmark charts
     // ---------------------------------------------------------------------------
-    function drawScalabilityChart(results) {
-      const ctx = document.getElementById('scaleChart');
-      if (!ctx) return;
-      if (state.scaleChart) {
-        state.scaleChart.destroy();
-      }
+    // Everything below is drawn from numbers the backend measured on this
+    // instance. Where a figure is a projection rather than a measurement it says
+    // so on the chart, because the scalability chart this replaces did not: it
+    // took one runtime and multiplied it by an assumed n^2 for QPSO and n for
+    // GA, under axes labelled "Number of customers" and "Runtime (ms)". Nothing
+    // had been timed at those sizes.
 
-      const sizes = [10, 20, 40, 60];
-      const palette = ['#00F5D4', '#7B5CFF', '#FEE440', '#FF0054', '#00BBF9'];
-      const datasets = results.map((r, i) => {
-        const isQPSO = r.algorithm.toLowerCase().includes('qpso');
-        const isGA = r.algorithm.toLowerCase().includes('ga');
-        const base = r.runtime_ms || 100;
+    const CHART_PALETTE = ['#00F5D4', '#7B5CFF', '#FEE440', '#FF0054', '#00BBF9'];
+    const CHART_AXIS = '#8b949e';
+    const CHART_GRID = 'rgba(255,255,255,0.05)';
 
-        const data = sizes.map(n => {
-          if (isQPSO) return (base / (60 * 60)) * (n * n);
-          if (isGA) return (base / 60) * n;
-          return (base / (60 * 60)) * (n * n) * 1.5;
+    function chartBase(xTitle, yTitle, opts) {
+      opts = opts || {};
+      return {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: opts.legend === false
+            ? { display: false }
+            : { position: 'top', labels: { color: CHART_AXIS, boxWidth: 12 } },
+        },
+        scales: {
+          x: {
+            title: { display: !!xTitle, text: xTitle, color: CHART_AXIS },
+            ticks: { color: CHART_AXIS }, grid: { color: CHART_GRID },
+          },
+          y: Object.assign({
+            title: { display: !!yTitle, text: yTitle, color: CHART_AXIS },
+            ticks: { color: CHART_AXIS }, grid: { color: CHART_GRID },
+          }, opts.y || {}),
+        },
+      };
+    }
+
+    function replaceChart(key, canvasId, config) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return null;
+      if (state[key]) { state[key].destroy(); state[key] = null; }
+      state[key] = new Chart(ctx, config);
+      return state[key];
+    }
+
+    // Samples for an algorithm, falling back to the single run when the
+    // benchmark was not asked for repeated trials.
+    function fitSamples(r) {
+      return (r.fitness_samples && r.fitness_samples.length) ? r.fitness_samples : [r.fitness];
+    }
+    function runSamples(r) {
+      return (r.runtime_samples_ms && r.runtime_samples_ms.length) ? r.runtime_samples_ms : [r.runtime_ms];
+    }
+    function trialCount(results) {
+      return Math.max(1, ...results.map(r => r.trials || 1));
+    }
+
+    function quantile(sorted, q) {
+      if (!sorted.length) return 0;
+      const pos = (sorted.length - 1) * q;
+      const lo = Math.floor(pos), hi = Math.ceil(pos);
+      return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+    }
+
+    // ---- 1. Solution quality --------------------------------------------------
+    // The best run as a bar, with the full observed range drawn behind it when
+    // there was more than one. A bare bar from a stochastic solver states a
+    // result as though repeating it would give the same number.
+    function drawQualityChart(results) {
+      const labels = results.map(r => shortAlgoName(r.algorithm));
+      const n = trialCount(results);
+      const datasets = [{
+        label: n > 1 ? 'Best of ' + n + ' runs' : 'Fitness',
+        data: results.map(r => Math.min.apply(null, fitSamples(r))),
+        backgroundColor: results.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]),
+        borderWidth: 0, order: 2,
+      }];
+      if (n > 1) {
+        datasets.push({
+          label: 'Observed range',
+          data: results.map(r => {
+            const f = fitSamples(r);
+            return [Math.min.apply(null, f), Math.max.apply(null, f)];
+          }),
+          backgroundColor: 'rgba(255,255,255,0.16)',
+          borderColor: 'rgba(255,255,255,0.45)', borderWidth: 1,
+          barPercentage: 0.35, order: 1,
         });
+      }
+      replaceChart('qualityChart', 'qualityChart', {
+        type: 'bar', data: { labels: labels, datasets: datasets },
+        options: chartBase('', 'Fitness (lower is better)', { legend: n > 1 }),
+      });
+      const el = document.getElementById('qualityProvenance');
+      if (el) el.textContent = n > 1
+        ? 'Bar is the best of ' + n + ' runs; the pale band is the full range across runs.'
+        : 'A single run per algorithm. Raise "runs" above 1 to see the spread.';
+    }
 
-        return {
-          label: shortAlgoName(r.algorithm),
-          data: data,
-          borderColor: palette[i % palette.length],
-          backgroundColor: palette[i % palette.length],
-          borderWidth: 2,
-          pointRadius: 5,
-          tension: 0
-        };
+    // ---- 2. Computation time --------------------------------------------------
+    function drawRuntimeChart(results) {
+      replaceChart('runtimeChart', 'runtimeChart', {
+        type: 'bar',
+        data: {
+          labels: results.map(r => shortAlgoName(r.algorithm)),
+          datasets: [{
+            label: 'Median wall-clock (ms)',
+            data: results.map(r => quantile(runSamples(r).slice().sort((a, b) => a - b), 0.5)),
+            backgroundColor: results.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]),
+            borderWidth: 0,
+          }],
+        },
+        options: chartBase('', 'Milliseconds (log scale)', {
+          legend: false, y: { type: 'logarithmic' },
+        }),
+      });
+    }
+
+    // ---- 3. Consistency across runs -------------------------------------------
+    // The interquartile range as a floating bar, min-max behind it, every
+    // individual run on top and the median marked. Chart.js has no box-plot type
+    // and this needs no extra library; at these trial counts plotting every run
+    // is more informative than a box on its own anyway.
+    function drawSpreadChart(results) {
+      const labels = results.map(r => shortAlgoName(r.algorithm));
+      const sorted = results.map(r => fitSamples(r).slice().sort((a, b) => a - b));
+      const points = [];
+      results.forEach(r => fitSamples(r).forEach(v =>
+        points.push({ x: shortAlgoName(r.algorithm), y: v })));
+
+      replaceChart('spreadChart', 'spreadChart', {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Min-max', order: 3, barPercentage: 0.18,
+              data: sorted.map(s => [s[0], s[s.length - 1]]),
+              backgroundColor: 'rgba(255,255,255,0.10)',
+            },
+            {
+              label: 'Interquartile range', order: 2, barPercentage: 0.55, borderWidth: 2,
+              data: sorted.map(s => [quantile(s, 0.25), quantile(s, 0.75)]),
+              backgroundColor: results.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length] + '55'),
+              borderColor: results.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]),
+            },
+            {
+              type: 'scatter', label: 'Individual runs', order: 1,
+              data: points, backgroundColor: '#FFFFFF', pointRadius: 3,
+            },
+            {
+              type: 'scatter', label: 'Median', order: 0,
+              data: sorted.map((s, i) => ({ x: labels[i], y: quantile(s, 0.5) })),
+              backgroundColor: '#FF0054', pointStyle: 'rectRot', pointRadius: 7,
+            },
+          ],
+        },
+        options: chartBase('', 'Fitness (lower is better)'),
       });
 
-      state.scaleChart = new Chart(ctx, {
-        type: 'line',
+      const n = trialCount(results);
+      const el = document.getElementById('spreadProvenance');
+      if (el) el.textContent = n > 1
+        ? n + ' runs per algorithm, one per seed. Every run is plotted.'
+        : 'Only one run per algorithm, so there is no spread to show yet.';
+    }
+
+    // ---- 4. Success rate ------------------------------------------------------
+    // Computed here rather than read off the response. The dashboard calls the
+    // benchmark endpoint once per algorithm so it can report progress, which
+    // means the server's own success_rate is measured against that one
+    // algorithm's best. Across the aggregated results the comparison is the
+    // intended one.
+    function drawSuccessChart(results, thresholdPct) {
+      const pct = thresholdPct || 5;
+      const all = [];
+      results.forEach(r => fitSamples(r).forEach(v => all.push(v)));
+      const best = Math.min.apply(null, all);
+      const cutoff = best * (1 + pct / 100);
+
+      replaceChart('successChart', 'successChart', {
+        type: 'bar',
         data: {
-          labels: sizes,
-          datasets: datasets
+          labels: results.map(r => shortAlgoName(r.algorithm)),
+          datasets: [
+            {
+              label: 'Within ' + pct + '% of best', borderWidth: 0,
+              backgroundColor: CHART_PALETTE[0],
+              data: results.map(r => {
+                const f = fitSamples(r);
+                return 100 * f.filter(v => v <= cutoff).length / f.length;
+              }),
+            },
+            {
+              label: 'Feasible', borderWidth: 0, backgroundColor: CHART_PALETTE[1],
+              data: results.map(r => 100 * (r.feasible_rate !== undefined
+                ? r.feasible_rate : (r.feasible ? 1 : 0))),
+            },
+          ],
+        },
+        options: chartBase('', 'Percent of runs', { y: { min: 0, max: 100 } }),
+      });
+
+      const el = document.getElementById('successProvenance');
+      if (el) el.textContent = 'The true optimum is unknown for these instances, so "best" means '
+        + 'the best fitness any algorithm reached in this run (' + best.toFixed(1) + ').';
+    }
+
+    // ---- 5. Time vs distance --------------------------------------------------
+    function drawParetoChart(results) {
+      const datasets = results.map((r, i) => {
+        const t = (r.time_samples && r.time_samples.length) ? r.time_samples : [r.time];
+        const d = (r.distance_samples && r.distance_samples.length) ? r.distance_samples : [r.distance];
+        return {
+          label: shortAlgoName(r.algorithm),
+          data: t.map((tv, k) => ({ x: tv, y: d[k] !== undefined ? d[k] : d[0] })),
+          backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+          pointRadius: 6,
+        };
+      });
+      replaceChart('paretoChart', 'paretoChart', {
+        type: 'scatter', data: { datasets: datasets },
+        options: chartBase('Fleet time (min)', 'Distance (km)'),
+      });
+    }
+
+    // ---- 6. At a glance -------------------------------------------------------
+    // Normalised within this run only: every axis is scaled against the best and
+    // worst algorithm present, so the shape compares these algorithms with each
+    // other and claims nothing about any absolute standard.
+    function drawRadarChart(results) {
+      const norm = (vals, invert) => {
+        const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+        if (hi - lo < 1e-12) return vals.map(() => 1);
+        return vals.map(v => invert ? (hi - v) / (hi - lo) : (v - lo) / (hi - lo));
+      };
+      const fit = results.map(r => Math.min.apply(null, fitSamples(r)));
+      const rt = results.map(r => quantile(runSamples(r).slice().sort((a, b) => a - b), 0.5));
+      const spread = results.map(r => {
+        const f = fitSamples(r);
+        return f.length > 1 ? (Math.max.apply(null, f) - Math.min.apply(null, f)) : 0;
+      });
+      const feas = results.map(r => r.feasible_rate !== undefined
+        ? r.feasible_rate : (r.feasible ? 1 : 0));
+      const dist = results.map(r => r.distance);
+
+      const qN = norm(fit, true), sN = norm(rt, true), cN = norm(spread, true), dN = norm(dist, true);
+
+      replaceChart('radarChart', 'radarChart', {
+        type: 'radar',
+        data: {
+          labels: ['Quality', 'Speed', 'Consistency', 'Feasibility', 'Distance'],
+          datasets: results.map((r, i) => ({
+            label: shortAlgoName(r.algorithm),
+            data: [qN[i], sN[i], cN[i], feas[i], dN[i]],
+            borderColor: CHART_PALETTE[i % CHART_PALETTE.length],
+            backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length] + '22',
+            borderWidth: 2, pointRadius: 3,
+          })),
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'top', labels: { color: '#8b949e', boxWidth: 12 } } },
+          plugins: { legend: { position: 'top', labels: { color: CHART_AXIS, boxWidth: 12 } } },
           scales: {
-            x: {
-              title: { display: true, text: 'Number of customers', color: '#8b949e' },
-              ticks: { color: '#8b949e' },
-              grid: { color: 'rgba(255,255,255,0.05)' }
+            r: {
+              min: 0, max: 1,
+              angleLines: { color: CHART_GRID }, grid: { color: CHART_GRID },
+              pointLabels: { color: CHART_AXIS, font: { size: 11 } },
+              ticks: { display: false },
             },
-            y: {
-              title: { display: true, text: 'Runtime (ms)', color: '#8b949e' },
-              ticks: { color: '#8b949e' },
-              grid: { color: 'rgba(255,255,255,0.05)' }
-            }
-          }
-        }
+          },
+        },
       });
+    }
+
+    // ---- 7. Scalability, measured ---------------------------------------------
+    // Reads the cache written by scripts/generate_stress_test_cache.py, which
+    // times real solves at each size. When that cache has not been generated the
+    // chart says so and draws nothing. The version this replaces filled the same
+    // gap with an assumed complexity curve, which is the one thing it must not
+    // do: an empty chart is honest, an invented one is not.
+    async function drawScalabilityChart() {
+      const ctx = document.getElementById('scaleChart');
+      const note = document.getElementById('scaleProvenance');
+      if (!ctx) return;
+
+      let doc = null;
+      try {
+        doc = await api('/api/benchmark/stress-test-cached');
+      } catch (e) {
+        if (state.scaleChart) { state.scaleChart.destroy(); state.scaleChart = null; }
+        ctx.style.display = 'none';
+        if (note) note.innerHTML = '<b>Not measured yet.</b> Generate it with '
+          + '<code>python scripts/generate_stress_test_cache.py</code>. '
+          + 'Nothing is plotted here rather than an estimate drawn as if it were data.';
+        return;
+      }
+      ctx.style.display = '';
+
+      const sizes = Object.keys(doc.results || {}).map(Number).sort((a, b) => a - b);
+      const algoSet = {};
+      sizes.forEach(n => Object.keys(doc.results[String(n)] || {}).forEach(a => { algoSet[a] = 1; }));
+      const algos = Object.keys(algoSet);
+
+      // A run that hit the time budget has no runtime to plot -- its wall clock
+      // is the budget, not a measurement, and drawing it as a data point would
+      // claim the solver finished in exactly the time it was cut off at. Those
+      // become gaps in the line and are named underneath instead.
+      const timedOut = [];
+      const runtimeAt = (n, algo) => {
+        const cell = (doc.results[String(n)] || {})[algo];
+        if (!cell || cell.runtime_ms == null) return null;
+        if (cell.fitness == null) { timedOut.push(algo.replace(/_/g, ' ') + ' at ' + n); return null; }
+        return cell.runtime_ms;
+      };
+
+      const datasets = algos.map((algo, i) => ({
+        label: algo.replace(/_/g, ' '),
+        data: sizes.map(n => runtimeAt(n, algo)),
+        borderColor: CHART_PALETTE[i % CHART_PALETTE.length],
+        backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+        borderWidth: 2, pointRadius: 5, tension: 0, spanGaps: true,
+      }));
+
+      replaceChart('scaleChart', 'scaleChart', {
+        type: 'line', data: { labels: sizes, datasets: datasets },
+        options: chartBase('Number of customers', 'Runtime (ms)'),
+      });
+
+      const m = doc.measurement || {};
+      if (note) {
+        const bits = ['Measured, not extrapolated.'];
+        if (m.seeds_per_point) bits.push('Best of ' + m.seeds_per_point + ' runs per point.');
+        if (m.network_source) bits.push('Network: ' + m.network_source + '.');
+        else if (doc.network_id) bits.push('Network: ' + doc.network_id + '.');
+        if (doc.generated_at) bits.push('Generated ' + doc.generated_at + '.');
+        if (timedOut.length) {
+          bits.push('No point plotted for ' + timedOut.join(', ')
+            + ' — that run hit the time budget without returning a solution.');
+        }
+        note.textContent = bits.join(' ');
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Detailed metrics panel
+    // ---------------------------------------------------------------------------
+    function toggleDetailMetrics() {
+      const panel = document.getElementById('detailMetrics');
+      const btn = document.getElementById('btnDetailMetrics');
+      if (!panel || !btn) return;
+      const show = panel.hidden;
+      panel.hidden = !show;
+      btn.setAttribute('aria-expanded', String(show));
+      btn.textContent = show ? 'Hide detailed metrics' : 'Show detailed metrics';
+      // Chart.js sizes a chart from its canvas at construction, and a canvas in
+      // a hidden container measures zero, so these are built only once the panel
+      // is actually on screen.
+      if (show && state.benchmarkResults) drawDetailCharts(state.benchmarkResults);
+    }
+
+    function drawDetailCharts(results) {
+      drawSpreadChart(results);
+      drawSuccessChart(results, SUCCESS_THRESHOLD_PCT);
+      drawParetoChart(results);
+      drawRadarChart(results);
+    }
+
+    const SUCCESS_THRESHOLD_PCT = 5;
+
+    function benchmarkTrials() {
+      const el = document.getElementById('benchTrials');
+      const v = el ? parseInt(el.value, 10) : 1;
+      return (isFinite(v) && v >= 1) ? Math.min(v, 25) : 1;
     }
 
     // ---------------------------------------------------------------------------
