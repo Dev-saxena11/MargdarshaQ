@@ -2210,7 +2210,11 @@
       position: absolute;
       top: 12px;
       right: 12px;
-      z-index: 500;
+      /* Above #routeLegend (520), which claims the same corner the moment a
+         plan is solved. Equal footing is not enough: the legend is appended to
+         #mapWrap later in document order, so on a tie it would win and swallow
+         the clicks. */
+      z-index: 530;
       display: flex;
       gap: 6px;
       background: var(--card-bg);
@@ -2533,10 +2537,13 @@
        roads. */
     #routeLegend {
       position: absolute;
-      top: 12px;
+      /* Clears the GIS/Graph toggle, which owns the top of this corner. The gap
+         is held whether or not a plan is solved, so the legend appearing never
+         shifts anything already on screen. */
+      top: 58px;
       right: 12px;
       z-index: 520;
-      max-height: calc(100% - 120px);
+      max-height: calc(100% - 166px);
       overflow-y: auto;
       display: block;
       margin: 0;
