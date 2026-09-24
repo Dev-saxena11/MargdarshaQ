@@ -2302,6 +2302,26 @@
       display: none;
     }
 
+    /* Once there is a solved plan, graph view becomes just the plan: the street
+       network, the junction dots and the drawn boundary go the way the basemap
+       already went, leaving the routed edges, the stops they serve and the
+       depot. Gated on routes existing, because before a plan is solved those
+       streets and junctions are the only thing on screen -- and the only thing
+       there is to click, since stops are placed by clicking a junction. Hiding
+       them unconditionally would make graph view an empty grid you cannot work
+       in.
+
+       Keyed off :has(.route-line) -- the routes themselves -- rather than a
+       class some JS has to remember to set, since the route layer is a plain
+       L.layerGroup and fires no add/remove events to hang that bookkeeping on.
+       A browser without :has() drops the whole rule and simply keeps the
+       streets, which is the previous behaviour rather than a broken screen. */
+    #mapWrap.graph-view:has(.route-line) .leaflet-roadGraph-pane,
+    #mapWrap.graph-view:has(.route-line) .pick-junction,
+    #mapWrap.graph-view:has(.route-line) .boundary-rect {
+      display: none;
+    }
+
     #mapWrap.graph-view .leaflet-container {
       background-color: var(--bg);
       background-image: radial-gradient(var(--canvas-dots) 1px, transparent 0);
@@ -7241,6 +7261,7 @@
 
         state.boundaryLayer = L.rectangle(bounds, {
           color: '#00F5D4', weight: 2.5, fillColor: '#00F5D4', fillOpacity: 0.06,
+          className: 'boundary-rect',
         }).addTo(map);
         state.bounds = {
           north: bounds.getNorth(), south: bounds.getSouth(),
@@ -7825,6 +7846,9 @@
         const isStop = stopSet.has(n.id);
         const marker = L.circleMarker([n.y, n.x], {
           pane: state.map.getPane('pickNodePane') ? 'pickNodePane' : undefined,
+          // Stops, depot and plain junctions share this pane, so graph view
+          // needs to tell them apart to keep the first two and drop the third.
+          className: isDepot ? 'pick-depot' : isStop ? 'pick-stop' : 'pick-junction',
           radius: isDepot ? 8 : isStop ? 6 : 3,
           color: isDepot ? '#EA580C' : isStop ? '#FFFFFF' : '#475569',
           weight: isDepot ? 3 : isStop ? 2 : 0,
