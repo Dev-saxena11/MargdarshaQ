@@ -8153,10 +8153,11 @@
           method: 'POST',
           body: JSON.stringify({
             vrp_id: state.vrp.vrp_id,
-            baseline_algo: 'greedy', optimized_algo: 'qpso',
+            baseline_algo: 'greedy', optimized_algo: document.getElementById('algorithm').value || 'qpso',
             n_particles: +document.getElementById('n_particles').value || 50,
             max_iter: +document.getElementById('max_iter').value || 150,
-            seed: 1, use_local_search: true,
+            seed: +document.getElementById('vrp_seed').value || 1, 
+            use_local_search: document.getElementById('use_local_search').checked,
           }),
         });
 
@@ -8618,10 +8619,11 @@
             vrp_id: state.vrp.vrp_id,
             incident_factor: +document.getElementById('incident_severity').value || 4.0,
             trigger_time_min: at,
-            algorithm: soloLabel ? document.getElementById('algorithm').value : 'qpso',
+            algorithm: document.getElementById('algorithm').value || 'qpso',
             n_particles: +document.getElementById('n_particles').value || 50,
             max_iter: +document.getElementById('max_iter').value || 150,
-            seed: 1,
+            seed: +document.getElementById('vrp_seed').value || 1,
+            use_local_search: document.getElementById('use_local_search').checked,
           }),
         });
 
