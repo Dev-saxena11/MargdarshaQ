@@ -3491,6 +3491,574 @@
 </head>
 
 <body>
+  <!-- Splash Screen -->
+  <style>
+    @keyframes scanline {
+      0% {
+        transform: translateY(-100%);
+      }
+
+      100% {
+        transform: translateY(100vh);
+      }
+    }
+
+    @keyframes glitchText {
+      0% {
+        clip-path: inset(10% 0 80% 0);
+        transform: translate(-2px, 1px);
+      }
+
+      20% {
+        clip-path: inset(80% 0 5% 0);
+        transform: translate(2px, -1px);
+      }
+
+      40% {
+        clip-path: inset(50% 0 30% 0);
+        transform: translate(-2px, 2px);
+      }
+
+      60% {
+        clip-path: inset(15% 0 60% 0);
+        transform: translate(2px, -2px);
+      }
+
+      80% {
+        clip-path: inset(30% 0 40% 0);
+        transform: translate(-1px, 1px);
+      }
+
+      100% {
+        clip-path: inset(70% 0 10% 0);
+        transform: translate(1px, -1px);
+      }
+    }
+
+    .splash-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #0a101d 0%, #03060a 100%);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      transition: opacity 1.5s ease-in-out;
+      font-family: 'Space Grotesk', sans-serif;
+      overflow: hidden;
+    }
+
+    /* Cyber grid */
+    .splash-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(rgba(0, 245, 212, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 245, 212, 0.05) 1px, transparent 1px);
+      background-size: 30px 30px;
+      perspective: 500px;
+      transform-origin: bottom;
+      transform: scale(1.5) rotateX(45deg);
+      opacity: 0.5;
+      animation: gridMove 10s linear infinite;
+    }
+
+    @keyframes gridMove {
+      0% {
+        transform: scale(1.5) rotateX(45deg) translateY(0);
+      }
+
+      100% {
+        transform: scale(1.5) rotateX(45deg) translateY(30px);
+      }
+    }
+
+    /* Scanlines */
+    .splash-container::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 50%, rgba(0, 245, 212, 0.1) 50%, rgba(0, 245, 212, 0.1));
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .splash-scan {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 50px;
+      background: linear-gradient(to bottom, transparent, rgba(0, 245, 212, 0.4), transparent);
+      animation: scanline 4s linear infinite;
+      z-index: 3;
+    }
+
+    .splash-content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Cyber frame - softened */
+    .cyber-frame {
+      position: relative;
+      padding: 40px 50px;
+      background: rgba(10, 16, 28, 0.4);
+      backdrop-filter: blur(12px);
+      border-radius: 40px;
+      border: 1px solid rgba(0, 245, 212, 0.1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 245, 212, 0.1), inset 0 0 40px rgba(0, 245, 212, 0.05);
+    }
+
+    .splash-glitch-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: #00F5D4;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin-top: 30px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .splash-glitch-text::before,
+    .splash-glitch-text::after {
+      content: 'MARGDARSHAQ INITIALIZING...';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+    }
+
+    .splash-glitch-text::before {
+      left: 2px;
+      text-shadow: -1px 0 #FF0054;
+      animation: glitchText 3s infinite linear alternate-reverse;
+    }
+
+    .splash-glitch-text::after {
+      left: -2px;
+      text-shadow: -1px 0 #7B5CFF;
+      animation: glitchText 2.5s infinite linear alternate-reverse;
+    }
+
+    @keyframes splashProgressLoadAdvanced {
+      0% {
+        width: 0%;
+      }
+
+      100% {
+        width: 100%;
+      }
+    }
+
+    .splash-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 245, 212, 0.1);
+      border: 1px solid rgba(0, 245, 212, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .splash-progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: repeating-linear-gradient(45deg, #00F5D4, #00F5D4 10px, #7B5CFF 10px, #7B5CFF 20px);
+      background-size: 28px 28px;
+      animation: splashProgressLoadAdvanced 5.2s linear forwards, stripMove 1s linear infinite;
+      box-shadow: 0 0 15px #00F5D4;
+    }
+
+    @keyframes stripMove {
+      0% {
+        background-position: 0 0;
+      }
+
+      100% {
+        background-position: 28px 0;
+      }
+    }
+  </style>
+  <div id="splashScreen" class="splash-container">
+    <div class="splash-scan"></div>
+    <div class="splash-content">
+      <div class="cyber-frame">
+        <div class="cyber-frame-inner"></div>
+        <img src="splash-speed.gif"
+          style="max-width:100%; max-height:50vh; object-fit:contain; filter: drop-shadow(0 0 10px rgba(0,245,212,0.3)); position: relative; z-index: 5;"
+          alt="Splash">
+      </div>
+      <div style="width: 80%; min-width: 320px; text-align: center;">
+        <div class="splash-glitch-text" data-text="MARGDARSHAQ INITIALIZING...">MARGDARSHAQ INITIALIZING...</div>
+        <div class="splash-progress-bar">
+          <div class="splash-progress-fill"></div>
+        </div>
+        <div
+          style="display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 8px; font-family: 'JetBrains Mono', monospace;">
+          <span>SYS.BOOT.SEQ</span>
+          <span>QUANTUM_OPT.SYS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        var splash = document.getElementById('splashScreen');
+        if (splash) {
+          splash.style.opacity = '0';
+          splash.style.pointerEvents = 'none';
+          setTimeout(function () { splash.style.display = 'none'; }, 1500);
+        }
+      }, 5200);
+    });
+  </script>
+
+  <!-- Landing Page Overlay -->
+  <div id="landingOverlay"
+    style="position:fixed; top:0; left:0; width:100%; height:100%; background:#090D16; z-index:999998; color:#F8FAFC; overflow-y:auto; padding: 40px; font-family:'Inter', sans-serif; display:flex; flex-direction:column; box-sizing:border-box; transition: opacity 1.5s ease-in-out;">
+    <!-- Header -->
+    <div
+      style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(0,245,212,0.15); box-shadow: 0 15px 30px -15px rgba(0,245,212,0.05); padding-bottom:16px; margin-bottom:32px; position:relative;">
+      <div>
+        <h1 class="landing-header-title"
+          style="font-family:'Space Grotesk', sans-serif; font-size:24px; margin:0; display:flex; align-items:center; gap:12px;">
+          <span class="landing-icon-float" style="font-size:20px;">🧭</span> Problem & Approach
+          <span class="landing-badge-glow"
+            style="font-size:10px; padding:4px 8px; background:rgba(0,245,212,0.1); color:#00F5D4; border-radius:4px; margin-left:8px; cursor:default;">MANDATORY
+            BRIEFING // STEP 1 OF 1</span>
+          <span class="landing-badge-glow"
+            style="font-size:10px; padding:4px 8px; background:rgba(123,92,255,0.1); color:#A78BFA; border-radius:4px; cursor:default;">CORE
+            PROTOCOL VERIFICATION</span>
+        </h1>
+        <p style="margin:8px 0 0; font-size:13px; color:#94A3B8;">Please review the core optimization principles before
+          proceeding to live dispatch.</p>
+      </div>
+      <div style="display:flex; gap:16px;">
+        <div class="landing-badge-glow"
+          style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:6px;">
+          <span class="landing-icon-spin" style="color:#00F5D4;">⚙</span> 5 DISTRICTS LOADED
+        </div>
+        <div class="landing-badge-glow"
+          style="background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:6px; font-size:11px; display:flex; align-items:center; gap:6px;">
+          <span class="landing-icon-float" style="color:#00F5D4;">✔</span> LATENCY: 0.083s
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div style="display:flex; gap:24px; margin-bottom:32px; flex-wrap:wrap;">
+      <style>
+        .landing-card {
+          position: relative;
+          flex: 1;
+          min-width: 300px;
+          background: rgba(16, 22, 38, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+          cursor: default;
+        }
+
+        .landing-card:hover {
+          border-color: #00F5D4;
+          box-shadow: 0 0 20px rgba(0, 245, 212, 0.2), inset 0 0 10px rgba(0, 245, 212, 0.1);
+          transform: translateY(-2px);
+        }
+
+        .landing-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(0, 245, 212, 0.1), transparent 40%);
+          opacity: 0;
+          transition: opacity 0.3s;
+          pointer-events: none;
+          z-index: 1;
+        }
+
+        .landing-card:hover::before {
+          opacity: 1;
+        }
+
+        .landing-card-content {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          flex-direction: column;
+          flex-grow: 1;
+        }
+
+        .landing-card:hover .landing-card-title {
+          color: #00F5D4 !important;
+          transition: color 0.3s;
+        }
+
+        @keyframes subtlePulse {
+
+          0%,
+          100% {
+            text-shadow: 0 0 10px rgba(0, 245, 212, 0);
+          }
+
+          50% {
+            text-shadow: 0 0 20px rgba(0, 245, 212, 0.5);
+          }
+        }
+
+        @keyframes floatIcon {
+
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+
+          50% {
+            transform: translateY(-3px);
+          }
+        }
+
+        @keyframes slowSpin {
+          0% {
+            transform: rotate(0deg);
+          }
+
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
+        .landing-header-title {
+          animation: subtlePulse 4s ease-in-out infinite;
+        }
+
+        .landing-icon-float {
+          display: inline-block;
+          animation: floatIcon 4s ease-in-out infinite;
+        }
+
+        .landing-icon-spin {
+          display: inline-block;
+          animation: slowSpin 8s linear infinite;
+        }
+
+        .landing-badge-glow {
+          box-shadow: 0 0 10px rgba(0, 245, 212, 0);
+          transition: box-shadow 0.3s ease, background 0.3s ease;
+        }
+
+        .landing-badge-glow:hover {
+          box-shadow: 0 0 15px rgba(0, 245, 212, 0.3);
+          background: rgba(0, 245, 212, 0.15) !important;
+        }
+      </style>
+
+      <!-- Card 1 -->
+      <div class="landing-card">
+        <div class="landing-card-content">
+          <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+            <span
+              style="color:#00F5D4; font-family:'JetBrains Mono', monospace; font-size:24px; font-weight:700;">[01]</span>
+            <span style="color:#64748B;">⌸</span>
+          </div>
+          <h3 class="landing-card-title"
+            style="margin:0 0 16px; font-family:'Space Grotesk', sans-serif; font-size:16px; line-height:1.4; color:#F8FAFC; transition: color 0.3s;">
+            The problem: getting a fleet through real traffic — not just finding short routes</h3>
+          <p style="font-size:13px; color:#94A3B8; line-height:1.6; margin-bottom:12px;">A delivery company has one
+            depot, a handful of vans, and a list of customers who have each been promised a time slot. Every van has a
+            load limit and has to be back by the end of the shift. The job is to decide <strong>which van visits which
+              customers, in which order.</strong></p>
+          <p style="font-size:13px; color:#94A3B8; line-height:1.6; margin-bottom:24px; flex-grow:1;">The trap is
+            treating this as a shortest-distance puzzle. The shortest route through a city at 9am is often the slowest
+            one to drive, because the short way is the way everyone else is also taking. What matters is time on the
+            road through <span style="color:#00F5D4;">actual traffic</span>, and whether the customer was reached inside
+            the slot they were promised.</p>
+          <div style="background:rgba(0,0,0,0.3); padding:16px; border-radius:8px; border-left:2px solid #3B82F6;">
+            <div
+              style="font-size:10px; font-family:'JetBrains Mono', monospace; color:#3B82F6; margin-bottom:8px; text-transform:uppercase;">
+              Formulation Definition</div>
+            <div style="font-size:12px; font-style:italic; color:#64748B; line-height:1.4;">Formally: a capacitated
+              vehicle routing problem with time windows (CVRPTW), priced on a congested, one-way-aware road network.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="landing-card">
+        <div class="landing-card-content">
+          <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+            <span
+              style="color:#00F5D4; font-family:'JetBrains Mono', monospace; font-size:24px; font-weight:700;">[02]</span>
+            <span style="color:#64748B;">⑂</span>
+          </div>
+          <h3 class="landing-card-title"
+            style="margin:0 0 16px; font-family:'Space Grotesk', sans-serif; font-size:16px; line-height:1.4; color:#F8FAFC; transition: color 0.3s;">
+            Why classical and greedy routing fails: it gets stuck in a dead end</h3>
+          <p style="font-size:13px; color:#94A3B8; line-height:1.6; margin-bottom:12px;">There are too many possible
+            plans to simply try them all — fifteen stops can be ordered more ways than there are seconds in the age of
+            the universe. So ordinary routing software guesses: send each van to whichever stop is <strong>nearest right
+              now.</strong> That looks sensible and it walks straight into the jam.</p>
+          <p style="font-size:13px; color:#94A3B8; line-height:1.6; margin-bottom:24px; flex-grow:1;">Worse, once it has
+            committed to that shape of route, every small change it can try makes things look briefly worse, so it stops
+            improving and calls it done — like always taking the first turning that looks clear, then finding yourself
+            in a dead end you cannot back out of.</p>
+          <div style="background:rgba(0,0,0,0.3); padding:16px; border-radius:8px; border-left:2px solid #EF4444;">
+            <div
+              style="font-size:10px; font-family:'JetBrains Mono', monospace; color:#EF4444; margin-bottom:8px; text-transform:uppercase;">
+              Heuristic Failure Mode</div>
+            <div style="font-size:12px; font-style:italic; color:#64748B; line-height:1.4;">This is a local minimum: a
+              plan that beats everything near it, while a far better plan exists somewhere the search never looked.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="landing-card">
+        <div class="landing-card-content">
+          <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+            <span
+              style="color:#00F5D4; font-family:'JetBrains Mono', monospace; font-size:24px; font-weight:700;">[03]</span>
+            <span style="color:#64748B;">≋</span>
+          </div>
+          <h3 class="landing-card-title"
+            style="margin:0 0 16px; font-family:'Space Grotesk', sans-serif; font-size:16px; line-height:1.4; color:#F8FAFC; transition: color 0.3s;">
+            Our approach: a search that can jump out, then tidy up</h3>
+          <p style="font-size:13px; color:#94A3B8; line-height:1.6; margin-bottom:12px;">Our method borrows an idea from
+            quantum physics. Instead of only ever stepping to the next-best option, a plan can <span
+              style="color:#00F5D4;">jump straight to a completely different arrangement</span> on the other side of the
+            search space — so it escapes the dead end the greedy method is stuck in and keeps finding better plans long
+            after the greedy one has given up.</p>
+          <p style="font-size:13px; color:#94A3B8; line-height:1.6; margin-bottom:24px; flex-grow:1;">Once it has a good
+            plan, a second pass tidies it: it re-reads its own routes for stops visited in a silly order — a crossing, a
+            doubling back — and straightens them out.</p>
+          <div style="background:rgba(0,0,0,0.3); padding:16px; border-radius:8px; border-left:2px solid #10B981;">
+            <div
+              style="font-size:10px; font-family:'JetBrains Mono', monospace; color:#10B981; margin-bottom:8px; text-transform:uppercase;">
+              Algorithmic Stack</div>
+            <div style="font-size:12px; font-style:italic; color:#64748B; line-height:1.4;">Technique: quantum-behaved
+              particle swarm optimisation (QPSO), refined by 2-opt / or-opt local search. The convergence curve further
+              down shows this happening iteration by iteration.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Agreement Section -->
+    <div
+      style="background:rgba(16,22,38,0.8); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+      <div style="display:flex; align-items:flex-start; gap:16px; flex:1; min-width:300px;">
+        <div style="position:relative; width:28px; height:28px; flex-shrink:0;">
+          <input type="checkbox" id="landingAgreeCheckbox"
+            style="position:absolute; opacity:0; width:100%; height:100%; cursor:pointer; z-index:2;">
+          <div id="landingCheckboxStyle"
+            style="width:100%; height:100%; background:rgba(255,255,255,0.1); border:2px solid #00F5D4; border-radius:4px; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+            <span id="landingCheckmark" style="color:#090D16; font-weight:bold; display:none;">✔</span>
+          </div>
+        </div>
+        <div>
+          <label for="landingAgreeCheckbox"
+            style="font-family:'Space Grotesk', sans-serif; font-size:16px; font-weight:600; cursor:pointer;">I have
+            read and understand the CVRPTW quantum-routing methodology and dynamic traffic principles.</label>
+          <div
+            style="color:#10B981; font-size:11px; font-family:'JetBrains Mono', monospace; margin-top:8px; display:flex; align-items:center; gap:6px;">
+            <span>🔓</span> Unlocks real-time simulation across Connaught Place, BKC Mumbai, Koramangala Bengaluru,
+            HITEC City Hyderabad, and Bareilly.
+          </div>
+        </div>
+      </div>
+      <button id="btnEnterDashboard" disabled
+        style="background:rgba(0,245,212,0.3); color:rgba(0,0,0,0.5); font-family:'Space Grotesk', sans-serif; font-weight:800; font-size:14px; padding:16px 32px; border:1px solid rgba(0,245,212,0.5); border-radius:8px; cursor:not-allowed; transition:all 0.3s ease; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+        Say OK & Enter Dashboard →
+      </button>
+    </div>
+
+    <!-- Footer Locations -->
+    <div
+      style="display:flex; justify-content:space-between; margin-top:32px; padding:0 16px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#64748B; flex-wrap:wrap; gap:12px;">
+      <div><span style="color:#00BBF9; margin-right:6px;">●</span>Connaught Place</div>
+      <div><span style="color:#00BBF9; margin-right:6px;">●</span>BKC Mumbai</div>
+      <div><span style="color:#00BBF9; margin-right:6px;">●</span>Koramangala Bengaluru</div>
+      <div><span style="color:#00BBF9; margin-right:6px;">●</span>HITEC Hyderabad</div>
+      <div><span style="color:#00BBF9; margin-right:6px;">●</span>Bareilly City</div>
+    </div>
+  </div>
+
+  <script>
+    // Logic for landing page hover tracking
+    document.querySelectorAll('.landing-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        card.style.setProperty('--mouse-x', `${x}px`);
+        card.style.setProperty('--mouse-y', `${y}px`);
+      });
+    });
+
+    // Logic for landing page checkbox and button
+    const landingCheckbox = document.getElementById('landingAgreeCheckbox');
+    const landingCheckboxStyle = document.getElementById('landingCheckboxStyle');
+    const landingCheckmark = document.getElementById('landingCheckmark');
+    const btnEnterDashboard = document.getElementById('btnEnterDashboard');
+    const landingOverlay = document.getElementById('landingOverlay');
+
+    landingCheckbox.addEventListener('change', function (e) {
+      if (e.target.checked) {
+        landingCheckboxStyle.style.background = '#00F5D4';
+        landingCheckmark.style.display = 'block';
+        btnEnterDashboard.disabled = false;
+        btnEnterDashboard.style.background = '#00F5D4';
+        btnEnterDashboard.style.color = '#000';
+        btnEnterDashboard.style.cursor = 'pointer';
+        btnEnterDashboard.style.opacity = '1';
+        btnEnterDashboard.style.boxShadow = '0 0 20px rgba(0,245,212,0.4)';
+      } else {
+        landingCheckboxStyle.style.background = 'rgba(255,255,255,0.1)';
+        landingCheckmark.style.display = 'none';
+        btnEnterDashboard.disabled = true;
+        btnEnterDashboard.style.background = 'rgba(0,245,212,0.3)';
+        btnEnterDashboard.style.color = 'rgba(0,0,0,0.5)';
+        btnEnterDashboard.style.cursor = 'not-allowed';
+        btnEnterDashboard.style.boxShadow = 'none';
+      }
+    });
+
+    btnEnterDashboard.addEventListener('click', function () {
+      if (!btnEnterDashboard.disabled) {
+        landingOverlay.style.display = 'none';
+      }
+    });
+  </script>
+
   <!-- Auth Overlay -->
   <div id="authOverlay"
     style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-family:sans-serif; overflow-y:auto; padding: 20px;">
@@ -3807,62 +4375,7 @@
           <div id="benchMatrixFoot" class="bench-matrix-foot" hidden></div>
         </div>
 
-        <!-- =================================================================
-           Problem & Approach (Executive Overview)
-           Sits above the maps deliberately: a reader who has never heard of
-           vehicle routing needs the problem in plain words before the
-           before/after picture means anything.
-           ================================================================= -->
-        <div class="why-card" id="problemApproach">
-          <h3><span>🧭</span> Problem &amp; Approach</h3>
-          <div class="why-grid">
-            <div class="why-item">
-              <div class="why-num">[ 01 ]</div>
-              <h4>The problem: getting a fleet through real traffic — not just finding short routes</h4>
-              <p>A delivery company has one depot, a handful of vans, and a list of customers who
-                have each been promised a time slot. Every van has a load limit and has to be back
-                by the end of the shift. The job is to decide <b>which van visits which customers,
-                  in which order</b>.</p>
-              <p>The trap is treating this as a shortest-distance puzzle. The shortest route through
-                a city at 9am is often the slowest one to drive, because the short way is the way
-                everyone else is also taking. What matters is time on the road through
-                <b>actual traffic</b>, and whether the customer was reached inside the slot they
-                were promised.
-              </p>
-              <span class="term-note">Formally: a capacitated vehicle routing problem with time
-                windows (CVRPTW), priced on a congested, one-way-aware road network.</span>
-            </div>
-            <div class="why-item">
-              <div class="why-num">[ 02 ]</div>
-              <h4>Why classical and greedy routing fails: it gets stuck in a dead end</h4>
-              <p>There are too many possible plans to simply try them all — fifteen stops can be
-                ordered more ways than there are seconds in the age of the universe. So ordinary
-                routing software guesses: send each van to whichever stop is <b>nearest right
-                  now</b>. That looks sensible and it walks straight into the jam.</p>
-              <p>Worse, once it has committed to that shape of route, every small change it can
-                try makes things look briefly worse, so it stops improving and calls it done —
-                like always taking the first turning that looks clear, then finding yourself in a
-                dead end you cannot back out of.</p>
-              <span class="term-note">This is a <b>local minimum</b>: a plan that beats everything
-                near it, while a far better plan exists somewhere the search never looked.</span>
-            </div>
-            <div class="why-item">
-              <div class="why-num">[ 03 ]</div>
-              <h4>Our approach: a search that can jump out, then tidy up</h4>
-              <p>Our method borrows an idea from quantum physics. Instead of only ever stepping to
-                the next-best option, a plan can <b>jump straight to a completely different
-                  arrangement</b> on the other side of the search space — so it escapes the dead
-                end the greedy method is stuck in and keeps finding better plans long after the
-                greedy one has given up.</p>
-              <p>Once it has a good plan, a second pass tidies it: it re-reads its own routes for
-                stops visited in a silly order — a crossing, a doubling back — and straightens
-                them out.</p>
-              <span class="term-note">Technique: quantum-behaved particle swarm optimisation
-                (QPSO), refined by 2-opt / or-opt local search. The convergence curve further down
-                shows this happening iteration by iteration.</span>
-            </div>
-          </div>
-        </div>
+
 
         <!-- Before / After Route Comparison Section -->
         <div class="comparison-section">
@@ -4381,10 +4894,10 @@
                    same coordinates, with the basemap taken away so the graph
                    structure is what you see. -->
               <div class="map-view-toggle" id="mapViewToggle">
-                <button class="map-view-btn" id="mapViewGisBtn" aria-pressed="true"
-                  onclick="setMapView('gis')" title="Road map underneath the network">GIS</button>
-                <button class="map-view-btn" id="mapViewGraphBtn" aria-pressed="false"
-                  onclick="setMapView('graph')" title="Network only, no basemap">GRAPH</button>
+                <button class="map-view-btn" id="mapViewGisBtn" aria-pressed="true" onclick="setMapView('gis')"
+                  title="Road map underneath the network">GIS</button>
+                <button class="map-view-btn" id="mapViewGraphBtn" aria-pressed="false" onclick="setMapView('graph')"
+                  title="Network only, no basemap">GRAPH</button>
               </div>
 
               <!-- Playback transport. Over the map rather than in a side panel:
@@ -4510,8 +5023,8 @@
                      would crowd the page for someone who just wants the result,
                      so it is opt-in. -->
                 <div class="detail-metrics-bar">
-                  <button class="secondary" id="btnDetailMetrics" onclick="toggleDetailMetrics()"
-                    aria-expanded="false" aria-controls="detailMetrics">Show detailed metrics</button>
+                  <button class="secondary" id="btnDetailMetrics" onclick="toggleDetailMetrics()" aria-expanded="false"
+                    aria-controls="detailMetrics">Show detailed metrics</button>
                   <span class="detail-metrics-note" id="detailMetricsNote"></span>
                 </div>
 
@@ -4535,7 +5048,8 @@
                     <div>
                       <h2 style="margin-top:0; font-size: 14px; text-align: center;">At a Glance</h2>
                       <div style="height:260px; position:relative;"><canvas id="radarChart"></canvas></div>
-                      <div class="chart-provenance">Each axis normalised across the algorithms in this run; outer is better.</div>
+                      <div class="chart-provenance">Each axis normalised across the algorithms in this run; outer is
+                        better.</div>
                     </div>
                   </div>
                 </div>
@@ -4567,10 +5081,11 @@
               <!-- One run tells you which algorithm won that run, which is not
                    the same as which is better. More runs is what the spread,
                    box plot and success rate are drawn from. -->
-              <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color: var(--text-muted);">
+              <label
+                style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color: var(--text-muted);">
                 Runs per algorithm
-                <input type="number" id="benchTrials" min="1" max="25" value="1"
-                  style="width:64px;" title="Each run uses a different seed. More runs take proportionally longer.">
+                <input type="number" id="benchTrials" min="1" max="25" value="1" style="width:64px;"
+                  title="Each run uses a different seed. More runs take proportionally longer.">
               </label>
             </section>
 
