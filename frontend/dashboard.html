@@ -8516,18 +8516,22 @@
               wrapper.style.transform = `rotate(${bearing}deg)`;
             }
           }
-          if (sim.clock < veh.endTime) vansOut++;
+          if (sim.clock < veh.endTime && (fleet.key === 'ours' || fleet.key === 'solo')) {
+            vansOut++;
+          }
         }
-        delivered += fleet.delivered;
-        late += fleet.late;
-        delay += fleet.delay;
+        if (fleet.key === 'ours' || fleet.key === 'solo') {
+          delivered += fleet.delivered;
+          late += fleet.late;
+          delay += fleet.delay;
+        }
       }
 
       const clockText = tdClock(TD_PROFILE.dayStartMin + sim.clock);
       document.getElementById('simClock').textContent = clockText;
       document.getElementById('simTransportClock').textContent = clockText;
       document.getElementById('simDelivered').textContent =
-        delivered + ' / ' + (sim.totalStops * sim.fleets.length);
+        delivered + ' / ' + sim.totalStops;
       document.getElementById('simVansOut').textContent = vansOut;
       document.getElementById('simDelay').textContent = delay.toFixed(1) + ' min';
 

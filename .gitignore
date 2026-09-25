@@ -44,3 +44,7 @@ cache/
 
 # 3D Assets
 *.glb
+
+# Local bug reports and temporary markdown
+bug_*.md
+ISSUE_*.md
